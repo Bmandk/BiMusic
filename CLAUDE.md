@@ -56,10 +56,11 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Auth:** JWT with separate access/refresh secrets. Refresh tokens stored as HMAC-SHA256 hashes
 - **Primary keys:** UUID TEXT via `lower(hex(randomblob(16)))` for all BiMusic tables; Lidarr IDs stay INTEGER
 - **Logging:** Pino with structured JSON output to file
+- **Lidarr client:** `src/services/lidarrClient.ts` — typed axios wrapper for all Lidarr API calls. Routes must call lidarrClient methods, never axios directly. Lidarr errors are mapped: 404 → 404 `NOT_FOUND`, 5xx → 502 `LIDARR_ERROR`, timeout → 504 `LIDARR_TIMEOUT`. Cover art methods return `AxiosResponse<Readable>` for pipe-through (no buffering). Lidarr types are in `src/types/lidarr.ts`.
 - **Transcoding:** `fluent-ffmpeg` for audio format conversion; passthrough Range headers for MP3, temp-file transcoding for other formats
 - **Validation:** Zod schemas for env config and request validation
 
-**Request flow:** `index.ts` → boots migrations + admin user → `app.ts` mounts routes → route handlers call services → services use Drizzle ORM
+**Request flow:** `index.ts` → boots migrations + admin user → `app.ts` mounts routes → route handlers call services → `lidarrClient` (Lidarr API) or Drizzle ORM (SQLite)
 
 **Route prefixes:** `/api/health`, `/api/auth`, `/api/library`, `/api/stream`, `/api/offline`, `/api/admin`, `/api/users`
 
@@ -76,7 +77,7 @@ Currently in early scaffold stage (basic Material app).
 ### Testing
 
 **Backend tests use Vitest** with two workspace projects:
-- **Unit tests:** `src/**/__tests__/**/*.test.ts` — colocated with source
+- **Unit tests:** `src/**/__tests__/**/*.test.ts` — colocated with source. Mock env with `vi.mock('../../config/env.js', ...)`. Use `nock` to stub outbound HTTP (lidarrClient tests); use `vi.mock` for DB/logger.
 - **Integration tests:** `tests/integration/**/*.test.ts` — use setup file, run in forked processes, 15s timeout
 
 **Flutter tests:** `test/*_test.dart`

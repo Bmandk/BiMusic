@@ -175,6 +175,10 @@ Auth integration tests pass. Admin user is created on first startup. Curl can lo
 
 ## Phase 3 — Lidarr Client
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/types/lidarr.ts`, `backend/src/services/lidarrClient.ts`, `backend/src/services/__tests__/lidarrClient.test.ts`. Installed: `nock`, `@types/nock`.
+> All 50 tests pass (21 new lidarrClient unit tests + 29 existing).
+
 **Goal:** Typed HTTP client for all Lidarr endpoints the backend needs. No routes yet — this is the foundation for library, stream, search, and requests.
 
 ### Tasks
