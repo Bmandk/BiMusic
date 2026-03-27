@@ -95,6 +95,10 @@ BiMusic/
 
 ## Phase 2 — Database + Auth
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/db/schema.ts`, `backend/src/db/connection.ts`, `backend/src/db/migrate.ts`, `backend/src/db/migrations/0000_initial.sql`, `backend/src/db/migrations/meta/_journal.json`, `backend/src/services/authService.ts`, `backend/src/services/userService.ts`, `backend/src/middleware/auth.ts`, `backend/src/routes/users.ts`, `backend/src/types/express.d.ts`, `backend/src/services/__tests__/authService.test.ts`, `backend/tests/setup.ts`, `backend/tests/integration/auth.test.ts`. Updated: `backend/src/routes/auth.ts`, `backend/src/app.ts`, `backend/src/index.ts`.
+> All 29 tests pass (10 unit, 10 integration auth, 9 existing env tests).
+
 **Goal:** Full JWT authentication works end-to-end. Admin user bootstrapped on first start.
 
 ### Tasks

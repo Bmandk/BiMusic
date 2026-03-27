@@ -2,11 +2,8 @@ import './config/env.js'; // validate env before anything else
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { createApp } from './app.js';
-
-function runMigrations(): void {
-  // Placeholder — Phase 2 will implement DB migrations via Drizzle
-  logger.debug('Migrations: skipped (Phase 2)');
-}
+import { runMigrations } from './db/migrate.js';
+import { bootstrapAdminIfNeeded } from './services/userService.js';
 
 function startServer(): Promise<void> {
   return new Promise((resolve) => {
@@ -32,6 +29,7 @@ function startServer(): Promise<void> {
 
 async function main() {
   runMigrations();
+  await bootstrapAdminIfNeeded();
   await startServer();
 }
 

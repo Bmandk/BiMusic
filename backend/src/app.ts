@@ -8,6 +8,7 @@ import libraryRouter from './routes/library.js';
 import streamRouter from './routes/stream.js';
 import offlineRouter from './routes/offline.js';
 import adminRouter from './routes/admin.js';
+import usersRouter from './routes/users.js';
 
 export function createApp() {
   const app = express();
@@ -45,6 +46,7 @@ export function createApp() {
   app.use('/api/stream', streamRouter);
   app.use('/api/offline', offlineRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/users', usersRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
