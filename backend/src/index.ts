@@ -1,0 +1,41 @@
+import './config/env.js'; // validate env before anything else
+import { env } from './config/env.js';
+import { logger } from './utils/logger.js';
+import { createApp } from './app.js';
+
+function runMigrations(): void {
+  // Placeholder — Phase 2 will implement DB migrations via Drizzle
+  logger.debug('Migrations: skipped (Phase 2)');
+}
+
+function startServer(): Promise<void> {
+  return new Promise((resolve) => {
+    const app = createApp();
+
+    const server = app.listen(env.PORT, () => {
+      logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Server started');
+      resolve();
+    });
+
+    function shutdown(signal: string) {
+      logger.info({ signal }, 'Shutting down gracefully');
+      server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+      });
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  });
+}
+
+async function main() {
+  runMigrations();
+  await startServer();
+}
+
+main().catch((err) => {
+  logger.error({ err }, 'Fatal startup error');
+  process.exit(1);
+});

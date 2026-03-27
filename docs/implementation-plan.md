@@ -53,6 +53,10 @@ BiMusic/
 
 ## Phase 1 — Backend Scaffold
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/config/env.ts`, `backend/src/utils/logger.ts`, `backend/src/app.ts`, `backend/src/index.ts`, `backend/src/middleware/errorHandler.ts`, `backend/src/routes/{health,auth,library,stream,offline,admin}.ts`, `backend/src/config/__tests__/env.test.ts`, `backend/vitest.workspace.ts`. Updated: `backend/package.json`, `backend/vitest.config.ts`, `backend/.env.example`.
+> References: `docs/backend-plan.md §9–10`, `docs/architecture-plan.md §6.9`.
+
 **Goal:** Express app boots, reads and validates environment, logs to file, handles unknown routes and errors gracefully.
 
 ### Tasks

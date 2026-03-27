@@ -14,11 +14,33 @@
     "test:integration": "vitest run --project integration",
     "test": "vitest run"
   },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "bcrypt": "^5.1.0",
+    "better-sqlite3": "^9.4.0",
+    "drizzle-orm": "^0.30.0",
+    "express": "^5.0.0",
+    "fluent-ffmpeg": "^2.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "pino": "^9.0.0",
+    "zod": "^3.22.0"
+  },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/express": "^5.0.6",
+    "@types/fluent-ffmpeg": "^2.1.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "@types/supertest": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "drizzle-kit": "^0.20.0",
     "eslint": "^8.57.0",
+    "pino-pretty": "^11.0.0",
     "prettier": "^3.2.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.4.0",
     "vitest": "^1.4.0"
   }
