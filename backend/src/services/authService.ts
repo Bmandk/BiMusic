@@ -60,7 +60,7 @@ export async function login(username: string, password: string): Promise<TokenPa
   return { accessToken, refreshToken: rawRefresh };
 }
 
-export async function refresh(rawToken: string): Promise<TokenPair> {
+export function refresh(rawToken: string): TokenPair {
   const tokenHash = hashRefreshToken(rawToken);
   const now = new Date().toISOString();
   const row = db

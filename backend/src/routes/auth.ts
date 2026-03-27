@@ -33,14 +33,14 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
   const parsed = refreshSchema.safeParse(req.body);
   if (!parsed.success) {
     next(createError(400, 'VALIDATION_ERROR', 'refreshToken is required'));
     return;
   }
   try {
-    const tokens = await authService.refresh(parsed.data.refreshToken);
+    const tokens = authService.refresh(parsed.data.refreshToken);
     res.json(tokens);
   } catch (err) {
     next(err);

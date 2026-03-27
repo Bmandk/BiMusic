@@ -120,19 +120,21 @@ describe('refresh', () => {
   it('rotates tokens correctly — returns new pair, old token is invalidated', async () => {
     await seedUser('alice', 'correctpassword');
     const { refreshToken: original } = await login('alice', 'correctpassword');
-    const newTokens = await refresh(original);
+    const newTokens = refresh(original);
     expect(newTokens.accessToken).toBeDefined();
     expect(newTokens.refreshToken).toBeDefined();
     expect(newTokens.refreshToken).not.toBe(original);
     // original token should no longer work
-    await expect(refresh(original)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(() => refresh(original)).toThrowError();
   });
 
   it('throws UNAUTHORIZED for an already-used token (rotation prevents reuse)', async () => {
     await seedUser('alice', 'correctpassword');
     const { refreshToken } = await login('alice', 'correctpassword');
-    await refresh(refreshToken); // use once
-    await expect(refresh(refreshToken)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    refresh(refreshToken); // use once
+    let err1: unknown;
+    try { refresh(refreshToken); } catch (e) { err1 = e; }
+    expect(err1).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   it('throws UNAUTHORIZED for an expired token', async () => {
@@ -146,11 +148,15 @@ describe('refresh', () => {
       token_hash: tokenHash,
       expiresAt: new Date(Date.now() - 1000).toISOString(),
     }).run();
-    await expect(refresh(rawToken)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    let err2: unknown;
+    try { refresh(rawToken); } catch (e) { err2 = e; }
+    expect(err2).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
-  it('throws UNAUTHORIZED for a completely unknown token', async () => {
-    await expect(refresh('totally-unknown-token')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  it('throws UNAUTHORIZED for a completely unknown token', () => {
+    let err3: unknown;
+    try { refresh('totally-unknown-token'); } catch (e) { err3 = e; }
+    expect(err3).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 });
 
@@ -167,6 +173,8 @@ describe('logout', () => {
     await seedUser('alice', 'correctpassword');
     const { refreshToken } = await login('alice', 'correctpassword');
     logout(refreshToken);
-    await expect(refresh(refreshToken)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    let err4: unknown;
+    try { refresh(refreshToken); } catch (e) { err4 = e; }
+    expect(err4).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 });
