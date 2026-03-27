@@ -1,0 +1,25 @@
+{
+  "name": "bimusic-backend",
+  "version": "0.1.0",
+  "description": "BiMusic REST API backend",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "dev": "tsx watch src/index.ts",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}

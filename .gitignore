@@ -1,0 +1,17 @@
+# Backend
+backend/dist/
+backend/node_modules/
+backend/coverage/
+
+# Flutter
+bimusic_app/.dart_tool/
+bimusic_app/build/
+bimusic_app/.flutter-plugins
+bimusic_app/.flutter-plugins-dependencies
+
+# Environment files
+**/.env
+
+# OS
+.DS_Store
+Thumbs.db

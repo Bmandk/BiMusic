@@ -28,6 +28,10 @@ BiMusic/
 
 ## Phase 0 — Repository & CI Skeleton
 
+> **Status: COMPLETED** — 2026-03-27
+> Files created: `backend/package.json`, `backend/tsconfig.json`, `backend/.eslintrc.json`, `backend/.env.example`, `backend/vitest.config.ts`, `backend/src/` tree, `backend/tests/` tree; `bimusic_app/pubspec.yaml`, `bimusic_app/lib/main.dart`, `bimusic_app/analysis_options.yaml`; `.github/workflows/ci.yml`; `.gitignore`.
+> References: `docs/backend-plan.md §2–3`, `docs/qa-plan.md §5.1`, `docs/flutter-plan.md §1–2`.
+
 **Goal:** Repo is structured, linters pass, and CI runs on every push before any feature code exists.
 
 ### Tasks
