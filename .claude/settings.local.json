@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''\\\\n''''.join\\(sorted\\(d[''''paths''''].keys\\(\\)\\)\\)\\)\")",
+      "Bash(node -e \"const d=require\\(''''./lidarr-openapi.json''''\\); console.log\\(Object.keys\\(d.paths\\).sort\\(\\).join\\(''''\\\\n''''\\)\\)\")",
+      "Bash(python3 -c \":*)",
+      "Bash(node -e \":*)",
+      "Bash(python:*)",
+      "Bash(python3:*)"
+    ]
+  }
+}
