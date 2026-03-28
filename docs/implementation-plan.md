@@ -452,6 +452,10 @@ Login screen works against real backend. Refresh token persists across app resta
 
 ## Phase 12 — Flutter Library
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `lib/models/artist.dart`, `lib/models/album.dart`, `lib/models/track.dart`, `lib/models/search_results.dart` (all freezed + json_serializable); `lib/services/music_service.dart`; `lib/providers/library_provider.dart`; `lib/ui/widgets/artist_card.dart`, `lib/ui/widgets/album_card.dart`, `lib/ui/widgets/track_tile.dart`; `lib/ui/screens/library_screen.dart`, `lib/ui/screens/artist_detail_screen.dart`, `lib/ui/screens/album_detail_screen.dart` (replaced stubs); `test/ui/album_detail_screen_test.dart`, `test/ui/track_tile_test.dart`.
+> References: `docs/flutter-plan.md`, `docs/ux-plan.md`.
+
 **Goal:** Browse artists, albums, and tracks. Album art loads and caches.
 
 ### Tasks
