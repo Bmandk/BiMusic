@@ -24,11 +24,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid artist ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid artist ID" },
+        });
         return;
       }
       const albums = await libraryService.getArtistAlbums(id);
@@ -45,11 +43,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid artist ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid artist ID" },
+        });
         return;
       }
       const imageRes = await libraryService.getArtistImageStream(id);
@@ -69,11 +65,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid artist ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid artist ID" },
+        });
         return;
       }
       const artist = await libraryService.getArtist(id);
@@ -90,11 +84,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid album ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid album ID" },
+        });
         return;
       }
       const tracks = await libraryService.getAlbumTracks(id);
@@ -111,11 +103,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid album ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid album ID" },
+        });
         return;
       }
       const imageRes = await libraryService.getAlbumImageStream(id);
@@ -135,11 +125,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid album ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid album ID" },
+        });
         return;
       }
       const album = await libraryService.getAlbum(id);
@@ -156,11 +144,9 @@ router.get(
     try {
       const id = parseInt(req.params["id"] as string, 10);
       if (isNaN(id)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid track ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid track ID" },
+        });
         return;
       }
       const track = await libraryService.getTrack(id);

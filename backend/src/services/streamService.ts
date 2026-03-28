@@ -264,11 +264,9 @@ export function serveFile(filePath: string, req: Request, res: Response): void {
   if (rangeHeader) {
     const [unit, range] = rangeHeader.split("=");
     if (unit !== "bytes" || !range) {
-      res
-        .status(400)
-        .json({
-          error: { code: "BAD_REQUEST", message: "Invalid Range header" },
-        });
+      res.status(400).json({
+        error: { code: "BAD_REQUEST", message: "Invalid Range header" },
+      });
       return;
     }
 

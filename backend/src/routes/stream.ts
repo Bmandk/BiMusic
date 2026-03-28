@@ -18,11 +18,9 @@ router.get(
     try {
       const trackId = parseInt(req.params["trackId"] as string, 10);
       if (isNaN(trackId)) {
-        res
-          .status(400)
-          .json({
-            error: { code: "BAD_REQUEST", message: "Invalid track ID" },
-          });
+        res.status(400).json({
+          error: { code: "BAD_REQUEST", message: "Invalid track ID" },
+        });
         return;
       }
 

@@ -10,14 +10,12 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const term = req.query["term"];
     if (typeof term !== "string" || !term.trim()) {
-      res
-        .status(400)
-        .json({
-          error: {
-            code: "BAD_REQUEST",
-            message: "Missing or empty search term",
-          },
-        });
+      res.status(400).json({
+        error: {
+          code: "BAD_REQUEST",
+          message: "Missing or empty search term",
+        },
+      });
       return;
     }
     const results = await libraryService.search(term);

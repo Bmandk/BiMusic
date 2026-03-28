@@ -43,15 +43,6 @@ class _FakeDio extends Fake implements Dio {
   }
 }
 
-DioException _make409(String path) => DioException(
-      requestOptions: RequestOptions(path: path),
-      response: Response<dynamic>(
-        statusCode: 409,
-        requestOptions: RequestOptions(path: path),
-      ),
-      type: DioExceptionType.badResponse,
-    );
-
 DioException _make500(String path) => DioException(
       requestOptions: RequestOptions(path: path),
       response: Response<dynamic>(
