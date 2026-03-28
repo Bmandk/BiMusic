@@ -10,7 +10,7 @@ import {
 import { access, constants } from 'fs/promises';
 import path from 'path';
 import { Request, Response } from 'express';
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg, { FfmpegCommand } from 'fluent-ffmpeg';
 import { env } from '../config/env.js';
 import { getTrack, getTrackFile, getRootFolders } from './lidarrClient.js';
 import { createError } from '../middleware/errorHandler.js';
@@ -65,6 +65,27 @@ function remapPath(lidarrFilePath: string, lidarrRoot: string): string {
 
 // Tracks in-progress transcodes so concurrent requests wait on the same promise.
 const inProgressTranscodes = new Map<string, Promise<void>>();
+
+// Tracks all active ffmpeg command objects for graceful shutdown.
+const activeTranscodeCommands = new Set<FfmpegCommand>();
+
+/** Register an active ffmpeg command (called by streamService and downloadService). */
+export function registerFfmpegCommand(cmd: FfmpegCommand): void {
+  activeTranscodeCommands.add(cmd);
+}
+
+/** Unregister a completed/failed ffmpeg command. */
+export function unregisterFfmpegCommand(cmd: FfmpegCommand): void {
+  activeTranscodeCommands.delete(cmd);
+}
+
+/** Kill all active ffmpeg processes — call during graceful shutdown. */
+export function killAllActiveTranscodes(): void {
+  for (const cmd of activeTranscodeCommands) {
+    try { cmd.kill('SIGTERM'); } catch { /* ignore */ }
+  }
+  activeTranscodeCommands.clear();
+}
 
 /** Create temp dir and clear any leftover files from a previous run. */
 export function initTempDir(): void {
@@ -169,21 +190,25 @@ export async function ensureTranscoded(sourcePath: string, bitrate: number): Pro
   }
 
   const transcodePromise = new Promise<void>((resolve, reject) => {
-    ffmpeg(sourcePath)
+    const cmd = ffmpeg(sourcePath)
       .noVideo()
       .audioCodec('libmp3lame')
       .audioBitrate(bitrate)
       .output(tempPath)
       .on('end', () => {
+        unregisterFfmpegCommand(cmd);
         inProgressTranscodes.delete(tempPath);
         resolve();
       })
       .on('error', (err: Error) => {
+        unregisterFfmpegCommand(cmd);
         inProgressTranscodes.delete(tempPath);
         try { unlinkSync(tempPath); } catch { /* ignore partial file */ }
         reject(err);
-      })
-      .run();
+      });
+
+    registerFfmpegCommand(cmd);
+    cmd.run();
   });
 
   inProgressTranscodes.set(tempPath, transcodePromise);

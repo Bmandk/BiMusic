@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
+import { env } from '../config/env.js';
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -32,10 +33,17 @@ export function errorHandler(
 ): void {
   const statusCode = err.statusCode ?? 500;
   const code = err.code ?? 'INTERNAL_ERROR';
-  const message = statusCode === 500 ? 'Internal server error' : err.message;
+
+  // In production, never expose internal details for 5xx errors
+  const message =
+    statusCode >= 500 && env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message;
 
   if (statusCode >= 500) {
     logger.error({ err, requestId: res.locals['requestId'] }, 'Unhandled error');
+  } else if (statusCode >= 400) {
+    logger.warn({ code, message, requestId: res.locals['requestId'] }, 'Client error');
   }
 
   res.status(statusCode).json({

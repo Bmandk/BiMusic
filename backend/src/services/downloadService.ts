@@ -6,7 +6,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import { db } from '../db/connection.js';
 import { offlineTracks } from '../db/schema.js';
 import { createError } from '../middleware/errorHandler.js';
-import { resolveFilePath } from './streamService.js';
+import { resolveFilePath, registerFfmpegCommand, unregisterFfmpegCommand } from './streamService.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
@@ -129,17 +129,23 @@ export function markDownloadComplete(id: string): void {
 
 function transcodeToFile(sourcePath: string, bitrate: number, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    ffmpeg(sourcePath)
+    const cmd = ffmpeg(sourcePath)
       .noVideo()
       .audioCodec('libmp3lame')
       .audioBitrate(bitrate)
       .output(outputPath)
-      .on('end', () => resolve())
+      .on('end', () => {
+        unregisterFfmpegCommand(cmd);
+        resolve();
+      })
       .on('error', (err: Error) => {
+        unregisterFfmpegCommand(cmd);
         try { unlinkSync(outputPath); } catch { /* ignore partial file */ }
         reject(err);
-      })
-      .run();
+      });
+
+    registerFfmpegCommand(cmd);
+    cmd.run();
   });
 }
 

@@ -4,8 +4,17 @@ import { logger } from './utils/logger.js';
 import { createApp } from './app.js';
 import { runMigrations } from './db/migrate.js';
 import { bootstrapAdminIfNeeded } from './services/userService.js';
-import { initTempDir, startTempFileCleanup } from './services/streamService.js';
+import { initTempDir, startTempFileCleanup, killAllActiveTranscodes } from './services/streamService.js';
 import { startDownloadWorker } from './services/downloadService.js';
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ reason }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception');
+  process.exit(1);
+});
 
 function startServer(): Promise<void> {
   return new Promise((resolve) => {
@@ -18,9 +27,20 @@ function startServer(): Promise<void> {
 
     function shutdown(signal: string) {
       logger.info({ signal }, 'Shutting down gracefully');
+
+      // Force exit after 5 s if in-flight requests don't drain
+      const forceKillTimer = setTimeout(() => {
+        logger.warn('Graceful shutdown timed out, forcing exit');
+        killAllActiveTranscodes();
+        process.exit(1);
+      }, 5000);
+      forceKillTimer.unref();
+
+      // Stop accepting new connections; wait for in-flight requests to finish
       server.close(() => {
         logger.info('HTTP server closed');
-        process.exit(0);
+        killAllActiveTranscodes();
+        logger.flush(() => process.exit(0));
       });
     }
 

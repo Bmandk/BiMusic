@@ -377,6 +377,10 @@ All search and request integration tests pass.
 
 ## Phase 9 — Health, Admin Bootstrap, and Polish
 
+> **Status: COMPLETED** — 2026-03-28
+> Files changed: `backend/src/routes/health.ts` (version from package.json), `backend/src/middleware/errorHandler.ts` (4xx warn logging, production 5xx sanitization), `backend/src/services/streamService.ts` (ffmpeg command tracking, `killAllActiveTranscodes`), `backend/src/services/downloadService.ts` (register ffmpeg commands), `backend/src/index.ts` (5s graceful shutdown, unhandledRejection/uncaughtException handlers), `backend/vitest.config.ts` (coverage config, 80% threshold), `backend/package.json` (`@vitest/coverage-v8`, `test:coverage` script). Tests created: `backend/tests/integration/health.test.ts`.
+> All 117 tests pass. Line coverage: 86.37% (≥ 80% gate passes).
+
 **Goal:** Backend is feature-complete and production-ready.
 
 ### Tasks
