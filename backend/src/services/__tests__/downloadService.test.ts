@@ -267,7 +267,7 @@ describe("markDownloadComplete", () => {
     const before = listDownloads(TEST_USER, TEST_DEVICE);
     expect(before[0]?.status).toBe("pending");
 
-    markDownloadComplete(before[0]!.id);
+    markDownloadComplete(before[0].id);
 
     const after = listDownloads(TEST_USER, TEST_DEVICE);
     expect(after[0]?.status).toBe("complete");

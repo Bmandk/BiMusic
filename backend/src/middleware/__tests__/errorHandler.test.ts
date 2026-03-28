@@ -93,7 +93,7 @@ describe("notFoundHandler", () => {
     notFoundHandler(req, makeRes() as never, next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    const err = next.mock.calls[0]?.[0] as AppError;
+    const err = (next.mock.calls[0] as [AppError])[0];
     expect(err.statusCode).toBe(404);
     expect(err.code).toBe("NOT_FOUND");
     expect(err.message).toContain("GET");
@@ -106,7 +106,7 @@ describe("notFoundHandler", () => {
 
     notFoundHandler(req, makeRes() as never, next);
 
-    const err = next.mock.calls[0]?.[0] as AppError;
+    const err = (next.mock.calls[0] as [AppError])[0];
     expect(err.message).toContain("POST");
     expect(err.message).toContain("/api/unknown");
   });
@@ -173,18 +173,15 @@ describe("errorHandler", () => {
 
     errorHandler(err, makeReq(), res as never, makeNext());
 
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: expect.objectContaining({ code: "INTERNAL_ERROR" }),
-      }),
-    );
+    const call = (res.json.mock.calls[0] as [{ error: { code: string } }])[0];
+    expect(call.error.code).toBe("INTERNAL_ERROR");
   });
 
   it("returns generic message for 5xx in production environment", async () => {
     // Temporarily override the env mock for this test
-    const { env } = await import("../../config/env.js");
-    const originalEnv = env.NODE_ENV;
-    (env as Record<string, unknown>)["NODE_ENV"] = "production";
+    const envModule = (await import("../../config/env.js")) as { env: Record<string, string> };
+    const originalEnv = envModule.env["NODE_ENV"];
+    envModule.env["NODE_ENV"] = "production";
 
     const err = createError(500, "INTERNAL_ERROR", "Sensitive internal details");
     const res = makeRes();
@@ -196,7 +193,7 @@ describe("errorHandler", () => {
     });
 
     // Restore
-    (env as Record<string, unknown>)["NODE_ENV"] = originalEnv;
+    envModule.env["NODE_ENV"] = originalEnv ?? "test";
   });
 
   it("sends real message for 5xx in non-production environment", () => {

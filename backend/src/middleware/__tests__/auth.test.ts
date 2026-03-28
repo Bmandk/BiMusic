@@ -24,6 +24,7 @@ vi.mock("../../config/env.js", () => ({
 
 import { authenticate, requireAdmin } from "../auth.js";
 import type { AuthUser } from "../auth.js";
+import type { AppError } from "../errorHandler.js";
 
 const ACCESS_SECRET = "test-access-secret-at-least-32-chars-long";
 
@@ -31,18 +32,22 @@ function makeValidToken(payload: AuthUser): string {
   return jwt.sign(payload, ACCESS_SECRET, { algorithm: "HS256", expiresIn: "15m" });
 }
 
+interface MockRequest {
+  headers: { authorization?: string };
+  query: Record<string, string | string[]>;
+  user?: AuthUser;
+}
+
 function makeReq(options: {
   authHeader?: string;
   queryToken?: string;
   user?: AuthUser;
-}) {
+}): MockRequest {
   return {
-    headers: {
-      authorization: options.authHeader,
-    },
+    headers: { authorization: options.authHeader },
     query: options.queryToken ? { token: options.queryToken } : {},
     user: options.user,
-  } as never;
+  };
 }
 
 function makeRes() {
@@ -53,6 +58,10 @@ function makeNext() {
   return vi.fn();
 }
 
+function getNextError(next: ReturnType<typeof makeNext>): AppError {
+  return (next.mock.calls[0] as [AppError])[0];
+}
+
 describe("authenticate", () => {
   it("sets req.user and calls next() for a valid Bearer token", () => {
     const payload: AuthUser = { userId: "u1", username: "alice", isAdmin: false };
@@ -60,7 +69,7 @@ describe("authenticate", () => {
     const req = makeReq({ authHeader: `Bearer ${token}` });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledWith(); // no error
@@ -75,7 +84,7 @@ describe("authenticate", () => {
     const req = makeReq({ queryToken: token });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledWith(); // no error
@@ -91,7 +100,7 @@ describe("authenticate", () => {
     const req = makeReq({ authHeader: `Bearer ${headerToken}`, queryToken });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
     expect(req.user?.username).toBe("header");
   });
@@ -100,10 +109,10 @@ describe("authenticate", () => {
     const req = makeReq({});
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err).toBeDefined();
     expect(err.statusCode).toBe(401);
     expect(err.code).toBe("UNAUTHORIZED");
@@ -113,10 +122,10 @@ describe("authenticate", () => {
     const req = makeReq({ authHeader: "Bearer invalid.token.here" });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err.statusCode).toBe(401);
     expect(err.code).toBe("UNAUTHORIZED");
   });
@@ -130,9 +139,9 @@ describe("authenticate", () => {
     const req = makeReq({ authHeader: `Bearer ${expiredToken}` });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err.statusCode).toBe(401);
     expect(err.code).toBe("UNAUTHORIZED");
   });
@@ -141,23 +150,23 @@ describe("authenticate", () => {
     const req = makeReq({ authHeader: "Basic somebase64value" });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err.statusCode).toBe(401);
   });
 
   it("ignores non-string query token values", () => {
-    const req = {
+    const req: MockRequest = {
       headers: {},
       query: { token: ["token1", "token2"] }, // array, not string
       user: undefined,
-    } as never;
+    };
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err.statusCode).toBe(401);
   });
 
@@ -167,7 +176,7 @@ describe("authenticate", () => {
     const req = makeReq({ authHeader: `Bearer ${token}` });
     const next = makeNext();
 
-    authenticate(req, makeRes(), next);
+    authenticate(req as never, makeRes(), next);
 
     expect(req.user?.isAdmin).toBe(true);
   });
@@ -180,7 +189,7 @@ describe("requireAdmin", () => {
     });
     const next = makeNext();
 
-    requireAdmin(req, makeRes(), next);
+    requireAdmin(req as never, makeRes(), next);
 
     expect(next).toHaveBeenCalledWith(); // no error
   });
@@ -191,9 +200,9 @@ describe("requireAdmin", () => {
     });
     const next = makeNext();
 
-    requireAdmin(req, makeRes(), next);
+    requireAdmin(req as never, makeRes(), next);
 
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err.statusCode).toBe(403);
     expect(err.code).toBe("FORBIDDEN");
   });
@@ -202,9 +211,9 @@ describe("requireAdmin", () => {
     const req = makeReq({});
     const next = makeNext();
 
-    requireAdmin(req, makeRes(), next);
+    requireAdmin(req as never, makeRes(), next);
 
-    const err = next.mock.calls[0]?.[0];
+    const err = getNextError(next);
     expect(err.statusCode).toBe(403);
     expect(err.code).toBe("FORBIDDEN");
   });
