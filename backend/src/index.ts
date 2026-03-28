@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { runMigrations } from './db/migrate.js';
 import { bootstrapAdminIfNeeded } from './services/userService.js';
 import { initTempDir, startTempFileCleanup } from './services/streamService.js';
+import { startDownloadWorker } from './services/downloadService.js';
 
 function startServer(): Promise<void> {
   return new Promise((resolve) => {
@@ -33,6 +34,7 @@ async function main() {
   await bootstrapAdminIfNeeded();
   initTempDir();
   startTempFileCleanup();
+  startDownloadWorker();
   await startServer();
 }
 

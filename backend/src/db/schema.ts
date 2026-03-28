@@ -49,6 +49,7 @@ export const offlineTracks = sqliteTable(
     userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
     lidarrTrackId: integer('lidarrTrackId').notNull(),
     deviceId: text('deviceId').notNull(),
+    bitrate: integer('bitrate').notNull().default(320),
     filePath: text('filePath'),
     fileSize: integer('fileSize'),
     status: text('status').notNull().default('pending'),

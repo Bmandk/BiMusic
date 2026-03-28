@@ -317,6 +317,10 @@ Playlist integration test suite passes.
 
 ## Phase 7 — Offline Downloads
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/services/downloadService.ts`, `backend/tests/integration/downloads.test.ts`. Updated: `backend/src/routes/downloads.ts`, `backend/src/db/schema.ts` (added `bitrate` column), `backend/src/db/migrations/0001_add_offline_tracks_bitrate.sql`, `backend/src/db/migrations/meta/_journal.json`, `backend/src/index.ts`, `backend/src/routes/playlists.ts` (fixed pre-existing TS type errors), `backend/src/services/streamService.ts` (fixed pre-existing lint error).
+> All 105 tests pass (14 new download integration tests + 91 existing).
+
 **Goal:** Backend records download requests, serves transcoded files for offline storage, tracks status.
 
 ### Tasks

@@ -36,7 +36,7 @@ async function getLidarrRootPath(): Promise<string> {
       throw createError(500, 'INTERNAL_ERROR', 'No root folders configured in Lidarr');
     }
     // Normalise: strip trailing slashes for reliable prefix matching.
-    lidarrRootPath = roots[0]!.path.replace(/[\\/]+$/, '');
+    lidarrRootPath = roots[0].path.replace(/[\\/]+$/, '');
     logger.info({ lidarrRootPath, musicLibraryPath: env.MUSIC_LIBRARY_PATH }, 'Cached Lidarr root folder for path remapping');
     return lidarrRootPath;
   })();

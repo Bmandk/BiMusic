@@ -1,0 +1,1 @@
+ALTER TABLE `offline_tracks` ADD COLUMN `bitrate` integer DEFAULT 320 NOT NULL;

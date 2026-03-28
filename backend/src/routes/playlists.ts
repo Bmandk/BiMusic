@@ -45,7 +45,7 @@ router.post('/', (req: Request, res: Response, next: NextFunction) => {
 
 router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
-    const playlist = playlistService.getPlaylist(req.params['id']!, req.user!.userId);
+    const playlist = playlistService.getPlaylist(req.params['id'] as string, req.user!.userId);
     res.json(playlist);
   } catch (err) {
     next(err);
@@ -59,7 +59,7 @@ router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
     return;
   }
   try {
-    const playlist = playlistService.updatePlaylist(req.params['id']!, req.user!.userId, parsed.data.name);
+    const playlist = playlistService.updatePlaylist(req.params['id'] as string, req.user!.userId, parsed.data.name);
     res.json(playlist);
   } catch (err) {
     next(err);
@@ -68,7 +68,7 @@ router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
 
 router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
-    playlistService.deletePlaylist(req.params['id']!, req.user!.userId);
+    playlistService.deletePlaylist(req.params['id'] as string, req.user!.userId);
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -83,7 +83,7 @@ router.post('/:id/tracks', (req: Request, res: Response, next: NextFunction) => 
   }
   try {
     const added = playlistService.addTracks(
-      req.params['id']!,
+      req.params['id'] as string,
       req.user!.userId,
       parsed.data.trackIds,
       parsed.data.position,
@@ -95,13 +95,13 @@ router.post('/:id/tracks', (req: Request, res: Response, next: NextFunction) => 
 });
 
 router.delete('/:id/tracks/:trackId', (req: Request, res: Response, next: NextFunction) => {
-  const lidarrTrackId = parseInt(req.params['trackId']!, 10);
+  const lidarrTrackId = parseInt(req.params['trackId'] as string, 10);
   if (isNaN(lidarrTrackId)) {
     next(createError(400, 'VALIDATION_ERROR', 'trackId must be a number'));
     return;
   }
   try {
-    playlistService.removeTrack(req.params['id']!, req.user!.userId, lidarrTrackId);
+    playlistService.removeTrack(req.params['id'] as string, req.user!.userId, lidarrTrackId);
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -115,7 +115,7 @@ router.put('/:id/tracks/reorder', (req: Request, res: Response, next: NextFuncti
     return;
   }
   try {
-    playlistService.reorderTracks(req.params['id']!, req.user!.userId, parsed.data.trackIds);
+    playlistService.reorderTracks(req.params['id'] as string, req.user!.userId, parsed.data.trackIds);
     res.status(200).send();
   } catch (err) {
     next(err);
