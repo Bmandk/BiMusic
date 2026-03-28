@@ -66,13 +66,21 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 ### Flutter Client
 
-- **State management:** Riverpod
-- **Audio:** just_audio + audio_service
-- **Routing:** go_router
-- **Offline storage:** Isar local DB
-- **Background downloads:** flutter_background_service
+- **State management:** Riverpod (flutter_riverpod ^2.6, riverpod_annotation ^2.6, riverpod_generator ^2.6)
+- **Audio:** just_audio ^0.9 + audio_service ^0.18 + audio_session ^0.1
+- **Routing:** go_router ^14.6 — `StatefulShellRoute.indexedStack` with 6 branches; shell builder delegates to `AdaptiveScaffold`
+- **Offline storage:** Isar 3.1.0 (pinned — 4.x not yet on pub.dev)
+- **Background downloads:** flutter_background_service ^5.0
+- **HTTP:** Dio ^5.7 with auth interceptor (future phase)
+- **Code gen:** freezed ^2.5 + json_serializable ^6.8 + riverpod_generator. Run `dart run build_runner build --delete-conflicting-outputs` after model changes.
+- **Theme:** Material 3, `ColorScheme.fromSeed(seedColor: Colors.deepPurple)`, light + dark, `ThemeMode.system`
+- **API config:** `lib/config/api_config.dart` — base URL via `--dart-define=API_BASE_URL=...` (default `http://localhost:3000`)
 
-Currently in early scaffold stage (basic Material app).
+**Layout:** `AdaptiveScaffold` (`lib/ui/widgets/adaptive_scaffold.dart`) switches at 1024 px:
+- `< 1024` → `MobileLayout` — 5-tab `NavigationBar` (Home/Library/Search/Playlists/Settings); Downloads tab omitted on mobile
+- `≥ 1024` → `DesktopLayout` — 220 px fixed sidebar with all 6 nav items + 80 px bottom player bar
+
+**Entry point:** `main.dart` wraps `ProviderScope(child: BiMusicApp())`. `BiMusicApp` lives in `lib/app.dart`.
 
 ### Testing
 
