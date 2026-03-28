@@ -60,12 +60,14 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Library service:** `src/services/libraryService.ts` — reshapes raw Lidarr responses into Flutter-facing types (`Artist`, `Album`, `Track` defined in `src/types/api.ts`), injects `imageUrl` (`/api/library/{artists|albums}/:id/image`) and `streamUrl` (`/api/stream/:id`) using `env.API_BASE_URL`. Image proxy methods fetch the Lidarr artist/album to determine the cover filename before streaming.
 - **Stream service:** `src/services/streamService.ts` — resolves Lidarr track → trackfile path, decides passthrough vs transcode, deduplicates concurrent transcodes via a `Map<tempPath, Promise<void>>`, serves files with full HTTP Range / 206 support. MP3 sources are always passed through without re-encoding. Non-MP3 sources are transcoded with `fluent-ffmpeg` to `TEMP_DIR/<sha256(path:bitrate)>.mp3`. `initTempDir()` clears the temp dir on startup; `startTempFileCleanup()` removes files older than 24 h on an hourly interval.
 - **Path remapping:** Lidarr may return absolute file paths under its own root folder (e.g. `/music/...` inside Docker). `resolveFilePath()` fetches Lidarr's root folder via `/api/v1/rootfolder` (cached), strips it from the track file path, and prepends `MUSIC_LIBRARY_PATH` from env. This lets the backend find files even when Lidarr and BiMusic see different mount points.
+- **Playlist service:** `src/services/playlistService.ts` — CRUD for `playlists` + `playlist_tracks` tables. Ownership is always verified before mutations (returns 404 to avoid leaking existence). `addTracks()` shifts existing `position` values when `insertPosition` is provided; `removeTrack()` repacks positions after deletion; `reorderTracks()` reassigns positions in a `db.transaction()`. Duplicate track inserts (unique constraint on `(playlistId, lidarrTrackId)`) are silently skipped.
+- **UUID generation pattern:** The schema uses `$defaultFn(() => randomUUID())` but Drizzle's `.run()` does not return the inserted row. When the generated ID or timestamp is needed immediately (e.g. to return in the response), generate it explicitly in JS and pass it into `.values({ id, createdAt, ... })` — do not round-trip with an extra SELECT.
 - **Transcoding:** `fluent-ffmpeg` (`libmp3lame`, configurable bitrate 128/320 kbps). Temp files live in `TEMP_DIR` (default `/tmp/bimusic`). Partial files are deleted on ffmpeg error.
 - **Validation:** Zod schemas for env config and request validation
 
 **Request flow:** `index.ts` → boots migrations + admin user + temp dir → `app.ts` mounts routes → route handlers call services → `lidarrClient` (Lidarr API) or Drizzle ORM (SQLite)
 
-**Route prefixes:** `/api/health`, `/api/auth`, `/api/library`, `/api/search`, `/api/stream`, `/api/downloads`, `/api/admin`, `/api/users`
+**Route prefixes:** `/api/health`, `/api/auth`, `/api/library`, `/api/search`, `/api/stream`, `/api/downloads`, `/api/admin`, `/api/users`, `/api/playlists`
 
 ### Flutter Client
 

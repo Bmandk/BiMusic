@@ -291,6 +291,10 @@ Streaming integration tests pass with fixture audio files. `GET /api/stream/1?bi
 
 ## Phase 6 — Playlists
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/services/playlistService.ts`, `backend/src/routes/playlists.ts`, `backend/tests/integration/playlists.test.ts`. Updated: `backend/src/app.ts`.
+> All 91 tests pass (20 new playlist integration tests + 71 existing).
+
 **Goal:** Full playlist CRUD with track ordering.
 
 ### Tasks
