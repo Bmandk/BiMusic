@@ -19,6 +19,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   String? _artistName;
   String? _albumTitle;
   String? _imageUrl;
+  Map<int, String> _localFilePaths = const {};
 
   AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
   bool _isShuffled = false;
@@ -65,6 +66,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     String? artistName,
     String? albumTitle,
     String? imageUrl,
+    Map<int, String> localFilePaths = const {},
   }) async {
     await _initCompleter.future;
 
@@ -74,6 +76,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     _artistName = artistName;
     _albumTitle = albumTitle;
     _imageUrl = imageUrl;
+    _localFilePaths = localFilePaths;
 
     final sources = tracks.map(_sourceForTrack).toList();
     queue.add(tracks.map(_trackToMediaItem).toList());
@@ -93,6 +96,11 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   }
 
   AudioSource _sourceForTrack(Track t) {
+    // Use locally-stored file if available (offline playback).
+    final localPath = _localFilePaths[t.id];
+    if (localPath != null) {
+      return AudioSource.file(localPath);
+    }
     // Pass token as query param instead of header — just_audio's header proxy
     // doesn't work reliably with just_audio_media_kit (libmpv).
     final params = <String, String>{

@@ -1,7 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/album.dart';
+import '../../models/download_task.dart';
+import '../../models/track.dart';
+import '../../providers/download_provider.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
@@ -91,6 +96,17 @@ class AlbumDetailScreen extends ConsumerWidget {
                                     .onSurfaceVariant,
                               ),
                         ),
+                      if (!kIsWeb)
+                        tracksAsync.whenOrNull(
+                          data: (tracks) => Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: _DownloadAlbumButton(
+                              album: album,
+                              tracks: tracks,
+                            ),
+                          ),
+                        ) ??
+                            const SizedBox.shrink(),
                     ],
                   ),
                 ),
@@ -126,6 +142,73 @@ class AlbumDetailScreen extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Download Album button (mobile/desktop only)
+// ---------------------------------------------------------------------------
+
+class _DownloadAlbumButton extends ConsumerWidget {
+  const _DownloadAlbumButton({required this.album, required this.tracks});
+
+  final Album album;
+  final List<Track> tracks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final downloadTasks = ref.watch(downloadProvider).tasks;
+
+    // Determine per-track offline status.
+    final trackIds = tracks.map((t) => t.id).toSet();
+    final relevant = downloadTasks.where((d) => trackIds.contains(d.trackId)).toList();
+
+    final completedCount =
+        relevant.where((d) => d.status == DownloadStatus.completed).length;
+    final downloadingCount =
+        relevant.where((d) => d.status == DownloadStatus.downloading).length;
+    final pendingCount =
+        relevant.where((d) => d.status == DownloadStatus.pending).length;
+
+    final allDownloaded = tracks.isNotEmpty && completedCount == tracks.length;
+    final anyActive = downloadingCount > 0 || pendingCount > 0;
+
+    if (allDownloaded) {
+      return OutlinedButton.icon(
+        icon: const Icon(Icons.download_done, size: 18),
+        label: const Text('Downloaded'),
+        onPressed: null, // already done
+      );
+    }
+
+    if (anyActive) {
+      final total = tracks.length;
+      final done = completedCount;
+      return OutlinedButton.icon(
+        icon: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            value: total > 0 ? done / total : null,
+            strokeWidth: 2,
+          ),
+        ),
+        label: Text('Downloading… ($done / $total)'),
+        onPressed: null,
+      );
+    }
+
+    return FilledButton.icon(
+      icon: const Icon(Icons.download_outlined, size: 18),
+      label: const Text('Download Album'),
+      onPressed: () => ref.read(downloadProvider.notifier).requestAlbumDownload(
+        tracks,
+        albumId: album.id,
+        artistId: album.artistId,
+        albumTitle: album.title,
+        artistName: album.artistName,
       ),
     );
   }

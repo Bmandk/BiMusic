@@ -1,5 +1,6 @@
 import 'package:bimusic_app/models/album.dart';
 import 'package:bimusic_app/models/track.dart';
+import 'package:bimusic_app/providers/download_provider.dart';
 import 'package:bimusic_app/providers/library_provider.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 import 'package:bimusic_app/ui/screens/album_detail_screen.dart';
@@ -10,6 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
+
+class _StubDownloadNotifier extends DownloadNotifier {
+  @override
+  DownloadState build() =>
+      const DownloadState(tasks: [], isLoading: false, deviceId: 'test-dev');
+}
 
 const _testAlbum = Album(
   id: 1,
@@ -59,6 +66,7 @@ void main() {
           authServiceProvider.overrideWith((_) => mockAuthService),
           albumProvider(1).overrideWith((_) async => _testAlbum),
           albumTracksProvider(1).overrideWith((_) async => _testTracks),
+          downloadProvider.overrideWith(() => _StubDownloadNotifier()),
         ],
         child: const MaterialApp(
           home: AlbumDetailScreen(id: '1'),

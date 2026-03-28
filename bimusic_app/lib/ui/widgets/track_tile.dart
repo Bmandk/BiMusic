@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/download_task.dart';
 import '../../models/playlist.dart';
 import '../../models/track.dart';
+import '../../providers/download_provider.dart';
 import '../../providers/playlist_provider.dart';
 
 class TrackTile extends ConsumerWidget {
@@ -28,6 +31,18 @@ class TrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Offline download status — only relevant on non-web platforms.
+    DownloadStatus? offlineStatus;
+    double? downloadProgress;
+    if (!kIsWeb) {
+      final tasks = ref.watch(downloadProvider).tasks;
+      final matching = tasks.where((t) => t.trackId == track.id);
+      if (matching.isNotEmpty) {
+        offlineStatus = matching.first.status;
+        downloadProgress = matching.first.progress;
+      }
+    }
+
     return ListTile(
       leading: SizedBox(
         width: 32,
@@ -48,12 +63,7 @@ class TrackTile extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (track.hasFile)
-            Icon(
-              Icons.download_done,
-              size: 16,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+          _offlineIcon(context, offlineStatus, downloadProgress),
           const SizedBox(width: 4),
           Text(
             _formatDuration(track.duration),
@@ -66,6 +76,49 @@ class TrackTile extends ConsumerWidget {
       onTap: onTap,
       onLongPress: () => _showContextSheet(context),
     );
+  }
+
+  Widget _offlineIcon(
+    BuildContext context,
+    DownloadStatus? status,
+    double? progress,
+  ) {
+    if (kIsWeb) return const SizedBox.shrink();
+    switch (status) {
+      case DownloadStatus.completed:
+        return Icon(
+          Icons.download_done,
+          size: 16,
+          color: Theme.of(context).colorScheme.primary,
+        );
+      case DownloadStatus.downloading:
+        return SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            value: progress,
+            strokeWidth: 2,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      case DownloadStatus.pending:
+        return Icon(
+          Icons.schedule,
+          size: 16,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        );
+      case DownloadStatus.failed:
+      case null:
+        // Show library file indicator as fallback (track in Lidarr).
+        if (track.hasFile) {
+          return Icon(
+            Icons.audio_file_outlined,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          );
+        }
+        return const SizedBox.shrink();
+    }
   }
 
   void _showContextSheet(BuildContext context) {

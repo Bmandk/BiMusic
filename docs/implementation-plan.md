@@ -610,6 +610,11 @@ Create a playlist. Add tracks from an album. Reorder. Play. Delete.
 
 ## Phase 16 — Flutter Offline Downloads (Mobile + Desktop)
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `bimusic_app/lib/services/download_service.dart`, `bimusic_app/lib/providers/download_provider.dart`, `bimusic_app/test/providers/download_provider_test.dart`, `bimusic_app/test/ui/downloads_screen_test.dart`. Updated: `bimusic_app/lib/main.dart`, `bimusic_app/lib/services/audio_service.dart`, `bimusic_app/lib/providers/player_provider.dart`, `bimusic_app/lib/ui/screens/downloads_screen.dart`, `bimusic_app/lib/ui/widgets/track_tile.dart`, `bimusic_app/lib/ui/screens/album_detail_screen.dart`, `bimusic_app/test/ui/track_tile_test.dart`, `bimusic_app/test/ui/album_detail_screen_test.dart`.
+> Implementation notes: Isar not used for persistence — `DownloadTask` records are saved as JSON files (`bimusic_downloads_<userId>.json`). `DownloadTask` is a plain Dart class (not freezed). `DownloadService` retries `GET /api/downloads/:id/file` every 10 s on 409 (backend transcode in progress). Max 2 concurrent downloads. Background service is a minimal process keepalive (foreground notification on Android/iOS); download logic runs in the main Riverpod context. `TrackTile` reads `downloadProvider` in `build()` — all tests rendering `TrackTile` or `AlbumDetailScreen` must override `downloadProvider`.
+> 75 Flutter tests pass. `flutter analyze --fatal-infos` passes.
+
 **Goal:** Users can download albums for offline listening. Downloads persist across app restarts.
 
 ### Tasks

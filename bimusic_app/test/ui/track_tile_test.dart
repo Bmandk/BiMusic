@@ -1,5 +1,7 @@
+import 'package:bimusic_app/models/download_task.dart';
 import 'package:bimusic_app/models/playlist.dart';
 import 'package:bimusic_app/models/track.dart';
+import 'package:bimusic_app/providers/download_provider.dart';
 import 'package:bimusic_app/services/playlist_service.dart';
 import 'package:bimusic_app/ui/widgets/track_tile.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +10,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockPlaylistService extends Mock implements PlaylistService {}
+
+/// Stub notifier that seeds a fixed set of download tasks.
+class _StubDownloadNotifier extends DownloadNotifier {
+  _StubDownloadNotifier([this._tasks = const []]);
+  final List<DownloadTask> _tasks;
+  @override
+  DownloadState build() =>
+      DownloadState(tasks: _tasks, isLoading: false, deviceId: 'test-dev');
+}
 
 const _testTrack = Track(
   id: 1,
@@ -32,12 +43,14 @@ const _trackWithoutFile = Track(
 );
 
 /// Builds a TrackTile inside a ProviderScope (required since TrackTile is a
-/// ConsumerWidget that accesses playlistProvider on long-press).
+/// ConsumerWidget that accesses playlistProvider on long-press and
+/// downloadProvider for the offline indicator).
 Widget _buildTile(
   Track track, {
   VoidCallback? onTap,
   VoidCallback? onRemoveFromPlaylist,
   PlaylistService? playlistService,
+  List<DownloadTask> downloads = const [],
 }) {
   final service = playlistService ?? _MockPlaylistService();
   if (playlistService == null) {
@@ -48,6 +61,8 @@ Widget _buildTile(
   return ProviderScope(
     overrides: [
       playlistServiceProvider.overrideWithValue(service),
+      downloadProvider
+          .overrideWith(() => _StubDownloadNotifier(downloads)),
     ],
     child: MaterialApp(
       home: Scaffold(
@@ -72,18 +87,42 @@ void main() {
     expect(find.text('3:33'), findsOneWidget);
   });
 
-  testWidgets('shows offline indicator when hasFile is true', (tester) async {
+  testWidgets('shows audio file indicator when hasFile is true and no offline download',
+      (tester) async {
     await tester.pumpWidget(_buildTile(_testTrack));
     await tester.pump();
 
-    expect(find.byIcon(Icons.download_done), findsOneWidget);
+    expect(find.byIcon(Icons.audio_file_outlined), findsOneWidget);
   });
 
-  testWidgets('hides offline indicator when hasFile is false', (tester) async {
+  testWidgets('hides audio file indicator when hasFile is false', (tester) async {
     await tester.pumpWidget(_buildTile(_trackWithoutFile));
     await tester.pump();
 
-    expect(find.byIcon(Icons.download_done), findsNothing);
+    expect(find.byIcon(Icons.audio_file_outlined), findsNothing);
+  });
+
+  testWidgets('shows download_done icon when track is completed offline',
+      (tester) async {
+    final completedTask = DownloadTask(
+      serverId: 's1',
+      trackId: 1,
+      albumId: 1,
+      artistId: 10,
+      userId: 'u1',
+      deviceId: 'dev-1',
+      status: DownloadStatus.completed,
+      trackTitle: 'Test Track',
+      trackNumber: '3',
+      albumTitle: 'Album',
+      artistName: 'Artist',
+      bitrate: 320,
+      requestedAt: '2026-03-28T10:00:00Z',
+    );
+    await tester.pumpWidget(_buildTile(_testTrack, downloads: [completedTask]));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.download_done), findsOneWidget);
   });
 
   testWidgets('tap triggers onTap callback', (tester) async {

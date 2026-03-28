@@ -1,9 +1,12 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/download_task.dart';
 import '../models/track.dart';
 import '../services/audio_service.dart';
 import '../services/auth_service.dart';
 import 'bitrate_provider.dart';
+import 'download_provider.dart';
 
 class PlayerState {
   const PlayerState({
@@ -106,6 +109,21 @@ class PlayerNotifier extends Notifier<PlayerState> {
       imageUrl: imageUrl,
     );
 
+    // Resolve any locally-stored files for offline-capable tracks.
+    final localFilePaths = <int, String>{};
+    if (!kIsWeb) {
+      final downloads = ref.read(downloadProvider).tasks;
+      for (final t in queue) {
+        final local = downloads.where(
+          (d) =>
+              d.trackId == t.id &&
+              d.status == DownloadStatus.completed &&
+              d.filePath != null,
+        );
+        if (local.isNotEmpty) localFilePaths[t.id] = local.first.filePath!;
+      }
+    }
+
     await handler.playQueue(
       queue,
       startIndex < 0 ? 0 : startIndex,
@@ -114,6 +132,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       artistName: artistName,
       albumTitle: albumTitle,
       imageUrl: imageUrl,
+      localFilePaths: localFilePaths,
     );
   }
 
