@@ -118,6 +118,12 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 ### Testing
 
+**`isAdmin` is stored as integer in SQLite** — Drizzle returns `isAdmin` as `0` or `1`, not `boolean`. Backend unit test assertions must use `toBe(0)` / `toBe(1)`; integration test assertions on `res.body.isAdmin` should use `toBeFalsy()` / `toBeTruthy()` since JSON preserves the integer value.
+
+**Schema uses camelCase SQL column names** — Unlike the typical snake_case convention, the BiMusic schema stores all columns as camelCase directly in SQLite (e.g., `displayName TEXT`, `passwordHash TEXT`, `isAdmin INTEGER`, `createdAt TEXT`). Backend unit test DB mocks must use these exact column names in `CREATE TABLE` SQL — do not use snake_case.
+
+**Backend unit tests: mock both `env.js` and `db/connection.js`** — `env.ts` calls `process.exit(1)` if required vars are missing. Unit tests that import any module touching `env.ts` must mock it with `vi.mock('../../config/env.js', () => ({ env: { ... } }))`. Tests that also need DB access must additionally mock `db/connection.js` with an in-memory SQLite instance that manually creates tables with the camelCase column names from `schema.ts`. See `src/services/__tests__/authService.test.ts` for the canonical pattern.
+
 **Backend tests use Vitest** with two workspace projects:
 - **Unit tests:** `src/**/__tests__/**/*.test.ts` — colocated with source. Mock env with `vi.mock('../../config/env.js', ...)`. Use `nock` to stub outbound HTTP (lidarrClient tests); use `vi.mock` for DB/logger.
 - **Integration tests:** `tests/integration/**/*.test.ts` — use setup file (`tests/setup.ts`), run in forked processes, 15s timeout. Library integration tests use `nock` to stub Lidarr HTTP calls; call `nock.cleanAll()` in `afterEach`. Stream and download integration tests mock `fluent-ffmpeg` using `vi.hoisted` (to make the mock reference available before imports are resolved) + `vi.mock('fluent-ffmpeg', ...)`. Each test that triggers transcoding must use a unique fixture file path so the `sha256(path:bitrate)` temp key doesn't collide across tests. Download worker tests call `processOnePendingDownload()` directly; because the in-memory DB is shared within a test file, any pending records created by earlier tests must be drained first (stub them to 404 so the worker marks them failed) before the target record is processed.
@@ -126,9 +132,15 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 To test widgets that use audio playback, override all four providers: `audioHandlerProvider` (mock `BiMusicAudioHandler`), `playerNotifierProvider` (fake notifier — see pattern below), `playerPositionProvider`, and `playerDurationProvider`. The fake notifier pattern: `class _FakePlayerNotifier extends Notifier<PlayerState> implements PlayerNotifier { ... }` — extend `Notifier<PlayerState>` AND implement `PlayerNotifier`, override `build()` to return a fixed state, and stub all methods as no-ops. Use `playerNotifierProvider.overrideWith(() => _FakePlayerNotifier(state))`.
 
-**`AsyncNotifierProvider.overrideWith` type constraint:** When stubbing an `AsyncNotifierProvider<ConcreteNotifier, T>` (e.g. `playlistProvider`), the stub must `extend ConcreteNotifier` — not just `AsyncNotifier<T>`. Riverpod enforces the exact notifier type: `class _Stub extends PlaylistNotifier { @override Future<List<PlaylistSummary>> build() async => []; }`. Extending only `AsyncNotifier<T>` causes a compile error.
+**`AsyncNotifierProvider` and `NotifierProvider` overrideWith type constraint:** The stub must implement the concrete notifier type — not just the base class. For `AsyncNotifierProvider<PlaylistNotifier, T>`: `class _Stub extends PlaylistNotifier { ... }`. For `NotifierProvider<AuthNotifier, AuthState>`: `class _Stub extends Notifier<AuthState> implements AuthNotifier { ... }` — because `AuthNotifier._initialized` is library-private you cannot subclass it directly; implementing the interface is required. The `overrideWith` factory parameter is typed as `ConcreteNotifier Function()`, so passing a plain `Notifier<T> Function()` is a compile error.
+
+**`AuthNotifier` stub pattern:** `AuthNotifier._initialized` is a private `late Future<void>`. Extend `Notifier<AuthState>` and implement `AuthNotifier` instead of extending it. Provide `Future<void> get initialized async {}` in the stub. Example: `class _StubAuthNotifier extends Notifier<AuthState> implements AuthNotifier { @override Future<void> get initialized async {} @override AuthState build() => AuthStateAuthenticated(tokens); @override Future<void> login(...) async {} @override Future<void> logout() async {} }`
 
 **`TrackTile` is a `ConsumerWidget`** — any test that renders `TrackTile` (directly or via a screen like `AlbumDetailScreen`) must have a `ProviderScope` ancestor. `TrackTile.build()` now reads `downloadProvider` on every render (for the offline indicator), so **all** tests rendering `TrackTile` must override `downloadProvider` — not just long-press tests. The widget only accesses `playlistProvider` inside the long-press context sheet, so `playlistServiceProvider` can be omitted for tests that don't trigger long-press. Stub pattern: `class _StubDownloadNotifier extends DownloadNotifier { @override DownloadState build() => DownloadState(tasks: [], isLoading: false, deviceId: 'test-dev'); }` — then `downloadProvider.overrideWith(() => _StubDownloadNotifier())`. Same override is required for `AlbumDetailScreen` tests (which render `TrackTile` and `_DownloadAlbumButton`). Playlist integration tests use `nock` (call `nock.disableNetConnect()` + `nock.enableNetConnect('127.0.0.1')` in `beforeAll`, `nock.cleanAll()` in `afterEach`) since `GET /api/playlists/:id` now calls Lidarr.
+
+**`SettingsScreen` widget tests:** The screen contains two file-private `FutureProvider`s (`_backendHealthProvider`, `_adminLogsProvider`) that make real HTTP calls when `user.isAdmin == true`. These create pending timers that fail tests. Use a **non-admin user** in `SettingsScreen` widget tests to skip the Debug section. If admin functionality must be tested, override `apiClientProvider` with a mock Dio that returns immediately. Additionally, `_BitratePreferenceTile` watches `bitratePreferenceProvider` which reads `FlutterSecureStorage` on init — override it: `class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier { @override BitratePreference build() => BitratePreference.auto; }`.
+
+**`SearchNotifier` stub for `searchProvider`:** `searchProvider` is `StateNotifierProvider<SearchNotifier, SearchState>`, so the override factory must return a `SearchNotifier`. Stub: `class _StubSearchNotifier extends SearchNotifier { _StubSearchNotifier(super.searchService); }` — use `searchProvider.overrideWith((ref) => _StubSearchNotifier(mockSearchService))`.
 
 **Connectivity provider in unit tests:** `connectivityProvider` uses a platform channel (EventChannel). Pure unit tests (non-widget) that indirectly instantiate providers watching connectivity must call `TestWidgetsFlutterBinding.ensureInitialized()` in `setUpAll` to avoid "Binding has not yet been initialized" errors.
 
@@ -136,9 +148,13 @@ To test widgets that use audio playback, override all four providers: `audioHand
 
 ### CI Pipeline (`.github/workflows/ci.yml`)
 
-Two jobs on push/PR to main:
-1. `backend-lint` — npm ci → lint → type-check
-2. `flutter-analyze` — pub get → build_runner → analyze
+Three stages on push/PR to main:
+1. **Stage 1 (parallel):**
+   - `backend-lint-unit` — npm ci → lint → format:check → build → unit tests with coverage (gate: ≥80% lines, ≥75% branches)
+   - `flutter-lint-unit` — pub get → build_runner → analyze → flutter test with coverage (gate: ≥70% lines)
+2. **Stage 2** (needs stage 1): `backend-integration` — installs ffmpeg → npm ci → integration tests (real SQLite + nock Lidarr)
+
+Coverage artifacts uploaded: `backend-coverage/` and `flutter-coverage/`.
 
 ## Locked Architecture Decisions
 

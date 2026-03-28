@@ -680,7 +680,7 @@ Settings screen renders all sections. Logout works. Storage usage is accurate.
 
 ---
 
-## Phase 18 — Testing Pass
+## Phase 18 — Testing Pass ✅
 
 **Goal:** All coverage targets from `qa-plan.md §1.2` are met.
 
@@ -712,6 +712,12 @@ Settings screen renders all sections. Logout works. Storage usage is accurate.
 ### Completion criteria
 
 CI pipeline is green. Backend ≥ 80% line coverage. Flutter ≥ 70% line coverage. All P0 test scenarios pass.
+
+### Outcomes
+
+- **Backend:** 140 tests (13 files) — 85.66% line coverage. Added `userService` unit tests and `users` + `admin` integration tests. All public API routes have ≥1 integration test.
+- **Flutter:** 102 tests (18 files) — widget tests added for all 7 previously untested screens (`LoginScreen`, `HomeScreen`, `ArtistDetailScreen`, `SearchScreen`, `SettingsScreen`, `LibraryScreen`, `PlaylistsScreen`).
+- **CI:** Updated to 3-stage pipeline with coverage gates (≥80% backend lines, ≥70% Flutter lines) and backend integration test stage.
 
 ---
 
