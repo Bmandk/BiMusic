@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as playlistService from '../services/playlistService.js';
+import * as libraryService from '../services/libraryService.js';
 import { authenticate } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 
@@ -43,10 +44,20 @@ router.post('/', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const playlist = playlistService.getPlaylist(req.params['id'] as string, req.user!.userId);
-    res.json(playlist);
+    // Enrich each playlist track with full Track data from Lidarr.
+    // Use allSettled so a deleted/missing track doesn't break the whole response.
+    const results = await Promise.allSettled(
+      playlist.tracks.map(t => libraryService.getTrack(t.lidarrTrackId)),
+    );
+    const tracks = results
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof libraryService.getTrack>>> =>
+        r.status === 'fulfilled',
+      )
+      .map(r => r.value);
+    res.json({ id: playlist.id, name: playlist.name, tracks });
   } catch (err) {
     next(err);
   }

@@ -1,10 +1,28 @@
 // tests/setup.ts sets env vars before this file loads (via vitest setupFiles)
-import { beforeAll, describe, it, expect } from 'vitest';
+import { beforeAll, afterEach, describe, it, expect } from 'vitest';
 import request from 'supertest';
+import nock from 'nock';
 import type { Express } from 'express';
 import { createApp } from '../../src/app.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { bootstrapAdminIfNeeded } from '../../src/services/userService.js';
+
+const LIDARR = 'http://localhost:8686';
+
+// Minimal Lidarr track stubs used in playlist track-enrichment tests.
+// The GET /api/playlists/:id route calls libraryService.getTrack(id) for each
+// track in the playlist, which in turn calls GET /api/v1/track/:id on Lidarr.
+function makeTrackStub(id: number) {
+  return { id, artistId: 1, albumId: 10, trackFileId: id + 1000, foreignTrackId: `trk${id}`,
+    trackNumber: '1', absoluteTrackNumber: 1, title: `Track ${id}`, duration: 200000,
+    hasFile: true, explicit: false, mediumNumber: 1, trackFile: null, artist: null };
+}
+
+function stubTrackFetch(...ids: number[]) {
+  for (const id of ids) {
+    nock(LIDARR).get(`/api/v1/track/${id}`).reply(200, makeTrackStub(id));
+  }
+}
 
 let app: Express;
 let adminToken: string;
@@ -12,7 +30,13 @@ let user2Token: string;
 
 const ADMIN = { username: 'admin', password: 'adminpassword123' };
 
+afterEach(() => {
+  nock.cleanAll();
+});
+
 beforeAll(async () => {
+  nock.disableNetConnect();
+  nock.enableNetConnect('127.0.0.1');
   runMigrations();
   await bootstrapAdminIfNeeded();
   app = createApp();
@@ -179,18 +203,16 @@ describe('Track management', () => {
   });
 
   it('tracks appear in order after adding', async () => {
+    stubTrackFetch(101, 102, 103);
     const res = await request(app)
       .get(`/api/playlists/${playlistId}`)
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
-    const tracks = res.body.tracks as { lidarrTrackId: number; position: number }[];
+    const tracks = res.body.tracks as { id: number; title: string }[];
     expect(tracks).toHaveLength(3);
-    expect(tracks[0]!.lidarrTrackId).toBe(101);
-    expect(tracks[1]!.lidarrTrackId).toBe(102);
-    expect(tracks[2]!.lidarrTrackId).toBe(103);
-    expect(tracks[0]!.position).toBe(0);
-    expect(tracks[1]!.position).toBe(1);
-    expect(tracks[2]!.position).toBe(2);
+    expect(tracks[0]!.id).toBe(101);
+    expect(tracks[1]!.id).toBe(102);
+    expect(tracks[2]!.id).toBe(103);
   });
 
   it('trackCount reflects added tracks', async () => {
@@ -208,13 +230,14 @@ describe('Track management', () => {
       .send({ trackIds: [103, 101, 102] });
     expect(res.status).toBe(200);
 
+    stubTrackFetch(103, 101, 102);
     const detail = await request(app)
       .get(`/api/playlists/${playlistId}`)
       .set('Authorization', `Bearer ${adminToken}`);
-    const tracks = detail.body.tracks as { lidarrTrackId: number; position: number }[];
-    expect(tracks[0]!.lidarrTrackId).toBe(103);
-    expect(tracks[1]!.lidarrTrackId).toBe(101);
-    expect(tracks[2]!.lidarrTrackId).toBe(102);
+    const tracks = detail.body.tracks as { id: number }[];
+    expect(tracks[0]!.id).toBe(103);
+    expect(tracks[1]!.id).toBe(101);
+    expect(tracks[2]!.id).toBe(102);
   });
 
   it('removes a track and repacks positions', async () => {
@@ -223,13 +246,15 @@ describe('Track management', () => {
       .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(204);
 
+    // After removal: remaining tracks are 103 (pos 0) and 102 (pos 1)
+    stubTrackFetch(103, 102);
     const detail = await request(app)
       .get(`/api/playlists/${playlistId}`)
       .set('Authorization', `Bearer ${adminToken}`);
-    const tracks = detail.body.tracks as { lidarrTrackId: number; position: number }[];
+    const tracks = detail.body.tracks as { id: number }[];
     expect(tracks).toHaveLength(2);
-    expect(tracks[0]!.position).toBe(0);
-    expect(tracks[1]!.position).toBe(1);
+    expect(tracks[0]!.id).toBe(103);
+    expect(tracks[1]!.id).toBe(102);
   });
 
   it('returns 404 when removing a track not in playlist', async () => {

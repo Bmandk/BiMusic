@@ -584,6 +584,10 @@ Search returns library results. Lidarr lookup works. Requesting an artist create
 
 ## Phase 15 — Flutter Playlists
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `bimusic_app/lib/models/playlist.dart`, `bimusic_app/lib/services/playlist_service.dart`, `bimusic_app/lib/providers/playlist_provider.dart`, `bimusic_app/test/ui/playlist_detail_screen_test.dart`. Updated: `bimusic_app/lib/ui/screens/playlists_screen.dart`, `bimusic_app/lib/ui/screens/playlist_detail_screen.dart`, `bimusic_app/lib/ui/widgets/track_tile.dart`, `bimusic_app/test/ui/track_tile_test.dart`, `backend/src/routes/playlists.ts` (enriches GET /:id with full Track data), `backend/tests/integration/playlists.test.ts` (nock stubs + updated assertions).
+> 58 Flutter tests pass (15 new) + 117 backend tests pass (all).
+
 **Goal:** Create, edit, and play playlists.
 
 ### Tasks
