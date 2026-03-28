@@ -29,7 +29,7 @@ export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && nvm use --lts
 | Single test file | `npx vitest run path/to/file.test.ts` |
 | Single test by name | `npx vitest run -t "test name pattern"` |
 
-Copy `.env.example` to `.env` for local development. Requires `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` (≥32 chars each).
+Copy `.env.example` to `.env` for local development. Requires `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` (≥32 chars each) and `ADMIN_PASSWORD` (≥8 chars). `API_BASE_URL` sets the public URL used to build `imageUrl` and `streamUrl` fields in API responses (default `http://localhost:3000`).
 
 ### Flutter Client (`bimusic_app/`)
 
@@ -57,6 +57,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Primary keys:** UUID TEXT via `lower(hex(randomblob(16)))` for all BiMusic tables; Lidarr IDs stay INTEGER
 - **Logging:** Pino with structured JSON output to file
 - **Lidarr client:** `src/services/lidarrClient.ts` — typed axios wrapper for all Lidarr API calls. Routes must call lidarrClient methods, never axios directly. Lidarr errors are mapped: 404 → 404 `NOT_FOUND`, 5xx → 502 `LIDARR_ERROR`, timeout → 504 `LIDARR_TIMEOUT`. Cover art methods return `AxiosResponse<Readable>` for pipe-through (no buffering). Lidarr types are in `src/types/lidarr.ts`.
+- **Library service:** `src/services/libraryService.ts` — reshapes raw Lidarr responses into Flutter-facing types (`Artist`, `Album`, `Track` defined in `src/types/api.ts`), injects `imageUrl` (`/api/library/{artists|albums}/:id/image`) and `streamUrl` (`/api/stream/:id`) using `env.API_BASE_URL`. Image proxy methods fetch the Lidarr artist/album to determine the cover filename before streaming.
 - **Transcoding:** `fluent-ffmpeg` for audio format conversion; passthrough Range headers for MP3, temp-file transcoding for other formats
 - **Validation:** Zod schemas for env config and request validation
 
@@ -86,7 +87,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 **Backend tests use Vitest** with two workspace projects:
 - **Unit tests:** `src/**/__tests__/**/*.test.ts` — colocated with source. Mock env with `vi.mock('../../config/env.js', ...)`. Use `nock` to stub outbound HTTP (lidarrClient tests); use `vi.mock` for DB/logger.
-- **Integration tests:** `tests/integration/**/*.test.ts` — use setup file, run in forked processes, 15s timeout
+- **Integration tests:** `tests/integration/**/*.test.ts` — use setup file (`tests/setup.ts`), run in forked processes, 15s timeout. Library integration tests use `nock` to stub Lidarr HTTP calls; call `nock.cleanAll()` in `afterEach`.
 
 **Flutter tests:** `test/*_test.dart`
 

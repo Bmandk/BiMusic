@@ -16,3 +16,4 @@ process.env['OFFLINE_STORAGE_PATH'] = './data/offline';
 process.env['ADMIN_USERNAME'] = 'admin';
 process.env['ADMIN_PASSWORD'] = 'adminpassword123';
 process.env['TEMP_DIR'] = '/tmp/bimusic';
+process.env['API_BASE_URL'] = 'http://localhost:3099';

@@ -16,6 +16,7 @@ const envSchema = z.object({
   ADMIN_USERNAME: z.string().default('admin'),
   ADMIN_PASSWORD: z.string().min(8),
   TEMP_DIR: z.string().default('/tmp/bimusic'),
+  API_BASE_URL: z.string().url().default('http://localhost:3000'),
 });
 
 const result = envSchema.safeParse(process.env);

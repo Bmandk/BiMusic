@@ -205,6 +205,10 @@ All `lidarrClient` methods have unit tests with nock stubs passing.
 
 ## Phase 4 — Library API
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/types/api.ts`, `backend/src/services/libraryService.ts`, `backend/tests/integration/library.test.ts`. Updated: `backend/src/routes/library.ts`, `backend/src/config/env.ts` (added `API_BASE_URL`), `backend/.env.example`, `backend/tests/setup.ts`.
+> All 62 tests pass (12 new library integration tests + 50 existing).
+
 **Goal:** All `/api/library/*` endpoints work. Flutter client can browse artists, albums, and tracks.
 
 ### Tasks
