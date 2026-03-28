@@ -39,7 +39,7 @@ function mapError(err: unknown): never {
 export async function getArtists(): Promise<LidarrArtist[]> {
   try {
     const res = await lidarrApi.get<LidarrArtist[]>('/artist');
-    return res.data;
+    return Array.isArray(res.data) ? res.data : [];
   } catch (err) {
     return mapError(err);
   }
@@ -76,7 +76,7 @@ export async function getAlbums(artistId?: number): Promise<LidarrAlbum[]> {
   try {
     const params = artistId !== undefined ? { artistId } : {};
     const res = await lidarrApi.get<LidarrAlbum[]>('/album', { params });
-    return res.data;
+    return Array.isArray(res.data) ? res.data : [];
   } catch (err) {
     return mapError(err);
   }

@@ -7,7 +7,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('30d'),
-  LIDARR_URL: z.string().url(),
+  LIDARR_URL: z.string().url().transform((url) => url.replace(/\/+$/, '')),
   LIDARR_API_KEY: z.string().min(1),
   MUSIC_LIBRARY_PATH: z.string().min(1),
   OFFLINE_STORAGE_PATH: z.string().default('./data/offline'),
