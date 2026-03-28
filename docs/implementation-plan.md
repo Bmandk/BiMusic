@@ -250,6 +250,10 @@ With Lidarr nock stubs, all library route integration tests pass. Image proxy re
 
 ## Phase 5 — Streaming
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `backend/src/services/streamService.ts`, `backend/tests/integration/stream.test.ts`. Updated: `backend/src/routes/stream.ts`, `backend/src/index.ts`.
+> All 71 tests pass (9 new streaming integration tests + 62 existing).
+
 **Goal:** `GET /api/stream/:trackId` transcodes via ffmpeg and serves with full HTTP Range / seeking support.
 
 ### Tasks

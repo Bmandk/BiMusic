@@ -4,6 +4,7 @@ import { logger } from './utils/logger.js';
 import { createApp } from './app.js';
 import { runMigrations } from './db/migrate.js';
 import { bootstrapAdminIfNeeded } from './services/userService.js';
+import { initTempDir, startTempFileCleanup } from './services/streamService.js';
 
 function startServer(): Promise<void> {
   return new Promise((resolve) => {
@@ -30,6 +31,8 @@ function startServer(): Promise<void> {
 async function main() {
   runMigrations();
   await bootstrapAdminIfNeeded();
+  initTempDir();
+  startTempFileCleanup();
   await startServer();
 }
 
