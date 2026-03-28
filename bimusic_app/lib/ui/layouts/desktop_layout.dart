@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/player_provider.dart';
+import '../widgets/player_bar.dart';
 
-class DesktopLayout extends StatelessWidget {
+class DesktopLayout extends ConsumerWidget {
   const DesktopLayout({
     super.key,
     required this.navigationShell,
@@ -46,7 +49,7 @@ class DesktopLayout extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final selectedIndex = navigationShell.currentIndex;
 
@@ -81,10 +84,14 @@ class DesktopLayout extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            height: 80,
-            color: theme.colorScheme.surface,
-            child: const Center(child: Text('Player Controls')),
+          Consumer(
+            builder: (context, ref, _) {
+              final hasTrack = ref.watch(
+                playerNotifierProvider.select((s) => s.hasTrack),
+              );
+              if (!hasTrack) return const SizedBox.shrink();
+              return const SizedBox(height: 80, child: PlayerBar());
+            },
           ),
         ],
       ),

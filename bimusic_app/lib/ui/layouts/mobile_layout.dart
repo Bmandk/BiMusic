@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/player_provider.dart';
+import '../widgets/player_bar.dart';
 
 /// Maps the 5 visible mobile tab indices to shell branch indices.
 /// Shell branches: 0=Home, 1=Library, 2=Search, 3=Playlists, 4=Downloads, 5=Settings
 /// Mobile tabs:    0=Home, 1=Library, 2=Search, 3=Playlists, 4=Settings
 const List<int> _mobileToBranchIndex = [0, 1, 2, 3, 5];
 
-class MobileLayout extends StatelessWidget {
+class MobileLayout extends ConsumerWidget {
   const MobileLayout({
     super.key,
     required this.navigationShell,
@@ -23,16 +26,19 @@ class MobileLayout extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Column(
         children: [
           Expanded(child: child),
-          Container(
-            height: 60,
-            color: theme.colorScheme.surface,
-            child: const Center(child: Text('Mini Player')),
+          Consumer(
+            builder: (context, ref, _) {
+              final hasTrack = ref.watch(
+                playerNotifierProvider.select((s) => s.hasTrack),
+              );
+              if (!hasTrack) return const SizedBox.shrink();
+              return const PlayerBar();
+            },
           ),
         ],
       ),

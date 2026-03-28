@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/library_provider.dart';
+import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
 import '../widgets/track_tile.dart';
 
@@ -108,8 +109,15 @@ class AlbumDetailScreen extends ConsumerWidget {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => TrackTile(
                       track: tracks[index],
-                      // Playback will be wired up in Phase 13.
-                      onTap: () {},
+                      onTap: () {
+                        ref.read(playerNotifierProvider.notifier).play(
+                          tracks[index],
+                          tracks,
+                          artistName: album.artistName,
+                          albumTitle: album.title,
+                          imageUrl: album.imageUrl,
+                        );
+                      },
                     ),
                     childCount: tracks.length,
                   ),

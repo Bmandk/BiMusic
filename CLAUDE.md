@@ -81,6 +81,10 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **MusicService:** `lib/services/music_service.dart` — all `/api/library/*` calls. Provided via `musicServiceProvider`. Never call the library endpoints directly from UI.
 - **Library providers:** `lib/providers/library_provider.dart` — `libraryProvider` (`AsyncNotifierProvider<LibraryNotifier, List<Artist>>`) caches the artist list and exposes `refresh()`. Per-item lookups are `FutureProvider.family<T, int>`: `artistProvider`, `artistAlbumsProvider`, `albumProvider`, `albumTracksProvider`.
 - **Image auth headers:** `CachedNetworkImage` requires `httpHeaders: {'Authorization': 'Bearer $token'}` to load images through the proxy endpoints. Read the token via `ref.watch(authServiceProvider).accessToken` in `ConsumerWidget`. Use `ColoredBox(color: colorScheme.surfaceContainerHighest)` as the placeholder — `surfaceVariant` is deprecated in Flutter 3.22+.
+- **Audio handler:** `BiMusicAudioHandler` (`lib/services/audio_service.dart`) is a `BaseAudioHandler` wrapping `just_audio`. It is instantiated once in `main()` via `AudioService.init()` and injected via `audioHandlerProvider` (a throw-sentinel `Provider` — must be overridden in both `main()` and tests). Call `handler.playQueue(tracks, startIndex, token, bitrate, ...)` to start playback. Never instantiate `BiMusicAudioHandler` directly.
+- **Player state:** `playerNotifierProvider` (`lib/providers/player_provider.dart`) is a `NotifierProvider<PlayerNotifier, PlayerState>`. `PlayerState` is a plain immutable class (not freezed) with manual `copyWith`. Position and duration are intentionally excluded from `PlayerState` — watch `playerPositionProvider` and `playerDurationProvider` (both `StreamProvider`) separately in widgets that need the seek bar, to avoid per-tick rebuilds of the full state tree.
+- **Connectivity/bitrate:** `connectivityProvider` (`StreamProvider<ConnectivityResult>`, `lib/providers/connectivity_provider.dart`) wraps `connectivity_plus` v6 (emits `List<ConnectivityResult>`, collapsed to single value). `bitrateProvider` (`Provider<int>`, `lib/providers/bitrate_provider.dart`) derives 320 kbps on WiFi, 128 kbps otherwise. Read bitrate once at play time via `ref.read(bitrateProvider)`, not watch.
+- **BehaviorSubject in Notifier.build():** When subscribing to `audio_service`'s `BehaviorSubject` streams inside `Notifier.build()`, use `.skip(1)` to skip the synchronous initial emission — setting `state` before `build()` returns throws in Riverpod 2.
 - **Theme:** Material 3, `ColorScheme.fromSeed(seedColor: Colors.deepPurple)`, light + dark, `ThemeMode.system`
 - **API config:** `lib/config/api_config.dart` — base URL via `--dart-define=API_BASE_URL=...` (default `http://localhost:3000`)
 
@@ -88,7 +92,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - `< 1024` → `MobileLayout` — 5-tab `NavigationBar` (Home/Library/Search/Playlists/Settings); Downloads tab omitted on mobile
 - `≥ 1024` → `DesktopLayout` — 220 px fixed sidebar with all 6 nav items + 80 px bottom player bar
 
-**Entry point:** `main.dart` wraps `ProviderScope(child: BiMusicApp())`. `BiMusicApp` is a `ConsumerWidget` in `lib/app.dart` that watches `routerProvider`.
+**Entry point:** `main.dart` is async — calls `WidgetsFlutterBinding.ensureInitialized()`, then `AudioService.init<BiMusicAudioHandler>(builder: BiMusicAudioHandler.new, config: ...)` to start the audio background service, then `runApp(ProviderScope(overrides: [audioHandlerProvider.overrideWithValue(audioHandler)], child: BiMusicApp()))`. `BiMusicApp` is a `ConsumerWidget` in `lib/app.dart` that watches `routerProvider`.
 
 ### Testing
 
@@ -97,6 +101,8 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Integration tests:** `tests/integration/**/*.test.ts` — use setup file (`tests/setup.ts`), run in forked processes, 15s timeout. Library integration tests use `nock` to stub Lidarr HTTP calls; call `nock.cleanAll()` in `afterEach`. Stream integration tests mock `fluent-ffmpeg` using `vi.hoisted` (to make the mock reference available before imports are resolved) + `vi.mock('fluent-ffmpeg', ...)`. Each test that triggers transcoding must use a unique fixture file path so the `sha256(path:bitrate)` temp key doesn't collide across tests.
 
 **Flutter tests:** `test/**/*_test.dart`. Tests are organised into subdirectories by layer (e.g. `test/providers/`, `test/services/`, `test/ui/`). Use `mocktail` for mocks; register fallback values with `setUpAll(() => registerFallbackValue(...))` for any non-primitive types passed to `any()`. To override a `FutureProvider.family` for a specific argument in widget tests: `albumProvider(1).overrideWith((_) async => testAlbum)`. Always override `authServiceProvider` in widget tests that render image-bearing widgets (to avoid secure storage errors and supply a fake token).
+
+To test widgets that use audio playback, override all four providers: `audioHandlerProvider` (mock `BiMusicAudioHandler`), `playerNotifierProvider` (fake notifier — see pattern below), `playerPositionProvider`, and `playerDurationProvider`. The fake notifier pattern: `class _FakePlayerNotifier extends Notifier<PlayerState> implements PlayerNotifier { ... }` — extend `Notifier<PlayerState>` AND implement `PlayerNotifier`, override `build()` to return a fixed state, and stub all methods as no-ops. Use `playerNotifierProvider.overrideWith(() => _FakePlayerNotifier(state))`.
 
 ### CI Pipeline (`.github/workflows/ci.yml`)
 

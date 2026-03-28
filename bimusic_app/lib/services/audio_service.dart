@@ -1,0 +1,208 @@
+import 'dart:async';
+import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/api_config.dart';
+import '../models/track.dart';
+
+class BiMusicAudioHandler extends BaseAudioHandler {
+  final AudioPlayer _player = AudioPlayer();
+  final ConcatenatingAudioSource _playlist =
+      ConcatenatingAudioSource(children: []);
+  final Completer<void> _initCompleter = Completer();
+  bool _sourceSet = false;
+
+  List<Track> _tracks = [];
+  String? _accessToken;
+  int _bitrate = 320;
+  String? _artistName;
+  String? _albumTitle;
+  String? _imageUrl;
+
+  AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
+  bool _isShuffled = false;
+
+  BiMusicAudioHandler() {
+    _init();
+  }
+
+  Stream<Duration> get positionStream => _player.positionStream;
+  Stream<Duration?> get durationStream => _player.durationStream;
+  List<Track> get currentTracks => List.unmodifiable(_tracks);
+
+  Future<void> _init() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+    } catch (_) {}
+    _player.playbackEventStream.listen((_) => _broadcastState());
+    _player.playerStateStream.listen((_) => _broadcastState());
+    _player.currentIndexStream.listen(_onCurrentIndexChanged);
+    _player.durationStream.listen(_onDurationChanged);
+    _initCompleter.complete();
+  }
+
+  void _onCurrentIndexChanged(int? index) {
+    if (index != null && index < _tracks.length) {
+      mediaItem.add(_trackToMediaItem(_tracks[index]));
+    }
+  }
+
+  void _onDurationChanged(Duration? d) {
+    if (d == null) return;
+    final current = mediaItem.valueOrNull;
+    if (current != null) {
+      mediaItem.add(current.copyWith(duration: d));
+    }
+  }
+
+  Future<void> playQueue(
+    List<Track> tracks,
+    int startIndex,
+    String? accessToken,
+    int bitrate, {
+    String? artistName,
+    String? albumTitle,
+    String? imageUrl,
+  }) async {
+    await _initCompleter.future;
+
+    _tracks = tracks;
+    _accessToken = accessToken;
+    _bitrate = bitrate;
+    _artistName = artistName;
+    _albumTitle = albumTitle;
+    _imageUrl = imageUrl;
+
+    final sources = tracks.map(_sourceForTrack).toList();
+    queue.add(tracks.map(_trackToMediaItem).toList());
+    mediaItem.add(_trackToMediaItem(tracks[startIndex]));
+
+    if (!_sourceSet) {
+      _sourceSet = true;
+      await _playlist.addAll(sources);
+      await _player.setAudioSource(_playlist, initialIndex: startIndex);
+    } else {
+      await _playlist.clear();
+      await _playlist.addAll(sources);
+      await _player.seek(Duration.zero, index: startIndex);
+    }
+
+    await _player.play();
+  }
+
+  AudioSource _sourceForTrack(Track t) {
+    return AudioSource.uri(
+      Uri.parse(
+        '${ApiConfig.baseUrl}/api/stream/${t.id}?bitrate=$_bitrate',
+      ),
+      headers: {
+        if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+      },
+    );
+  }
+
+  MediaItem _trackToMediaItem(Track t) => MediaItem(
+    id: '${ApiConfig.baseUrl}/api/stream/${t.id}',
+    title: t.title,
+    artist: _artistName,
+    album: _albumTitle,
+    artUri: _imageUrl != null ? Uri.tryParse(_imageUrl!) : null,
+    duration: Duration(milliseconds: t.duration),
+  );
+
+  void _broadcastState() {
+    final isPlaying = _player.playing;
+    final processingState = {
+          ProcessingState.idle: AudioProcessingState.idle,
+          ProcessingState.loading: AudioProcessingState.loading,
+          ProcessingState.buffering: AudioProcessingState.buffering,
+          ProcessingState.ready: AudioProcessingState.ready,
+          ProcessingState.completed: AudioProcessingState.completed,
+        }[_player.processingState] ??
+        AudioProcessingState.idle;
+
+    playbackState.add(
+      PlaybackState(
+        controls: [
+          MediaControl.skipToPrevious,
+          if (isPlaying) MediaControl.pause else MediaControl.play,
+          MediaControl.stop,
+          MediaControl.skipToNext,
+        ],
+        systemActions: const {MediaAction.seek},
+        androidCompactActionIndices: const [0, 1, 3],
+        processingState: processingState,
+        playing: isPlaying,
+        updatePosition: _player.position,
+        bufferedPosition: _player.bufferedPosition,
+        speed: _player.speed,
+        queueIndex: _player.currentIndex,
+        repeatMode: _repeatMode,
+        shuffleMode: _isShuffled
+            ? AudioServiceShuffleMode.all
+            : AudioServiceShuffleMode.none,
+      ),
+    );
+  }
+
+  @override
+  Future<void> play() => _player.play();
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> stop() async {
+    await _player.stop();
+    await super.stop();
+  }
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> skipToNext() async {
+    if (_player.hasNext) await _player.seekToNext();
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    if (_player.position > const Duration(seconds: 3)) {
+      await _player.seek(Duration.zero);
+    } else if (_player.hasPrevious) {
+      await _player.seekToPrevious();
+    } else {
+      await _player.seek(Duration.zero);
+    }
+  }
+
+  @override
+  Future<void> skipToQueueItem(int index) =>
+      _player.seek(Duration.zero, index: index);
+
+  @override
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    _repeatMode = repeatMode;
+    final loopMode = switch (repeatMode) {
+      AudioServiceRepeatMode.one => LoopMode.one,
+      AudioServiceRepeatMode.group => LoopMode.all,
+      AudioServiceRepeatMode.all => LoopMode.all,
+      _ => LoopMode.off,
+    };
+    await _player.setLoopMode(loopMode);
+    _broadcastState();
+  }
+
+  @override
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    _isShuffled = shuffleMode != AudioServiceShuffleMode.none;
+    await _player.setShuffleModeEnabled(_isShuffled);
+    _broadcastState();
+  }
+}
+
+final audioHandlerProvider = Provider<BiMusicAudioHandler>(
+  (_) => throw UnimplementedError('audioHandlerProvider must be overridden'),
+);

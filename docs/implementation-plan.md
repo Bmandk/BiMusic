@@ -489,6 +489,10 @@ Library browses end-to-end against real backend. Album art loads. Tapping a trac
 
 ## Phase 13 — Flutter Audio Playback
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `bimusic_app/lib/services/audio_service.dart`, `bimusic_app/lib/providers/connectivity_provider.dart`, `bimusic_app/lib/providers/bitrate_provider.dart`, `bimusic_app/lib/providers/player_provider.dart`, `bimusic_app/lib/ui/widgets/player_bar.dart`, `bimusic_app/lib/ui/widgets/full_player.dart`, `bimusic_app/test/ui/player_bar_test.dart`, `bimusic_app/test/ui/full_player_test.dart`. Updated: `bimusic_app/lib/main.dart`, `bimusic_app/lib/ui/layouts/mobile_layout.dart`, `bimusic_app/lib/ui/layouts/desktop_layout.dart`, `bimusic_app/lib/ui/screens/album_detail_screen.dart`.
+> References: `docs/flutter-plan.md §5`, `docs/ux-plan.md`.
+
 **Goal:** Tracks play, seeking works, media controls appear on lock screen and notifications.
 
 ### Tasks

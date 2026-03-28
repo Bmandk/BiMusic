@@ -1,0 +1,146 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/player_provider.dart';
+import '../../services/auth_service.dart';
+import 'full_player.dart';
+
+class PlayerBar extends ConsumerWidget {
+  const PlayerBar({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerState = ref.watch(playerNotifierProvider);
+    final position = ref.watch(playerPositionProvider).valueOrNull;
+    final duration = ref.watch(playerDurationProvider).valueOrNull;
+
+    if (!playerState.hasTrack) return const SizedBox.shrink();
+
+    final track = playerState.currentTrack!;
+    final token = ref.watch(authServiceProvider).accessToken;
+    final headers = token != null
+        ? <String, String>{'Authorization': 'Bearer $token'}
+        : <String, String>{};
+
+    final progress = (position != null &&
+            duration != null &&
+            duration.inMilliseconds > 0)
+        ? position.inMilliseconds / duration.inMilliseconds
+        : 0.0;
+
+    return GestureDetector(
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (_) => const FullPlayer(),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LinearProgressIndicator(
+            value: progress.clamp(0.0, 1.0),
+            minHeight: 2,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                // Album art thumbnail
+                if (playerState.imageUrl != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: CachedNetworkImage(
+                      imageUrl: playerState.imageUrl!,
+                      httpHeaders: headers,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        width: 40,
+                        height: 40,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: 40,
+                        height: 40,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        child: const Icon(Icons.music_note, size: 20),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(Icons.music_note, size: 20),
+                  ),
+                const SizedBox(width: 8),
+                // Track info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (playerState.artistName != null)
+                        Text(
+                          playerState.artistName!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Play/pause button
+                IconButton(
+                  icon: Icon(
+                    playerState.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                  ),
+                  onPressed: () {
+                    final notifier =
+                        ref.read(playerNotifierProvider.notifier);
+                    if (playerState.isPlaying) {
+                      notifier.pause();
+                    } else {
+                      notifier.resume();
+                    }
+                  },
+                ),
+                // Skip next
+                IconButton(
+                  icon: const Icon(Icons.skip_next_rounded),
+                  onPressed: () =>
+                      ref.read(playerNotifierProvider.notifier).skipNext(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
