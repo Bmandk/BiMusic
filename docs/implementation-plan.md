@@ -550,6 +550,10 @@ Tap a track in `AlbumDetailScreen` → audio plays. Progress bar is draggable. L
 
 ## Phase 14 — Flutter Search & Music Requests
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `bimusic_app/lib/models/lidarr_search_results.dart`, `bimusic_app/lib/models/music_request.dart`, `bimusic_app/lib/services/search_service.dart`, `bimusic_app/lib/providers/search_provider.dart`, `bimusic_app/lib/providers/requests_provider.dart`, `bimusic_app/test/providers/search_provider_test.dart`. Updated: `bimusic_app/lib/ui/screens/search_screen.dart`, `backend/src/services/lidarrClient.ts` (added `getQualityProfiles`, `getMetadataProfiles`), `backend/src/routes/requests.ts` (artist request Lidarr defaults auto-populated).
+> References: `docs/flutter-plan.md §6–7`, `docs/ux-plan.md §4, §8`.
+
 **Goal:** Search the library and request new music from Lidarr.
 
 ### Tasks

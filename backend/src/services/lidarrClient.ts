@@ -213,3 +213,21 @@ export async function getRootFolders(): Promise<{ id: number; path: string }[]> 
     return mapError(err);
   }
 }
+
+export async function getQualityProfiles(): Promise<{ id: number; name: string }[]> {
+  try {
+    const res = await lidarrApi.get<{ id: number; name: string }[]>('/qualityprofile');
+    return res.data;
+  } catch (err) {
+    return mapError(err);
+  }
+}
+
+export async function getMetadataProfiles(): Promise<{ id: number; name: string }[]> {
+  try {
+    const res = await lidarrApi.get<{ id: number; name: string }[]>('/metadataprofile');
+    return res.data;
+  } catch (err) {
+    return mapError(err);
+  }
+}

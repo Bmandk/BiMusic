@@ -5,6 +5,27 @@ import * as lidarrClient from '../services/lidarrClient.js';
 import { createRequest, listRequests } from '../services/requestService.js';
 import { createError } from '../middleware/errorHandler.js';
 
+/** Fetch the first available quality profile, metadata profile, and root folder from Lidarr. */
+async function getLidarrDefaults(): Promise<{
+  qualityProfileId: number;
+  metadataProfileId: number;
+  rootFolderPath: string;
+}> {
+  const [qualityProfiles, metadataProfiles, rootFolders] = await Promise.all([
+    lidarrClient.getQualityProfiles(),
+    lidarrClient.getMetadataProfiles(),
+    lidarrClient.getRootFolders(),
+  ]);
+  if (!qualityProfiles.length) throw createError(502, 'LIDARR_ERROR', 'No quality profiles found in Lidarr');
+  if (!metadataProfiles.length) throw createError(502, 'LIDARR_ERROR', 'No metadata profiles found in Lidarr');
+  if (!rootFolders.length) throw createError(502, 'LIDARR_ERROR', 'No root folders found in Lidarr');
+  return {
+    qualityProfileId: qualityProfiles[0].id,
+    metadataProfileId: metadataProfiles[0].id,
+    rootFolderPath: rootFolders[0].path,
+  };
+}
+
 const router = Router();
 
 router.use(authenticate);
@@ -30,9 +51,9 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
 const artistRequestSchema = z.object({
   foreignArtistId: z.string().min(1),
   artistName: z.string().min(1),
-  qualityProfileId: z.number().int().positive(),
-  metadataProfileId: z.number().int().positive(),
-  rootFolderPath: z.string().min(1),
+  qualityProfileId: z.number().int().positive().optional(),
+  metadataProfileId: z.number().int().positive().optional(),
+  rootFolderPath: z.string().min(1).optional(),
   monitored: z.boolean().default(true),
 });
 
@@ -45,8 +66,15 @@ router.post('/artist', async (req: Request, res: Response, next: NextFunction) =
       return;
     }
 
-    const { foreignArtistId, artistName, qualityProfileId, metadataProfileId, rootFolderPath, monitored } =
-      parsed.data;
+    const { foreignArtistId, artistName, monitored } = parsed.data;
+    let { qualityProfileId, metadataProfileId, rootFolderPath } = parsed.data;
+
+    if (qualityProfileId === undefined || metadataProfileId === undefined || rootFolderPath === undefined) {
+      const defaults = await getLidarrDefaults();
+      qualityProfileId ??= defaults.qualityProfileId;
+      metadataProfileId ??= defaults.metadataProfileId;
+      rootFolderPath ??= defaults.rootFolderPath;
+    }
 
     const artist = await lidarrClient.addArtist({
       foreignArtistId,
