@@ -1,0 +1,72 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../models/album.dart';
+import '../../services/auth_service.dart';
+
+class AlbumCard extends ConsumerWidget {
+  const AlbumCard({super.key, required this.album, required this.onTap});
+
+  final Album album;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final token = ref.watch(authServiceProvider).accessToken;
+    final headers = token != null
+        ? <String, String>{'Authorization': 'Bearer $token'}
+        : <String, String>{};
+
+    final year =
+        album.releaseDate != null && album.releaseDate!.length >= 4
+            ? album.releaseDate!.substring(0, 4)
+            : null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: album.imageUrl,
+                httpHeaders: headers,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => ColoredBox(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                errorWidget: (context, url, error) => ColoredBox(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: const Icon(Icons.album, size: 48),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              album.title,
+              style: Theme.of(context).textTheme.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (year != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                year,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

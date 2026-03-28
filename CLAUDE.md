@@ -76,6 +76,10 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Auth:** `AuthService` (`lib/services/auth_service.dart`) handles token storage (`flutter_secure_storage`) and auth API calls using its own private Dio instance (never the intercepted one — avoids circular refresh loops). User info is decoded from the JWT payload locally, no extra `/api/auth/me` call. `AuthNotifier` (`lib/providers/auth_provider.dart`) manages `AuthState` (sealed class: `AuthStateLoading`, `AuthStateUnauthenticated`, `AuthStateAuthenticated`). `authNotifierProvider.notifier.initialized` is a `Future<void>` that resolves once the startup token check completes — await it in tests.
 - **Routing:** `routerProvider` (`lib/router.dart`) is a Riverpod `Provider<GoRouter>`. The `_RouterNotifier` (ChangeNotifier) bridges `authNotifierProvider` to GoRouter's `refreshListenable`, triggering redirects on auth state changes.
 - **Code gen:** freezed ^2.5 + json_serializable ^6.8 + riverpod_generator. Run `dart run build_runner build --delete-conflicting-outputs` after model changes. **Providers use manual Riverpod 2 style** (`NotifierProvider`, `Provider`, etc.) — not `@Riverpod` codegen. Only freezed models require build_runner.
+- **Library models:** `lib/models/artist.dart`, `album.dart`, `track.dart`, `search_results.dart` — freezed + json_serializable, matching `src/types/api.ts` exactly. IDs are `int` (Lidarr integer IDs), not UUID strings.
+- **MusicService:** `lib/services/music_service.dart` — all `/api/library/*` calls. Provided via `musicServiceProvider`. Never call the library endpoints directly from UI.
+- **Library providers:** `lib/providers/library_provider.dart` — `libraryProvider` (`AsyncNotifierProvider<LibraryNotifier, List<Artist>>`) caches the artist list and exposes `refresh()`. Per-item lookups are `FutureProvider.family<T, int>`: `artistProvider`, `artistAlbumsProvider`, `albumProvider`, `albumTracksProvider`.
+- **Image auth headers:** `CachedNetworkImage` requires `httpHeaders: {'Authorization': 'Bearer $token'}` to load images through the proxy endpoints. Read the token via `ref.watch(authServiceProvider).accessToken` in `ConsumerWidget`. Use `ColoredBox(color: colorScheme.surfaceContainerHighest)` as the placeholder — `surfaceVariant` is deprecated in Flutter 3.22+.
 - **Theme:** Material 3, `ColorScheme.fromSeed(seedColor: Colors.deepPurple)`, light + dark, `ThemeMode.system`
 - **API config:** `lib/config/api_config.dart` — base URL via `--dart-define=API_BASE_URL=...` (default `http://localhost:3000`)
 
@@ -91,7 +95,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Unit tests:** `src/**/__tests__/**/*.test.ts` — colocated with source. Mock env with `vi.mock('../../config/env.js', ...)`. Use `nock` to stub outbound HTTP (lidarrClient tests); use `vi.mock` for DB/logger.
 - **Integration tests:** `tests/integration/**/*.test.ts` — use setup file (`tests/setup.ts`), run in forked processes, 15s timeout. Library integration tests use `nock` to stub Lidarr HTTP calls; call `nock.cleanAll()` in `afterEach`.
 
-**Flutter tests:** `test/**/*_test.dart`. Tests are organised into subdirectories by layer (e.g. `test/providers/`, `test/services/`). Use `mocktail` for mocks; register fallback values with `setUpAll(() => registerFallbackValue(...))` for any non-primitive types passed to `any()`.
+**Flutter tests:** `test/**/*_test.dart`. Tests are organised into subdirectories by layer (e.g. `test/providers/`, `test/services/`, `test/ui/`). Use `mocktail` for mocks; register fallback values with `setUpAll(() => registerFallbackValue(...))` for any non-primitive types passed to `any()`. To override a `FutureProvider.family` for a specific argument in widget tests: `albumProvider(1).overrideWith((_) async => testAlbum)`. Always override `authServiceProvider` in widget tests that render image-bearing widgets (to avoid secure storage errors and supply a fake token).
 
 ### CI Pipeline (`.github/workflows/ci.yml`)
 
