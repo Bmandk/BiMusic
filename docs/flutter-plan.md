@@ -409,7 +409,7 @@ class MusicService {
   }
 
   Future<List<SearchResult>> searchLibrary(String query) async {
-    final response = await _dio.get('/api/library/search', queryParameters: {'term': query});
+    final response = await _dio.get('/api/search', queryParameters: {'term': query});
     return (response.data as List).map((j) => SearchResult.fromJson(j)).toList();
   }
 
@@ -445,7 +445,7 @@ class MusicService {
 | GET | `/api/library/albums/:id/tracks` | Tracks for album |
 | GET | `/api/library/albums/:id/image` | Proxy album cover from Lidarr |
 | GET | `/api/library/tracks/:id` | Track detail + file info |
-| GET | `/api/library/search?term=` | Search artists/albums in library |
+| GET | `/api/search?term=` | Search artists/albums in library |
 | **Streaming** | | |
 | GET | `/api/stream/:trackId?bitrate=` | Stream transcoded audio (128 or 320) |
 | **Requests (Lidarr)** | | |

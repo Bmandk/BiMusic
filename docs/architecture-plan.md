@@ -226,7 +226,7 @@ Base path: `/api`
 | GET | /library/albums/:id | Bearer | Album detail |
 | GET | /library/albums/:id/tracks | Bearer | Tracks for album |
 | GET | /library/tracks/:id | Bearer | Track detail + file info |
-| GET | /library/search | Bearer | Search artists/albums (proxies Lidarr /api/v1/search) |
+| GET | /search | Bearer | Search artists/albums (proxies Lidarr /api/v1/search) |
 | GET | /library/artists/:id/image | Bearer | Proxy artist image from Lidarr |
 | GET | /library/albums/:id/image | Bearer | Proxy album cover from Lidarr |
 

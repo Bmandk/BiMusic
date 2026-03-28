@@ -49,7 +49,7 @@ class MusicService {
 
   Future<SearchResults> searchLibrary(String term) async {
     final response = await _dio.get<Map<String, dynamic>>(
-      '/api/library/search',
+      '/api/search',
       queryParameters: {'term': term},
     );
     return SearchResults.fromJson(response.data!);

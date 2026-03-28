@@ -233,7 +233,7 @@ All `lidarrClient` methods have unit tests with nock stubs passing.
    - `GET /api/library/albums/:id`
    - `GET /api/library/albums/:id/tracks`
    - `GET /api/library/tracks/:id`
-   - `GET /api/library/search?term=`
+   - `GET /api/search?term=`
    - `GET /api/library/artists/:id/image` — pipe Lidarr image stream through (do not buffer)
    - `GET /api/library/albums/:id/image` — pipe Lidarr image stream through
 
@@ -344,7 +344,7 @@ Download integration tests pass. File is served correctly.
 ### Tasks
 
 1. **`src/routes/search.ts`** (or merge into `library.ts`):
-   - `GET /api/library/search?term=` — proxy to Lidarr `/api/v1/search`
+   - `GET /api/search?term=` — proxy to Lidarr `/api/v1/search`
 
 2. **`src/routes/requests.ts`**:
    - `GET /api/requests/search?term=` — proxy Lidarr artist and album lookup, return combined results
@@ -539,7 +539,7 @@ Tap a track in `AlbumDetailScreen` → audio plays. Progress bar is draggable. L
 ### Tasks
 
 1. **`lib/providers/search_provider.dart`** — `StateNotifier<SearchState>`:
-   - Library search (debounced 300ms): calls `/api/library/search?term=`
+   - Library search (debounced 300ms): calls `/api/search?term=`
    - Lidarr lookup (for requests): calls `/api/requests/search?term=`
    - Request submission state
 

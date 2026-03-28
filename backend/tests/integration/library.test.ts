@@ -246,13 +246,13 @@ describe('GET /api/library/albums/:id/image', () => {
   });
 });
 
-describe('GET /api/library/search', () => {
+describe('GET /api/search', () => {
   it('returns artists and albums grouped from Lidarr search results', async () => {
     const searchResult = { id: 1, foreignId: 'f1', artist: stubArtist, album: stubAlbum };
     nock(LIDARR).get('/api/v1/search').query({ term: 'test' }).reply(200, [searchResult]);
 
     const res = await request(app)
-      .get('/api/library/search?term=test')
+      .get('/api/search?term=test')
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
@@ -264,7 +264,7 @@ describe('GET /api/library/search', () => {
 
   it('returns 400 when term is missing', async () => {
     const res = await request(app)
-      .get('/api/library/search')
+      .get('/api/search')
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(400);

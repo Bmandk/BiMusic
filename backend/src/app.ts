@@ -6,7 +6,8 @@ import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
 import libraryRouter from './routes/library.js';
 import streamRouter from './routes/stream.js';
-import offlineRouter from './routes/offline.js';
+import downloadsRouter from './routes/downloads.js';
+import searchRouter from './routes/search.js';
 import adminRouter from './routes/admin.js';
 import usersRouter from './routes/users.js';
 
@@ -44,7 +45,8 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/library', libraryRouter);
   app.use('/api/stream', streamRouter);
-  app.use('/api/offline', offlineRouter);
+  app.use('/api/downloads', downloadsRouter);
+  app.use('/api/search', searchRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/users', usersRouter);
 

@@ -137,7 +137,7 @@ Integration tests use a **real SQLite database** (file-based, reset between suit
 | **GET /api/library/albums/:id** | Returns single album with track list |
 | **GET /api/library/albums/:id/tracks** | Returns tracks for album |
 | **GET /api/library/tracks/:id** | Returns track detail with file info |
-| **GET /api/library/search?term=...** | Proxies to Lidarr search; returns unified results (artists + albums) |
+| **GET /api/search?term=...** | Proxies to Lidarr search; returns unified results (artists + albums) |
 | **GET /api/library/artists/:id/image** | Proxies artist cover art from Lidarr; streams response |
 | **GET /api/library/albums/:id/image** | Proxies album cover art from Lidarr; streams response |
 | **GET /api/requests/search?term=...** | Searches Lidarr for new artists/albums to request (lookup endpoints) |
@@ -278,7 +278,7 @@ Full-stack tests: Flutter client communicates with a live backend, which uses a 
 | E11a | **Streaming: seek on passthrough** | P1 | Stream track that is already MP3 at requested bitrate; send `Range: bytes=0-999` | Response is 206 Partial Content; `Content-Range: bytes 0-999/<total>`; served directly from source file without transcoding |
 | E12 | **Streaming: missing track** | P1 | Request stream for nonexistent track ID | 404 with standard error format |
 | E13 | **Library: browse artists and albums** | P0 | GET /api/library/artists; GET /api/library/artists/:id; GET /api/library/artists/:id/albums; GET /api/library/albums/:id; GET /api/library/albums/:id/tracks | All return shaped responses from mock Lidarr with image URLs |
-| E14 | **Library: search** | P0 | GET /api/library/search?term=test | Results returned from mock Lidarr search endpoint |
+| E14 | **Library: search** | P0 | GET /api/search?term=test | Results returned from mock Lidarr search endpoint |
 | E15 | **Library: cover art proxy** | P1 | GET /api/library/artists/:id/image; GET /api/library/albums/:id/image | Both stream image data from mock Lidarr |
 | E16 | **Requests: search and request artist** | P1 | GET /api/requests/search?term=new-artist; POST /api/requests/artist with result | Search returns Lidarr lookup results; POST returns 202; mock Lidarr /api/v1/command receives ArtistSearch |
 | E17 | **Requests: request album** | P1 | POST /api/requests/album with album payload | 202; mock Lidarr receives monitor PUT and command POST |
@@ -289,7 +289,7 @@ Full-stack tests: Flutter client communicates with a live backend, which uses a 
 | E22 | **Offline: list and delete** | P2 | POST download; GET /api/downloads?deviceId=test-device-1; DELETE /api/downloads/:id; GET /api/downloads?deviceId=test-device-1 | Download removed from list |
 | E22a | **Offline: device isolation** | P2 | User1 POST /api/downloads with `deviceId: "phone"`; user1 POST same track with `deviceId: "tablet"`; GET /api/downloads?deviceId=phone returns only phone record; GET /api/downloads?deviceId=tablet returns only tablet record | Separate download entries per device; device-scoped listing works correctly |
 | E23 | **Multi-user: concurrent streams** | P2 | User1 and user2 both stream simultaneously | Both receive valid audio streams; no interference |
-| E24 | **Resilience: Lidarr down** | P1 | Stop mock Lidarr; GET /api/library/search | Backend returns 502/503; error response uses standard error format |
+| E24 | **Resilience: Lidarr down** | P1 | Stop mock Lidarr; GET /api/search | Backend returns 502/503; error response uses standard error format |
 | E25 | **Resilience: backend 500** | P2 | Force backend error; client handles gracefully | Client displays error, does not crash |
 
 ---
@@ -664,7 +664,7 @@ Scenarios ordered by priority. **P0** = must pass before any release. **P1** = s
 | 8 | Backend Integration | GET /api/stream/:trackId | Core feature: music playback |
 | 9 | Backend Unit | ffmpeg command construction (320k, 128k) | Transcoding correctness |
 | 10 | Backend Integration | GET /api/library/artists, /albums (Lidarr proxy) | Browse library |
-| 11 | Backend Integration | GET /api/library/search (Lidarr proxy) | Find music |
+| 11 | Backend Integration | GET /api/search (Lidarr proxy) | Find music |
 | 12 | Backend Integration | Playlist CRUD full lifecycle (all 7 endpoints) | Core feature |
 | 13 | Backend Integration | Playlist user isolation | Security: users must not see others' playlists |
 | 14 | Flutter Unit | AuthService (login, token storage, refresh, getMe) | Client auth foundation |

@@ -65,7 +65,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 **Request flow:** `index.ts` → boots migrations + admin user + temp dir → `app.ts` mounts routes → route handlers call services → `lidarrClient` (Lidarr API) or Drizzle ORM (SQLite)
 
-**Route prefixes:** `/api/health`, `/api/auth`, `/api/library`, `/api/stream`, `/api/offline`, `/api/admin`, `/api/users`
+**Route prefixes:** `/api/health`, `/api/auth`, `/api/library`, `/api/search`, `/api/stream`, `/api/downloads`, `/api/admin`, `/api/users`
 
 ### Flutter Client
 
