@@ -2,6 +2,7 @@
 backend/dist/
 backend/node_modules/
 backend/coverage/
+backend/data/
 
 # Flutter
 bimusic_app/.dart_tool/

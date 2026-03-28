@@ -93,14 +93,15 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   }
 
   AudioSource _sourceForTrack(Track t) {
-    return AudioSource.uri(
-      Uri.parse(
-        '${ApiConfig.baseUrl}/api/stream/${t.id}?bitrate=$_bitrate',
-      ),
-      headers: {
-        if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
-      },
-    );
+    // Pass token as query param instead of header — just_audio's header proxy
+    // doesn't work reliably with just_audio_media_kit (libmpv).
+    final params = <String, String>{
+      'bitrate': '$_bitrate',
+      if (_accessToken != null) 'token': _accessToken!,
+    };
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/stream/${t.id}')
+        .replace(queryParameters: params);
+    return AudioSource.uri(uri);
   }
 
   MediaItem _trackToMediaItem(Track t) => MediaItem(

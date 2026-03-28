@@ -204,3 +204,12 @@ export async function getQueue(): Promise<LidarrQueue[]> {
     return mapError(err);
   }
 }
+
+export async function getRootFolders(): Promise<{ id: number; path: string }[]> {
+  try {
+    const res = await lidarrApi.get<{ id: number; path: string }[]>('/rootfolder');
+    return res.data;
+  } catch (err) {
+    return mapError(err);
+  }
+}

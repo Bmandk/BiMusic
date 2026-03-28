@@ -53,12 +53,13 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 - **Framework:** Express 5 with TypeScript strict mode
 - **Database:** SQLite via `better-sqlite3` + Drizzle ORM. Schema in `src/db/schema.ts`, migrations in `src/db/migrations/`
-- **Auth:** JWT with separate access/refresh secrets. Refresh tokens stored as HMAC-SHA256 hashes
+- **Auth:** JWT with separate access/refresh secrets. Refresh tokens stored as HMAC-SHA256 hashes. The `authenticate` middleware accepts tokens via `Authorization: Bearer <token>` header **or** `?token=<jwt>` query parameter (fallback for clients like libmpv that don't support custom HTTP headers on media streams).
 - **Primary keys:** UUID TEXT via `lower(hex(randomblob(16)))` for all BiMusic tables; Lidarr IDs stay INTEGER
 - **Logging:** Pino with structured JSON output to file
 - **Lidarr client:** `src/services/lidarrClient.ts` — typed axios wrapper for all Lidarr API calls. Routes must call lidarrClient methods, never axios directly. Lidarr errors are mapped: 404 → 404 `NOT_FOUND`, 5xx → 502 `LIDARR_ERROR`, timeout → 504 `LIDARR_TIMEOUT`. Cover art methods return `AxiosResponse<Readable>` for pipe-through (no buffering). Lidarr types are in `src/types/lidarr.ts`.
 - **Library service:** `src/services/libraryService.ts` — reshapes raw Lidarr responses into Flutter-facing types (`Artist`, `Album`, `Track` defined in `src/types/api.ts`), injects `imageUrl` (`/api/library/{artists|albums}/:id/image`) and `streamUrl` (`/api/stream/:id`) using `env.API_BASE_URL`. Image proxy methods fetch the Lidarr artist/album to determine the cover filename before streaming.
 - **Stream service:** `src/services/streamService.ts` — resolves Lidarr track → trackfile path, decides passthrough vs transcode, deduplicates concurrent transcodes via a `Map<tempPath, Promise<void>>`, serves files with full HTTP Range / 206 support. MP3 sources are always passed through without re-encoding. Non-MP3 sources are transcoded with `fluent-ffmpeg` to `TEMP_DIR/<sha256(path:bitrate)>.mp3`. `initTempDir()` clears the temp dir on startup; `startTempFileCleanup()` removes files older than 24 h on an hourly interval.
+- **Path remapping:** Lidarr may return absolute file paths under its own root folder (e.g. `/music/...` inside Docker). `resolveFilePath()` fetches Lidarr's root folder via `/api/v1/rootfolder` (cached), strips it from the track file path, and prepends `MUSIC_LIBRARY_PATH` from env. This lets the backend find files even when Lidarr and BiMusic see different mount points.
 - **Transcoding:** `fluent-ffmpeg` (`libmp3lame`, configurable bitrate 128/320 kbps). Temp files live in `TEMP_DIR` (default `/tmp/bimusic`). Partial files are deleted on ffmpeg error.
 - **Validation:** Zod schemas for env config and request validation
 
@@ -69,7 +70,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 ### Flutter Client
 
 - **State management:** Riverpod (flutter_riverpod ^2.6, riverpod_annotation ^2.6, riverpod_generator ^2.6)
-- **Audio:** just_audio ^0.9 + audio_service ^0.18 + audio_session ^0.1
+- **Audio:** just_audio ^0.9 + just_audio_media_kit ^2.1 (libmpv backend for Windows/Linux — `just_audio_windows` dropped due to WMF not supporting HTTP headers) + audio_service ^0.18 + audio_session ^0.1. `JustAudioMediaKit.ensureInitialized()` is called in `main()` before audio service init. Stream URLs pass the JWT as a `?token=` query parameter (not an `Authorization` header) because just_audio's header proxy doesn't work reliably with libmpv.
 - **Routing:** go_router ^14.6 — `StatefulShellRoute.indexedStack` with 6 branches; shell builder delegates to `AdaptiveScaffold`
 - **Offline storage:** Isar 3.1.0 (pinned — 4.x not yet on pub.dev)
 - **Background downloads:** flutter_background_service ^5.0

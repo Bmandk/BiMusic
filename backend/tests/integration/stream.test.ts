@@ -51,7 +51,7 @@ vi.mock('fluent-ffmpeg', () => ({
 import { createApp } from '../../src/app.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { bootstrapAdminIfNeeded } from '../../src/services/userService.js';
-import { initTempDir } from '../../src/services/streamService.js';
+import { initTempDir, resetLidarrRootCache } from '../../src/services/streamService.js';
 
 const LIDARR = 'http://localhost:8686';
 
@@ -108,6 +108,12 @@ function makeTrackFile(trackFileId: number, filePath: string) {
 }
 
 function stubLidarr(trackId: number, trackFileId: number, filePath: string, times = 1) {
+  // Root folder stub — needed for path remapping (cached after first call).
+  // Use a path that won't match fixtureDir so remapPath returns paths as-is.
+  nock(LIDARR)
+    .get('/api/v1/rootfolder')
+    .optionally()
+    .reply(200, [{ id: 1, path: '/lidarr-root-unused' }]);
   nock(LIDARR)
     .get(`/api/v1/track/${trackId}`)
     .times(times)
@@ -143,6 +149,7 @@ afterEach(() => {
   nock.cleanAll();
   mockState.callCount = 0;
   mockState.delayMs = 0;
+  resetLidarrRootCache();
 });
 
 describe('GET /api/stream/:trackId — auth & validation', () => {

@@ -100,6 +100,8 @@ bimusic_app/
 | `riverpod_annotation` | ^2.6 | Code generation for providers | Reduces boilerplate, enforces conventions |
 | `dio` | ^5.7 | HTTP client | Interceptor support for JWT refresh, request cancellation for search, multipart for future needs |
 | `just_audio` | ^0.9 | Audio playback | Best cross-platform audio: streaming from URL, gapless playback, buffer control. Supports mobile, web, desktop. |
+| `just_audio_media_kit` | ^2.1 | Desktop audio backend (libmpv) | Replaces `just_audio_windows` — WMF doesn't support custom HTTP headers on media streams. libmpv has broad codec support. |
+| `media_kit_libs_windows_audio` | ^1.0 | libmpv native libs for Windows | Required by `just_audio_media_kit` on Windows. |
 | `audio_service` | ^0.18 | Background playback + media controls | Lock screen controls, notification media controls, background audio on mobile. Integrates with just_audio. |
 | `audio_session` | ^0.1 | Audio focus management | Handles interruptions (calls, other apps) properly per platform |
 | `connectivity_plus` | ^6.1 | Network type detection | Detects WiFi vs cellular vs none. Needed for bitrate selection logic. |
@@ -192,10 +194,11 @@ just_audio (decode + output)
 **Streaming URL Construction:**
 The player requests a streaming URL from the backend:
 ```
-GET /api/stream/:trackId?bitrate={128|320}
-Authorization: Bearer <jwt>
+GET /api/stream/:trackId?bitrate={128|320}&token=<jwt>
 ```
-The backend transcodes via ffmpeg and serves the response with HTTP Range header support for seeking. The `just_audio` player is pointed at this URL with auth headers and handles Range requests natively.
+The JWT is passed as a `?token=` query parameter rather than an `Authorization` header because `just_audio`'s header-proxy mechanism doesn't work reliably with the libmpv backend (`just_audio_media_kit`). The backend `authenticate` middleware accepts tokens from either the header or the query parameter.
+
+The backend transcodes via ffmpeg and serves the response with HTTP Range header support for seeking. libmpv handles Range requests natively.
 
 **Bitrate Selection:**
 ```dart
@@ -213,7 +216,7 @@ int getStreamBitrate(ConnectivityResult connectivity) {
 Note: `connectivity_plus` cannot distinguish 5G from LTE reliably on all platforms. We will treat WiFi as 320k guaranteed, and for mobile connections, use the `NetworkInformation` API on web and platform channels on Android/iOS to check for 5G when possible. If detection fails, default to 128k (safe fallback).
 
 **Seeking and Progress Bar:**
-The backend serves all streams (both passthrough and transcoded) with HTTP Range header support. `just_audio` handles Range requests natively, so the progress bar is fully draggable and `seek()` works for both streamed and offline content. No special query parameters needed — standard HTTP Range negotiation.
+The backend serves all streams (both passthrough and transcoded) with HTTP Range header support. libmpv handles Range requests natively, so the progress bar is fully draggable and `seek()` works for both streamed and offline content.
 
 **Gapless Playback:**
 Use `just_audio`'s `ConcatenatingAudioSource` to queue tracks for gapless album/playlist playback.

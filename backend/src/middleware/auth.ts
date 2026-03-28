@@ -11,11 +11,19 @@ export interface AuthUser {
 
 export function authenticate(req: Request, _res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
+  const queryToken = typeof req.query['token'] === 'string' ? req.query['token'] : undefined;
+
+  let token: string | undefined;
+  if (header?.startsWith('Bearer ')) {
+    token = header.slice(7);
+  } else if (queryToken) {
+    token = queryToken;
+  }
+
+  if (!token) {
     next(createError(401, 'UNAUTHORIZED', 'Missing or invalid Authorization header'));
     return;
   }
-  const token = header.slice(7);
   try {
     const payload = jwt.verify(token, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] }) as AuthUser;
     req.user = payload;

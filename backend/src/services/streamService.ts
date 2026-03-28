@@ -12,9 +12,56 @@ import path from 'path';
 import { Request, Response } from 'express';
 import ffmpeg from 'fluent-ffmpeg';
 import { env } from '../config/env.js';
-import { getTrack, getTrackFile } from './lidarrClient.js';
+import { getTrack, getTrackFile, getRootFolders } from './lidarrClient.js';
 import { createError } from '../middleware/errorHandler.js';
 import { logger } from '../utils/logger.js';
+
+// Cached Lidarr root folder path (fetched once on first stream request).
+let lidarrRootPath: string | null = null;
+let lidarrRootPromise: Promise<string> | null = null;
+
+/** Reset cached Lidarr root path (for tests). */
+export function resetLidarrRootCache(): void {
+  lidarrRootPath = null;
+  lidarrRootPromise = null;
+}
+
+async function getLidarrRootPath(): Promise<string> {
+  if (lidarrRootPath !== null) return lidarrRootPath;
+  if (lidarrRootPromise !== null) return lidarrRootPromise;
+
+  lidarrRootPromise = (async () => {
+    const roots = await getRootFolders();
+    if (roots.length === 0) {
+      throw createError(500, 'INTERNAL_ERROR', 'No root folders configured in Lidarr');
+    }
+    // Normalise: strip trailing slashes for reliable prefix matching.
+    lidarrRootPath = roots[0]!.path.replace(/[\\/]+$/, '');
+    logger.info({ lidarrRootPath, musicLibraryPath: env.MUSIC_LIBRARY_PATH }, 'Cached Lidarr root folder for path remapping');
+    return lidarrRootPath;
+  })();
+
+  return lidarrRootPromise;
+}
+
+/**
+ * Remap a Lidarr absolute path to the local MUSIC_LIBRARY_PATH.
+ * e.g. Lidarr returns "/music/Artist/Album/track.flac"
+ *      MUSIC_LIBRARY_PATH = "/c/test-music"
+ *      → "/c/test-music/Artist/Album/track.flac"
+ */
+function remapPath(lidarrFilePath: string, lidarrRoot: string): string {
+  // Normalise separators to forward slashes for comparison.
+  const normFile = lidarrFilePath.replace(/\\/g, '/');
+  const normRoot = lidarrRoot.replace(/\\/g, '/');
+
+  if (normFile.startsWith(normRoot)) {
+    const relative = normFile.slice(normRoot.length);
+    return path.join(env.MUSIC_LIBRARY_PATH, relative);
+  }
+  // If already under MUSIC_LIBRARY_PATH, return as-is.
+  return lidarrFilePath;
+}
 
 // Tracks in-progress transcodes so concurrent requests wait on the same promise.
 const inProgressTranscodes = new Map<string, Promise<void>>();
@@ -66,21 +113,27 @@ export function startTempFileCleanup(): void {
 export async function resolveFilePath(trackId: number): Promise<string> {
   const track = await getTrack(trackId);
   if (!track.hasFile || !track.trackFileId) {
+    logger.warn({ trackId, hasFile: track.hasFile, trackFileId: track.trackFileId }, 'Track has no associated file');
     throw createError(404, 'NOT_FOUND', 'Track has no associated file');
   }
 
   const trackFile = await getTrackFile(track.trackFileId);
   if (!trackFile.path) {
+    logger.warn({ trackId, trackFileId: track.trackFileId }, 'Track file path is not set');
     throw createError(404, 'NOT_FOUND', 'Track file path is not set');
   }
 
+  const lidarrRoot = await getLidarrRootPath();
+  const localPath = remapPath(trackFile.path, lidarrRoot);
+
   try {
-    await access(trackFile.path, constants.R_OK);
+    await access(localPath, constants.R_OK);
   } catch {
+    logger.warn({ trackId, lidarrPath: trackFile.path, localPath }, 'Track file is not readable on disk');
     throw createError(404, 'NOT_FOUND', 'Track file is not readable');
   }
 
-  return trackFile.path;
+  return localPath;
 }
 
 /** Returns the deterministic temp file path for a given source + bitrate. */
