@@ -19,18 +19,27 @@ class _MockAuthService extends Mock implements AuthService {}
 
 class _MockAudioHandler extends Mock implements BiMusicAudioHandler {}
 
-// Notifier stubs ─────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Notifier stubs
+// ---------------------------------------------------------------------------
 
 class _StubAuthNotifier extends Notifier<AuthState> implements AuthNotifier {
+  _StubAuthNotifier({this.isAdmin = false});
+  final bool isAdmin;
+
   @override
   Future<void> get initialized async {}
 
   @override
-  AuthState build() => const AuthStateAuthenticated(
+  AuthState build() => AuthStateAuthenticated(
         AuthTokens(
           accessToken: 'tok',
           refreshToken: 'rtok',
-          user: User(userId: 'u1', username: 'testuser', isAdmin: false),
+          user: User(
+            userId: 'u1',
+            username: 'testuser',
+            isAdmin: isAdmin,
+          ),
         ),
       );
 
@@ -81,39 +90,56 @@ class _StubPlayerNotifier extends Notifier<PlayerState>
 }
 
 class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
+  _StubBitratePreferenceNotifier([this._pref = BitratePreference.auto]);
+  final BitratePreference _pref;
+
   @override
-  BitratePreference build() => BitratePreference.auto;
+  BitratePreference build() => _pref;
+
+  @override
+  Future<void> setPreference(BitratePreference pref) async {
+    state = pref;
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
+
+Widget buildSubject({
+  bool isAdmin = false,
+  BitratePreference bitratePref = BitratePreference.auto,
+  _MockAuthService? authService,
+  _MockAudioHandler? handler,
+}) {
+  final mockAuth = authService ?? _MockAuthService();
+  final mockHandler = handler ?? _MockAudioHandler();
+  when(() => mockAuth.accessToken).thenReturn('test_token');
+
+  return ProviderScope(
+    overrides: [
+      authServiceProvider.overrideWith((_) => mockAuth),
+      authNotifierProvider
+          .overrideWith(() => _StubAuthNotifier(isAdmin: isAdmin)),
+      downloadProvider.overrideWith(() => _StubDownloadNotifier()),
+      audioHandlerProvider.overrideWithValue(mockHandler),
+      playerNotifierProvider.overrideWith(() => _StubPlayerNotifier()),
+      bitratePreferenceProvider
+          .overrideWith(() => _StubBitratePreferenceNotifier(bitratePref)),
+    ],
+    child: const MaterialApp(home: SettingsScreen()),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 void main() {
-  late _MockAuthService mockAuthService;
-  late _MockAudioHandler mockHandler;
-
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     registerFallbackValue(AudioServiceRepeatMode.none);
   });
-
-  setUp(() {
-    mockAuthService = _MockAuthService();
-    mockHandler = _MockAudioHandler();
-    when(() => mockAuthService.accessToken).thenReturn('test_token');
-  });
-
-  Widget buildSubject() => ProviderScope(
-        overrides: [
-          authServiceProvider.overrideWith((_) => mockAuthService),
-          authNotifierProvider.overrideWith(() => _StubAuthNotifier()),
-          downloadProvider.overrideWith(() => _StubDownloadNotifier()),
-          audioHandlerProvider.overrideWithValue(mockHandler),
-          playerNotifierProvider.overrideWith(() => _StubPlayerNotifier()),
-          bitratePreferenceProvider
-              .overrideWith(() => _StubBitratePreferenceNotifier()),
-        ],
-        child: const MaterialApp(home: SettingsScreen()),
-      );
 
   testWidgets('renders Settings title', (tester) async {
     await tester.pumpWidget(buildSubject());
@@ -143,5 +169,162 @@ void main() {
     await tester.pumpWidget(buildSubject());
     await tester.pump();
     expect(find.text('Streaming Quality'), findsOneWidget);
+  });
+
+  testWidgets('renders Account section header', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    expect(find.text('Account'), findsOneWidget);
+  });
+
+  testWidgets('renders About section', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    // About section is at the bottom of the ListView — scroll to reveal it.
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pump();
+    expect(find.text('About'), findsOneWidget);
+  });
+
+  testWidgets('renders App Version tile', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pump();
+    expect(find.text('App Version'), findsOneWidget);
+  });
+
+  testWidgets('renders Backend URL tile', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pump();
+    expect(find.text('Backend URL'), findsOneWidget);
+  });
+
+  testWidgets('renders Open Source Licenses tile', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pump();
+    expect(find.text('Open Source Licenses'), findsOneWidget);
+  });
+
+  testWidgets('renders Offline Downloads section on non-web', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    expect(find.text('Offline Downloads'), findsOneWidget);
+  });
+
+  testWidgets('renders Offline Music storage tile', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    expect(find.text('Offline Music'), findsOneWidget);
+  });
+
+  testWidgets('renders Clear All Downloads tile', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    expect(find.text('Clear All Downloads'), findsOneWidget);
+  });
+
+  testWidgets('does NOT render Debug section for non-admin user', (tester) async {
+    await tester.pumpWidget(buildSubject(isAdmin: false));
+    await tester.pump();
+    expect(find.text('Debug'), findsNothing);
+    expect(find.text('Backend'), findsNothing);
+    expect(find.text('View Logs'), findsNothing);
+  });
+
+  testWidgets('shows auto bitrate label when preference is auto', (tester) async {
+    await tester.pumpWidget(
+      buildSubject(bitratePref: BitratePreference.auto),
+    );
+    await tester.pump();
+    expect(
+      find.textContaining('Automatic'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows always low label when preference is alwaysLow',
+      (tester) async {
+    await tester.pumpWidget(
+      buildSubject(bitratePref: BitratePreference.alwaysLow),
+    );
+    await tester.pump();
+    expect(find.textContaining('Always Low'), findsOneWidget);
+  });
+
+  testWidgets('shows always high label when preference is alwaysHigh',
+      (tester) async {
+    await tester.pumpWidget(
+      buildSubject(bitratePref: BitratePreference.alwaysHigh),
+    );
+    await tester.pump();
+    expect(find.textContaining('Always High'), findsOneWidget);
+  });
+
+  testWidgets('tapping Sign Out shows confirmation dialog', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    await tester.tap(find.text('Sign Out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Are you sure? Offline downloads on this device will be kept.'),
+        findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+  });
+
+  testWidgets('cancelling logout dialog closes it without action',
+      (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    await tester.tap(find.text('Sign Out'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Dialog is gone, still on settings screen.
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Are you sure?'), findsNothing);
+  });
+
+  testWidgets('tapping Streaming Quality opens picker dialog', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    await tester.tap(find.text('Streaming Quality'));
+    await tester.pumpAndSettle();
+
+    // SimpleDialog with title "Streaming Quality" should appear.
+    expect(find.text('Streaming Quality'), findsWidgets);
+    // All three options should be listed.
+    expect(find.textContaining('Automatic'), findsWidgets);
+    expect(find.textContaining('Always Low'), findsWidgets);
+    expect(find.textContaining('Always High'), findsWidgets);
+  });
+
+  testWidgets('tapping Clear All Downloads shows confirmation dialog',
+      (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+
+    await tester.tap(find.text('Clear All Downloads'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Clear All Downloads'), findsWidgets);
+    expect(find.text('Remove all offline downloads from this device? This cannot be undone.'),
+        findsOneWidget);
+  });
+
+  testWidgets('Crossfade tile is visible but disabled', (tester) async {
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    expect(find.text('Crossfade'), findsOneWidget);
+    expect(find.text('Coming soon'), findsOneWidget);
   });
 }

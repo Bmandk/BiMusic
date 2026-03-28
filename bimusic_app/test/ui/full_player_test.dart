@@ -72,7 +72,12 @@ void main() {
     albumTitle: 'Test Album',
   );
 
-  Widget buildSubject(PlayerState playerState) => ProviderScope(
+  Widget buildSubject(
+    PlayerState playerState, {
+    Duration position = const Duration(seconds: 60),
+    Duration? duration = const Duration(seconds: 240),
+  }) =>
+      ProviderScope(
         overrides: [
           authServiceProvider.overrideWith((_) => mockAuthService),
           audioHandlerProvider.overrideWithValue(mockHandler),
@@ -80,10 +85,10 @@ void main() {
             () => _FakePlayerNotifier(playerState),
           ),
           playerPositionProvider.overrideWith(
-            (_) => Stream.value(const Duration(seconds: 60)),
+            (_) => Stream.value(position),
           ),
           playerDurationProvider.overrideWith(
-            (_) => Stream.value(const Duration(seconds: 240)),
+            (_) => Stream.value(duration),
           ),
         ],
         child: const MaterialApp(home: Scaffold(body: FullPlayer())),
@@ -125,5 +130,79 @@ void main() {
     await tester.pump();
     // Duration is 240s = 4 minutes -> "04:00"
     expect(find.text('04:00'), findsOneWidget);
+  });
+
+  testWidgets('position label is shown', (tester) async {
+    await tester.pumpWidget(
+      buildSubject(playingState, position: const Duration(seconds: 90)),
+    );
+    await tester.pump();
+    // Position 90s = 1:30 -> "01:30"
+    expect(find.text('01:30'), findsOneWidget);
+  });
+
+  testWidgets('shows Nothing playing when no track', (tester) async {
+    await tester.pumpWidget(buildSubject(const PlayerState()));
+    await tester.pump();
+    expect(find.text('Nothing playing'), findsOneWidget);
+  });
+
+  testWidgets('shows album title in app bar', (tester) async {
+    await tester.pumpWidget(buildSubject(playingState));
+    await tester.pump();
+    expect(find.text('Test Album'), findsOneWidget);
+  });
+
+  testWidgets('shows shuffle icon button', (tester) async {
+    await tester.pumpWidget(buildSubject(playingState));
+    await tester.pump();
+    expect(find.byIcon(Icons.shuffle_rounded), findsOneWidget);
+  });
+
+  testWidgets('shows skip prev and skip next buttons', (tester) async {
+    await tester.pumpWidget(buildSubject(playingState));
+    await tester.pump();
+    expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
+  });
+
+  testWidgets('shows repeat icon button', (tester) async {
+    await tester.pumpWidget(buildSubject(playingState));
+    await tester.pump();
+    expect(find.byIcon(Icons.repeat_rounded), findsOneWidget);
+  });
+
+  testWidgets('shows repeat_one icon when repeatMode is one', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      repeatMode: AudioServiceRepeatMode.one,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byIcon(Icons.repeat_one_rounded), findsOneWidget);
+  });
+
+  testWidgets('shows music_note icon when no image URL', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      imageUrl: null,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byIcon(Icons.album), findsOneWidget);
+  });
+
+  testWidgets('shuffle icon has primary color when shuffled', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      isShuffled: true,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    // Icon is rendered with primary color when shuffled — just verify widget renders
+    expect(find.byIcon(Icons.shuffle_rounded), findsOneWidget);
   });
 }

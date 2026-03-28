@@ -202,7 +202,9 @@ describe("listRequests", () => {
 
   it("swallows queue fetch errors and proceeds with pending status", async () => {
     createRequest(TEST_USER_ID, "artist", 10);
-    vi.mocked(lidarrClient.getQueue).mockRejectedValue(new Error("Queue unavailable"));
+    vi.mocked(lidarrClient.getQueue).mockRejectedValue(
+      new Error("Queue unavailable"),
+    );
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 10,
       artistName: "Artist",
@@ -217,7 +219,9 @@ describe("listRequests", () => {
   it("swallows individual status check errors and leaves request as pending", async () => {
     createRequest(TEST_USER_ID, "artist", 10);
     vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
-    vi.mocked(lidarrClient.getArtist).mockRejectedValue(new Error("Lidarr down"));
+    vi.mocked(lidarrClient.getArtist).mockRejectedValue(
+      new Error("Lidarr down"),
+    );
 
     const result = await listRequests(TEST_USER_ID);
     expect(result[0]?.status).toBe("pending");

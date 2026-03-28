@@ -123,7 +123,10 @@ describe("getArtists", () => {
   });
 
   it("uses 'Unknown Artist' when artistName is missing", async () => {
-    const artistNoName = { ...mockArtist, artistName: undefined as unknown as string };
+    const artistNoName = {
+      ...mockArtist,
+      artistName: undefined as unknown as string,
+    };
     vi.mocked(lidarrClient.getArtists).mockResolvedValue([artistNoName]);
     vi.mocked(lidarrClient.getAlbums).mockResolvedValue([]);
 
@@ -143,7 +146,10 @@ describe("getArtists", () => {
 describe("getArtist", () => {
   it("returns a shaped single artist with album count", async () => {
     vi.mocked(lidarrClient.getArtist).mockResolvedValue(mockArtist);
-    vi.mocked(lidarrClient.getAlbums).mockResolvedValue([mockAlbum, { ...mockAlbum, id: 11 }]);
+    vi.mocked(lidarrClient.getAlbums).mockResolvedValue([
+      mockAlbum,
+      { ...mockAlbum, id: 11 },
+    ]);
 
     const result = await getArtist(1);
 
@@ -181,7 +187,10 @@ describe("getArtistAlbums", () => {
   });
 
   it("uses 'Unknown Album' when title is missing", async () => {
-    const albumNoTitle = { ...mockAlbum, title: undefined as unknown as string };
+    const albumNoTitle = {
+      ...mockAlbum,
+      title: undefined as unknown as string,
+    };
     vi.mocked(lidarrClient.getAlbums).mockResolvedValue([albumNoTitle]);
 
     const result = await getArtistAlbums(1);
@@ -189,7 +198,10 @@ describe("getArtistAlbums", () => {
   });
 
   it("uses 'Unknown Artist' when artist.artistName is missing", async () => {
-    const albumNoArtist = { ...mockAlbum, artist: undefined as unknown as { artistName: string } };
+    const albumNoArtist = {
+      ...mockAlbum,
+      artist: undefined as unknown as { artistName: string },
+    };
     vi.mocked(lidarrClient.getAlbums).mockResolvedValue([albumNoArtist]);
 
     const result = await getArtistAlbums(1);
@@ -206,7 +218,10 @@ describe("getArtistAlbums", () => {
 describe("getAlbum", () => {
   it("returns a shaped album with track count", async () => {
     vi.mocked(lidarrClient.getAlbum).mockResolvedValue(mockAlbum);
-    vi.mocked(lidarrClient.getTracks).mockResolvedValue([mockTrack, { ...mockTrack, id: 101 }]);
+    vi.mocked(lidarrClient.getTracks).mockResolvedValue([
+      mockTrack,
+      { ...mockTrack, id: 101 },
+    ]);
 
     const result = await getAlbum(10);
 
@@ -218,7 +233,10 @@ describe("getAlbum", () => {
   });
 
   it("uses empty array for genres when missing", async () => {
-    const albumNoGenres = { ...mockAlbum, genres: undefined as unknown as string[] };
+    const albumNoGenres = {
+      ...mockAlbum,
+      genres: undefined as unknown as string[],
+    };
     vi.mocked(lidarrClient.getAlbum).mockResolvedValue(albumNoGenres);
     vi.mocked(lidarrClient.getTracks).mockResolvedValue([]);
 
@@ -247,7 +265,10 @@ describe("getAlbumTracks", () => {
   });
 
   it("uses 'Unknown Track' when title is missing", async () => {
-    const trackNoTitle = { ...mockTrack, title: undefined as unknown as string };
+    const trackNoTitle = {
+      ...mockTrack,
+      title: undefined as unknown as string,
+    };
     vi.mocked(lidarrClient.getTracks).mockResolvedValue([trackNoTitle]);
 
     const result = await getAlbumTracks(10);
@@ -255,7 +276,10 @@ describe("getAlbumTracks", () => {
   });
 
   it("uses '0' for trackNumber when missing", async () => {
-    const trackNoNumber = { ...mockTrack, trackNumber: undefined as unknown as string };
+    const trackNoNumber = {
+      ...mockTrack,
+      trackNumber: undefined as unknown as string,
+    };
     vi.mocked(lidarrClient.getTracks).mockResolvedValue([trackNoNumber]);
 
     const result = await getAlbumTracks(10);
@@ -277,7 +301,9 @@ describe("getTrack", () => {
   });
 
   it("propagates lidarrClient errors", async () => {
-    vi.mocked(lidarrClient.getTrack).mockRejectedValue(new Error("Track not found"));
+    vi.mocked(lidarrClient.getTrack).mockRejectedValue(
+      new Error("Track not found"),
+    );
     await expect(getTrack(999)).rejects.toThrow("Track not found");
   });
 });
@@ -312,7 +338,9 @@ describe("search", () => {
   });
 
   it("handles results with only artist (no album)", async () => {
-    vi.mocked(lidarrClient.search).mockResolvedValue([{ artist: mockArtist, album: undefined as unknown as typeof mockAlbum }]);
+    vi.mocked(lidarrClient.search).mockResolvedValue([
+      { artist: mockArtist, album: undefined as unknown as typeof mockAlbum },
+    ]);
 
     const result = await search("artist only");
     expect(result.artists).toHaveLength(1);
@@ -320,7 +348,9 @@ describe("search", () => {
   });
 
   it("handles results with only album (no artist)", async () => {
-    vi.mocked(lidarrClient.search).mockResolvedValue([{ artist: undefined as unknown as typeof mockArtist, album: mockAlbum }]);
+    vi.mocked(lidarrClient.search).mockResolvedValue([
+      { artist: undefined as unknown as typeof mockArtist, album: mockAlbum },
+    ]);
 
     const result = await search("album only");
     expect(result.artists).toHaveLength(0);
@@ -338,9 +368,14 @@ describe("search", () => {
 
 describe("getArtistImageStream", () => {
   it("fetches artist and returns cover stream for poster image", async () => {
-    const mockStream = { data: { pipe: vi.fn() }, headers: { "content-type": "image/jpeg" } };
+    const mockStream = {
+      data: { pipe: vi.fn() },
+      headers: { "content-type": "image/jpeg" },
+    };
     vi.mocked(lidarrClient.getArtist).mockResolvedValue(mockArtist);
-    vi.mocked(lidarrClient.getArtistCover).mockResolvedValue(mockStream as never);
+    vi.mocked(lidarrClient.getArtistCover).mockResolvedValue(
+      mockStream as never,
+    );
 
     const result = await getArtistImageStream(1);
 
@@ -353,7 +388,9 @@ describe("getArtistImageStream", () => {
     const artistNoImages = { ...mockArtist, images: [] };
     const mockStream = { data: { pipe: vi.fn() } };
     vi.mocked(lidarrClient.getArtist).mockResolvedValue(artistNoImages);
-    vi.mocked(lidarrClient.getArtistCover).mockResolvedValue(mockStream as never);
+    vi.mocked(lidarrClient.getArtistCover).mockResolvedValue(
+      mockStream as never,
+    );
 
     await getArtistImageStream(1);
     expect(lidarrClient.getArtistCover).toHaveBeenCalledWith(1, "poster.jpg");
@@ -363,7 +400,9 @@ describe("getArtistImageStream", () => {
     const artistNullImages = { ...mockArtist, images: null as never };
     const mockStream = { data: { pipe: vi.fn() } };
     vi.mocked(lidarrClient.getArtist).mockResolvedValue(artistNullImages);
-    vi.mocked(lidarrClient.getArtistCover).mockResolvedValue(mockStream as never);
+    vi.mocked(lidarrClient.getArtistCover).mockResolvedValue(
+      mockStream as never,
+    );
 
     await getArtistImageStream(1);
     expect(lidarrClient.getArtistCover).toHaveBeenCalledWith(1, "poster.jpg");
@@ -372,9 +411,14 @@ describe("getArtistImageStream", () => {
 
 describe("getAlbumImageStream", () => {
   it("fetches album and returns cover stream for cover image", async () => {
-    const mockStream = { data: { pipe: vi.fn() }, headers: { "content-type": "image/jpeg" } };
+    const mockStream = {
+      data: { pipe: vi.fn() },
+      headers: { "content-type": "image/jpeg" },
+    };
     vi.mocked(lidarrClient.getAlbum).mockResolvedValue(mockAlbum);
-    vi.mocked(lidarrClient.getAlbumCover).mockResolvedValue(mockStream as never);
+    vi.mocked(lidarrClient.getAlbumCover).mockResolvedValue(
+      mockStream as never,
+    );
 
     const result = await getAlbumImageStream(10);
 
@@ -387,7 +431,9 @@ describe("getAlbumImageStream", () => {
     const albumNoImages = { ...mockAlbum, images: [] };
     const mockStream = { data: { pipe: vi.fn() } };
     vi.mocked(lidarrClient.getAlbum).mockResolvedValue(albumNoImages);
-    vi.mocked(lidarrClient.getAlbumCover).mockResolvedValue(mockStream as never);
+    vi.mocked(lidarrClient.getAlbumCover).mockResolvedValue(
+      mockStream as never,
+    );
 
     await getAlbumImageStream(10);
     expect(lidarrClient.getAlbumCover).toHaveBeenCalledWith(10, "cover.jpg");

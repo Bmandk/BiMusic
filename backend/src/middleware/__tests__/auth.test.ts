@@ -29,7 +29,10 @@ import type { AppError } from "../errorHandler.js";
 const ACCESS_SECRET = "test-access-secret-at-least-32-chars-long";
 
 function makeValidToken(payload: AuthUser): string {
-  return jwt.sign(payload, ACCESS_SECRET, { algorithm: "HS256", expiresIn: "15m" });
+  return jwt.sign(payload, ACCESS_SECRET, {
+    algorithm: "HS256",
+    expiresIn: "15m",
+  });
 }
 
 interface MockRequest {
@@ -64,7 +67,11 @@ function getNextError(next: ReturnType<typeof makeNext>): AppError {
 
 describe("authenticate", () => {
   it("sets req.user and calls next() for a valid Bearer token", () => {
-    const payload: AuthUser = { userId: "u1", username: "alice", isAdmin: false };
+    const payload: AuthUser = {
+      userId: "u1",
+      username: "alice",
+      isAdmin: false,
+    };
     const token = makeValidToken(payload);
     const req = makeReq({ authHeader: `Bearer ${token}` });
     const next = makeNext();
@@ -92,8 +99,16 @@ describe("authenticate", () => {
   });
 
   it("prefers Authorization header over query token when both present", () => {
-    const headerPayload: AuthUser = { userId: "header-user", username: "header", isAdmin: false };
-    const queryPayload: AuthUser = { userId: "query-user", username: "query", isAdmin: false };
+    const headerPayload: AuthUser = {
+      userId: "header-user",
+      username: "header",
+      isAdmin: false,
+    };
+    const queryPayload: AuthUser = {
+      userId: "query-user",
+      username: "query",
+      isAdmin: false,
+    };
     const headerToken = makeValidToken(headerPayload);
     const queryToken = makeValidToken(queryPayload);
 
@@ -131,7 +146,11 @@ describe("authenticate", () => {
   });
 
   it("calls next with UNAUTHORIZED error for an expired token", () => {
-    const payload: AuthUser = { userId: "u3", username: "charlie", isAdmin: false };
+    const payload: AuthUser = {
+      userId: "u3",
+      username: "charlie",
+      isAdmin: false,
+    };
     const expiredToken = jwt.sign(payload, ACCESS_SECRET, {
       algorithm: "HS256",
       expiresIn: -1, // already expired
@@ -171,7 +190,11 @@ describe("authenticate", () => {
   });
 
   it("sets isAdmin true for admin tokens", () => {
-    const payload: AuthUser = { userId: "admin-id", username: "admin", isAdmin: true };
+    const payload: AuthUser = {
+      userId: "admin-id",
+      username: "admin",
+      isAdmin: true,
+    };
     const token = makeValidToken(payload);
     const req = makeReq({ authHeader: `Bearer ${token}` });
     const next = makeNext();

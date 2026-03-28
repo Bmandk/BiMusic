@@ -47,51 +47,49 @@ class _StubDownloadNotifier extends DownloadNotifier {
       tasks: state.tasks.where((t) => t.serverId != serverId).toList(),
     );
   }
+
+  @override
+  Future<void> clearAllDownloads() async {
+    state = state.copyWith(tasks: []);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-List<DownloadTask> _tasks({bool withItems = true}) {
-  if (!withItems) return [];
-  return [
+DownloadTask _makeTask({
+  required String serverId,
+  required int trackId,
+  required DownloadStatus status,
+  String trackTitle = 'Track',
+  String trackNumber = '1',
+  String albumTitle = 'Great Album',
+  String artistName = 'Great Artist',
+  double? progress,
+  int? fileSizeBytes,
+  String? filePath,
+  String? errorMessage,
+}) =>
     DownloadTask(
-      serverId: 's1',
-      trackId: 1,
+      serverId: serverId,
+      trackId: trackId,
       albumId: 10,
       artistId: 5,
       userId: 'u1',
       deviceId: 'dev-1',
-      status: DownloadStatus.completed,
-      fileSizeBytes: 4 * 1024 * 1024,
-      filePath: '/docs/1.mp3',
-      completedAt: DateTime(2026, 3, 28),
-      trackTitle: 'First Track',
-      trackNumber: '1',
-      albumTitle: 'Great Album',
-      artistName: 'Great Artist',
+      status: status,
+      trackTitle: trackTitle,
+      trackNumber: trackNumber,
+      albumTitle: albumTitle,
+      artistName: artistName,
       bitrate: 320,
       requestedAt: '2026-03-28T10:00:00Z',
-    ),
-    DownloadTask(
-      serverId: 's2',
-      trackId: 2,
-      albumId: 10,
-      artistId: 5,
-      userId: 'u1',
-      deviceId: 'dev-1',
-      status: DownloadStatus.downloading,
-      progress: 0.5,
-      trackTitle: 'Second Track',
-      trackNumber: '2',
-      albumTitle: 'Great Album',
-      artistName: 'Great Artist',
-      bitrate: 320,
-      requestedAt: '2026-03-28T10:00:00Z',
-    ),
-  ];
-}
+      progress: progress,
+      fileSizeBytes: fileSizeBytes,
+      filePath: filePath,
+      errorMessage: errorMessage,
+    );
 
 ProviderContainer _container(List<DownloadTask> tasks) => ProviderContainer(
       overrides: [
@@ -123,7 +121,20 @@ void main() {
   });
 
   testWidgets('renders track titles when downloads are present', (tester) async {
-    final container = _container(_tasks());
+    final tasks = [
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed,
+          trackTitle: 'First Track'),
+      _makeTask(
+          serverId: 's2',
+          trackId: 2,
+          status: DownloadStatus.downloading,
+          trackTitle: 'Second Track',
+          progress: 0.5),
+    ];
+    final container = _container(tasks);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_buildSubject(container));
@@ -134,7 +145,14 @@ void main() {
   });
 
   testWidgets('shows album group header', (tester) async {
-    final container = _container(_tasks());
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed,
+          albumTitle: 'Great Album',
+          artistName: 'Great Artist'),
+    ]);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_buildSubject(container));
@@ -145,13 +163,20 @@ void main() {
   });
 
   testWidgets('storage usage banner shows used size', (tester) async {
-    final container = _container(_tasks());
+    final container = _container([
+      _makeTask(
+        serverId: 's1',
+        trackId: 1,
+        status: DownloadStatus.completed,
+        fileSizeBytes: 4 * 1024 * 1024,
+        filePath: '/docs/1.mp3',
+      ),
+    ]);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_buildSubject(container));
     await tester.pump();
 
-    // 4 MB completed track → should see "MB" in the banner
     expect(find.textContaining('MB'), findsOneWidget);
   });
 
@@ -161,20 +186,22 @@ void main() {
         authServiceProvider.overrideWith((_) => _FakeAuthService()),
         authNotifierProvider.overrideWith(() => _FakeAuthNotifier()),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
-        downloadProvider.overrideWith(
-          () => _LoadingDownloadNotifier(),
-        ),
+        downloadProvider.overrideWith(() => _LoadingDownloadNotifier()),
       ],
     );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_buildSubject(container));
-    // Don't pump — state still loading.
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
   testWidgets('remove all button appears when downloads exist', (tester) async {
-    final container = _container(_tasks());
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed),
+    ]);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_buildSubject(container));
@@ -191,6 +218,210 @@ void main() {
     await tester.pump();
 
     expect(find.byIcon(Icons.delete_sweep_outlined), findsNothing);
+  });
+
+  testWidgets('shows pending task with schedule icon', (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1', trackId: 1, status: DownloadStatus.pending),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.schedule), findsOneWidget);
+  });
+
+  testWidgets('shows downloading progress indicator for downloading task',
+      (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.downloading,
+          progress: 0.4),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    // LinearProgressIndicator for subtitle, CircularProgressIndicator for icon.
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('shows completed icon for completed task', (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed,
+          fileSizeBytes: 1024,
+          filePath: '/docs/1.mp3'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.download_done), findsWidgets);
+  });
+
+  testWidgets('shows failed task error message', (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.failed,
+          errorMessage: 'Connection timed out'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    expect(find.text('Connection timed out'), findsOneWidget);
+  });
+
+  testWidgets('shows refresh icon button for failed task', (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.failed,
+          errorMessage: 'Error'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+  });
+
+  testWidgets('remove all dialog appears when tapping delete sweep icon',
+      (tester) async {
+    final container = _container([
+      _makeTask(serverId: 's1', trackId: 1, status: DownloadStatus.completed),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.delete_sweep_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove all downloads?'), findsOneWidget);
+    expect(find.text('Remove all'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+  });
+
+  testWidgets('cancelling remove all dialog leaves downloads intact',
+      (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed,
+          trackTitle: 'My Track'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.delete_sweep_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('My Track'), findsOneWidget);
+  });
+
+  testWidgets('confirming remove all clears the download list', (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed,
+          trackTitle: 'My Track'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.delete_sweep_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Remove all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No downloads yet'), findsOneWidget);
+  });
+
+  testWidgets('shows album delete button per group', (tester) async {
+    final container = _container([
+      _makeTask(serverId: 's1', trackId: 1, status: DownloadStatus.completed),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.delete_outline), findsWidgets);
+  });
+
+  testWidgets('album delete dialog appears when tapping album delete button',
+      (tester) async {
+    final container = _container([
+      _makeTask(serverId: 's1', trackId: 1, status: DownloadStatus.completed,
+          albumTitle: 'My Album'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    // The album delete icon button (smaller size 20).
+    final deleteIcons = find.byIcon(Icons.delete_outline);
+    await tester.tap(deleteIcons.first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove album?'), findsOneWidget);
+  });
+
+  testWidgets('shows correct track count in empty storage banner',
+      (tester) async {
+    final container = _container([]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    // 0 tracks shown
+    expect(find.textContaining('0 tracks'), findsOneWidget);
+  });
+
+  testWidgets('shows singular "track" in storage banner for 1 track',
+      (tester) async {
+    final container = _container([
+      _makeTask(
+          serverId: 's1',
+          trackId: 1,
+          status: DownloadStatus.completed,
+          fileSizeBytes: 1024 * 1024,
+          filePath: '/docs/1.mp3'),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_buildSubject(container));
+    await tester.pump();
+
+    expect(find.textContaining('1 track'), findsOneWidget);
   });
 }
 

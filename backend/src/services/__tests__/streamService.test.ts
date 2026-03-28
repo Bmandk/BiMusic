@@ -47,7 +47,11 @@ const mockFfmpegCmd = vi.hoisted(() => ({
   audioCodec: vi.fn().mockReturnThis(),
   audioBitrate: vi.fn().mockReturnThis(),
   output: vi.fn().mockReturnThis(),
-  on: vi.fn().mockImplementation(function (this: unknown, event: string, cb: (...args: unknown[]) => void) {
+  on: vi.fn().mockImplementation(function (
+    this: unknown,
+    event: string,
+    cb: (...args: unknown[]) => void,
+  ) {
     if (event === "end") setTimeout(() => cb(), 0);
     return this;
   }),
@@ -103,7 +107,11 @@ beforeEach(() => {
   vi.mocked(fs.existsSync).mockReturnValue(false);
 
   // Reset ffmpeg mock to default success behavior
-  mockFfmpegCmd.on.mockImplementation(function (this: unknown, event: string, cb: (...args: unknown[]) => void) {
+  mockFfmpegCmd.on.mockImplementation(function (
+    this: unknown,
+    event: string,
+    cb: (...args: unknown[]) => void,
+  ) {
     if (event === "end") setTimeout(() => cb(), 0);
     return this;
   });
@@ -153,11 +161,16 @@ describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTransco
 describe("initTempDir", () => {
   it("creates the temp directory", () => {
     initTempDir();
-    expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp/bimusic", { recursive: true });
+    expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp/bimusic", {
+      recursive: true,
+    });
   });
 
   it("deletes files found in the temp directory", () => {
-    vi.mocked(fs.readdirSync).mockReturnValue(["file1.mp3", "file2.mp3"] as never);
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      "file1.mp3",
+      "file2.mp3",
+    ] as never);
     initTempDir();
     expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
   });
@@ -376,12 +389,19 @@ describe("ensureTranscoded", () => {
   it("throws TRANSCODE_ERROR when ffmpeg fails", async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
-    mockFfmpegCmd.on.mockImplementation(function (this: unknown, event: string, cb: (...args: unknown[]) => void) {
-      if (event === "error") setTimeout(() => cb(new Error("ffmpeg crashed")), 0);
+    mockFfmpegCmd.on.mockImplementation(function (
+      this: unknown,
+      event: string,
+      cb: (...args: unknown[]) => void,
+    ) {
+      if (event === "error")
+        setTimeout(() => cb(new Error("ffmpeg crashed")), 0);
       return this;
     });
 
-    await expect(ensureTranscoded("/music/track.flac", 320)).rejects.toMatchObject({
+    await expect(
+      ensureTranscoded("/music/track.flac", 320),
+    ).rejects.toMatchObject({
       code: "TRANSCODE_ERROR",
     });
   });
@@ -419,7 +439,10 @@ describe("serveFile", () => {
   }
 
   beforeEach(() => {
-    vi.mocked(fs.statSync).mockReturnValue({ size: 10000, mtimeMs: Date.now() } as never);
+    vi.mocked(fs.statSync).mockReturnValue({
+      size: 10000,
+      mtimeMs: Date.now(),
+    } as never);
     mockReadStream.pipe.mockClear();
     vi.mocked(fs.createReadStream).mockReturnValue(mockReadStream as never);
   });
@@ -444,9 +467,15 @@ describe("serveFile", () => {
     serveFile("/music/track.mp3", req, res as never);
 
     expect(res.status).toHaveBeenCalledWith(206);
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Range", "bytes 0-999/10000");
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 0-999/10000",
+    );
     expect(res.setHeader).toHaveBeenCalledWith("Content-Length", 1000);
-    expect(fs.createReadStream).toHaveBeenCalledWith("/music/track.mp3", { start: 0, end: 999 });
+    expect(fs.createReadStream).toHaveBeenCalledWith("/music/track.mp3", {
+      start: 0,
+      end: 999,
+    });
   });
 
   it("handles open-ended Range header (end omitted)", () => {
@@ -456,7 +485,10 @@ describe("serveFile", () => {
     serveFile("/music/track.mp3", req, res as never);
 
     expect(res.status).toHaveBeenCalledWith(206);
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Range", "bytes 5000-9999/10000");
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 5000-9999/10000",
+    );
   });
 
   it("returns 416 when range is out of bounds", () => {
@@ -466,7 +498,10 @@ describe("serveFile", () => {
     serveFile("/music/track.mp3", req, res as never);
 
     expect(res.status).toHaveBeenCalledWith(416);
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Range", "bytes */10000");
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes */10000",
+    );
     expect(res.end).toHaveBeenCalled();
   });
 

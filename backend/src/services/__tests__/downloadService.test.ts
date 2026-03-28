@@ -75,7 +75,11 @@ const mockFfmpegCmd = vi.hoisted(() => ({
   audioCodec: vi.fn().mockReturnThis(),
   audioBitrate: vi.fn().mockReturnThis(),
   output: vi.fn().mockReturnThis(),
-  on: vi.fn().mockImplementation(function (this: unknown, event: string, cb: (...args: unknown[]) => void) {
+  on: vi.fn().mockImplementation(function (
+    this: unknown,
+    event: string,
+    cb: (...args: unknown[]) => void,
+  ) {
     if (event === "end") setTimeout(() => cb(), 0);
     return this;
   }),
@@ -124,7 +128,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   // Reset ffmpeg mock to default success behavior
-  mockFfmpegCmd.on.mockImplementation(function (this: unknown, event: string, cb: (...args: unknown[]) => void) {
+  mockFfmpegCmd.on.mockImplementation(function (
+    this: unknown,
+    event: string,
+    cb: (...args: unknown[]) => void,
+  ) {
     if (event === "end") setTimeout(() => cb(), 0);
     return this;
   });
@@ -282,7 +290,9 @@ describe("processOnePendingDownload", () => {
   });
 
   it("transcodes a pending download and marks it ready", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue("/music/track.flac");
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
+      "/music/track.flac",
+    );
 
     const created = requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
     await processOnePendingDownload();
@@ -296,7 +306,9 @@ describe("processOnePendingDownload", () => {
   });
 
   it("marks download as failed when resolveFilePath throws", async () => {
-    vi.mocked(streamService.resolveFilePath).mockRejectedValue(new Error("Track not found"));
+    vi.mocked(streamService.resolveFilePath).mockRejectedValue(
+      new Error("Track not found"),
+    );
 
     requestDownload(TEST_USER, TEST_DEVICE, 999, 320);
     await processOnePendingDownload();
@@ -307,10 +319,16 @@ describe("processOnePendingDownload", () => {
   });
 
   it("marks download as failed when ffmpeg errors", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue("/music/track.flac");
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
+      "/music/track.flac",
+    );
 
     // Make ffmpeg call the error callback instead of end
-    mockFfmpegCmd.on.mockImplementation(function (this: unknown, event: string, cb: (...args: unknown[]) => void) {
+    mockFfmpegCmd.on.mockImplementation(function (
+      this: unknown,
+      event: string,
+      cb: (...args: unknown[]) => void,
+    ) {
       if (event === "error") setTimeout(() => cb(new Error("ffmpeg error")), 0);
       return this;
     });
@@ -323,7 +341,9 @@ describe("processOnePendingDownload", () => {
   });
 
   it("processes the oldest pending download first", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue("/music/track.flac");
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
+      "/music/track.flac",
+    );
 
     // Insert with specific requestedAt values
     const earlier = new Date(Date.now() - 10000).toISOString();
@@ -366,7 +386,9 @@ describe("processOnePendingDownload", () => {
   });
 
   it("calls registerFfmpegCommand and unregisterFfmpegCommand", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue("/music/track.flac");
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
+      "/music/track.flac",
+    );
 
     requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
     await processOnePendingDownload();

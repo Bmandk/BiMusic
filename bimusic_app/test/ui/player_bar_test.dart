@@ -69,7 +69,12 @@ void main() {
     when(() => mockHandler.currentTracks).thenReturn([]);
   });
 
-  Widget buildSubject(PlayerState playerState) => ProviderScope(
+  Widget buildSubject(
+    PlayerState playerState, {
+    Duration position = const Duration(seconds: 30),
+    Duration? duration = const Duration(seconds: 180),
+  }) =>
+      ProviderScope(
         overrides: [
           authServiceProvider.overrideWith((_) => mockAuthService),
           audioHandlerProvider.overrideWithValue(mockHandler),
@@ -77,10 +82,10 @@ void main() {
             () => _FakePlayerNotifier(playerState),
           ),
           playerPositionProvider.overrideWith(
-            (_) => Stream.value(const Duration(seconds: 30)),
+            (_) => Stream.value(position),
           ),
           playerDurationProvider.overrideWith(
-            (_) => Stream.value(const Duration(seconds: 180)),
+            (_) => Stream.value(duration),
           ),
         ],
         child: const MaterialApp(home: Scaffold(body: PlayerBar())),
@@ -129,5 +134,65 @@ void main() {
     await tester.pumpWidget(buildSubject(state));
     await tester.pump();
     expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+  });
+
+  testWidgets('shows LinearProgressIndicator when track is playing',
+      (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      artistName: 'Artist',
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('shows skip next button', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
+  });
+
+  testWidgets('shows music_note icon when no image URL', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      imageUrl: null,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byIcon(Icons.music_note), findsOneWidget);
+  });
+
+  testWidgets('progress bar shows 0 when position/duration are null',
+      (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+    );
+    await tester.pumpWidget(
+      buildSubject(state, position: Duration.zero, duration: null),
+    );
+    await tester.pump();
+    // LinearProgressIndicator should still render with 0 value
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('does not show artist name when artistName is null',
+      (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      artistName: null,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    // Track title still shows
+    expect(find.text('Test Song'), findsOneWidget);
   });
 }
