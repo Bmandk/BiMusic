@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:bimusic_app/models/auth_tokens.dart';
-import 'package:bimusic_app/models/download_task.dart';
 import 'package:bimusic_app/models/track.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/providers/auth_provider.dart';

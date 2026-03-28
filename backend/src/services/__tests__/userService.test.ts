@@ -65,19 +65,19 @@ describe('userService', () => {
     it('creates a user and returns public fields (no passwordHash)', async () => {
       const user = await userService.createUser('alice', 'password123', false);
       expect(user).toBeDefined();
-      expect(user!.username).toBe('alice');
-      expect(user!.isAdmin).toBe(0);
+      expect(user.username).toBe('alice');
+      expect(user.isAdmin).toBe(0);
       expect(user).not.toHaveProperty('passwordHash');
     });
 
     it('creates an admin user when isAdmin is true', async () => {
       const user = await userService.createUser('bob', 'password123', true);
-      expect(user!.isAdmin).toBe(1);
+      expect(user.isAdmin).toBe(1);
     });
 
     it('defaults isAdmin to false when omitted', async () => {
       const user = await userService.createUser('charlie', 'password123');
-      expect(user!.isAdmin).toBe(0);
+      expect(user.isAdmin).toBe(0);
     });
   });
 
@@ -109,7 +109,7 @@ describe('userService', () => {
   describe('getUser', () => {
     it('returns the user by id', async () => {
       const created = await userService.createUser('dave', 'password123');
-      const found = userService.getUser(created!.id);
+      const found = userService.getUser(created.id);
       expect(found).toBeDefined();
       expect(found!.username).toBe('dave');
     });
@@ -123,7 +123,7 @@ describe('userService', () => {
   describe('deleteUser', () => {
     it('removes the user from the list', async () => {
       const user = await userService.createUser('eve', 'password123');
-      userService.deleteUser(user!.id);
+      userService.deleteUser(user.id);
       const all = userService.listUsers();
       expect(all.map((u) => u.username)).not.toContain('eve');
     });

@@ -5,7 +5,6 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:bimusic_app/models/auth_tokens.dart';
 import 'package:bimusic_app/models/user.dart';
-import 'package:bimusic_app/providers/auth_provider.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 import 'package:bimusic_app/ui/screens/login_screen.dart';
 
@@ -14,7 +13,7 @@ class _MockAuthService extends Mock implements AuthService {}
 void main() {
   late _MockAuthService mockAuthService;
 
-  const _testTokens = AuthTokens(
+  const testTokens = AuthTokens(
     accessToken: 'access',
     refreshToken: 'refresh',
     user: User(userId: 'u1', username: 'admin', isAdmin: false),
@@ -79,7 +78,7 @@ void main() {
   testWidgets('calls login on the auth service when form is submitted',
       (tester) async {
     when(() => mockAuthService.login(any(), any()))
-        .thenAnswer((_) async => _testTokens);
+        .thenAnswer((_) async => testTokens);
 
     await tester.pumpWidget(buildSubject());
     await tester.pumpAndSettle();
