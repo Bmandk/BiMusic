@@ -11,6 +11,7 @@ import searchRouter from './routes/search.js';
 import adminRouter from './routes/admin.js';
 import usersRouter from './routes/users.js';
 import playlistsRouter from './routes/playlists.js';
+import requestsRouter from './routes/requests.js';
 
 export function createApp() {
   const app = express();
@@ -51,6 +52,7 @@ export function createApp() {
   app.use('/api/admin', adminRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/playlists', playlistsRouter);
+  app.use('/api/requests', requestsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

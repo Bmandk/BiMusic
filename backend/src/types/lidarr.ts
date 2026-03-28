@@ -27,6 +27,7 @@ export interface LidarrArtist {
   genres: string[] | null;
   sortName: string | null;
   ratings: LidarrRatings;
+  statistics: { trackFileCount: number } | null;
 }
 
 export interface LidarrAlbum {
@@ -45,6 +46,7 @@ export interface LidarrAlbum {
   genres: string[] | null;
   ratings: LidarrRatings;
   remoteCover: string | null;
+  statistics: { trackFileCount: number } | null;
 }
 
 export interface LidarrQuality {

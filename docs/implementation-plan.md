@@ -347,6 +347,10 @@ Download integration tests pass. File is served correctly.
 
 ## Phase 8 — Search & Music Requests
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created/modified: `backend/src/routes/requests.ts`, `backend/src/services/requestService.ts`, `backend/src/types/lidarr.ts` (added `statistics` to `LidarrArtist`/`LidarrAlbum`), `backend/src/types/api.ts` (added `MusicRequest`), `backend/src/app.ts` (mounted `/api/requests`), `backend/tests/integration/requests.test.ts`.
+> All 10 request integration tests pass (75 total across all integration test files).
+
 **Goal:** Users can search the Lidarr catalog and request new music, tracking status of pending requests.
 
 ### Tasks

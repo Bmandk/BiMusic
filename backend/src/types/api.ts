@@ -36,3 +36,12 @@ export interface SearchResults {
   artists: Artist[];
   albums: Album[];
 }
+
+export interface MusicRequest {
+  id: string;
+  type: string;
+  lidarrId: number;
+  status: string;
+  requestedAt: string;
+  resolvedAt: string | null;
+}
