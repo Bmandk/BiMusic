@@ -658,6 +658,9 @@ Download an album. Background download continues when app is backgrounded (mobil
 
 ## Phase 17 — Flutter Settings
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created/modified: `bimusic_app/lib/ui/screens/settings_screen.dart`, `bimusic_app/lib/providers/bitrate_preference_provider.dart`, `bimusic_app/lib/providers/bitrate_provider.dart`, `bimusic_app/lib/providers/download_provider.dart` (`clearAllDownloads()`), `bimusic_app/pubspec.yaml` (`package_info_plus`), `backend/src/routes/admin.ts` (`GET /api/admin/logs`).
+
 **Goal:** Settings screen with useful controls and debug info.
 
 ### Tasks

@@ -262,6 +262,40 @@ class DownloadNotifier extends Notifier<DownloadState> {
     await _persist();
   }
 
+  /// Cancel all active downloads, delete all local files, remove all backend
+  /// records, and clear the task list.
+  Future<void> clearAllDownloads() async {
+    // Cancel all in-flight transfers.
+    for (final token in _cancelTokens.values) {
+      token.cancel('Cleared by user');
+    }
+    _cancelTokens.clear();
+
+    final tasks = List<DownloadTask>.from(state.tasks);
+
+    // Delete local files (best-effort).
+    for (final task in tasks) {
+      if (task.filePath != null) {
+        try {
+          final f = File(task.filePath!);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      }
+    }
+
+    // Remove backend records (best-effort, fire and forget).
+    final dio = ref.read(apiClientProvider);
+    for (final task in tasks) {
+      try {
+        await dio.delete('/api/downloads/${task.serverId}');
+      } catch (_) {}
+    }
+
+    _activeCount = 0;
+    state = state.copyWith(tasks: []);
+    await _persist();
+  }
+
   /// Permanently remove a download: cancels any active transfer, deletes the
   /// local file, and removes the server-side record.
   Future<void> removeDownload(String serverId) async {
