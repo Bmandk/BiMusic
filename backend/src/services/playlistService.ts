@@ -1,8 +1,8 @@
-import { randomUUID } from 'crypto';
-import { eq, and, gte, sql, asc } from 'drizzle-orm';
-import { db } from '../db/connection.js';
-import { playlists, playlistTracks } from '../db/schema.js';
-import { createError } from '../middleware/errorHandler.js';
+import { randomUUID } from "crypto";
+import { eq, and, gte, sql, asc } from "drizzle-orm";
+import { db } from "../db/connection.js";
+import { playlists, playlistTracks } from "../db/schema.js";
+import { createError } from "../middleware/errorHandler.js";
 
 export interface PlaylistSummary {
   id: string;
@@ -22,12 +22,16 @@ function assertOwnership(
   userId: string,
 ): asserts playlist is { userId: string } & Record<string, unknown> {
   if (!playlist || playlist.userId !== userId) {
-    throw createError(404, 'NOT_FOUND', 'Playlist not found');
+    throw createError(404, "NOT_FOUND", "Playlist not found");
   }
 }
 
 export function listPlaylists(userId: string): PlaylistSummary[] {
-  const rows = db.select().from(playlists).where(eq(playlists.userId, userId)).all();
+  const rows = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.userId, userId))
+    .all();
   return rows.map((p) => {
     const countRow = db
       .select({ count: sql<number>`count(*)` })
@@ -43,15 +47,24 @@ export function listPlaylists(userId: string): PlaylistSummary[] {
   });
 }
 
-export function createPlaylist(userId: string, name: string): { id: string; name: string; createdAt: string } {
+export function createPlaylist(
+  userId: string,
+  name: string,
+): { id: string; name: string; createdAt: string } {
   const id = randomUUID();
   const now = new Date().toISOString();
-  db.insert(playlists).values({ id, userId, name, createdAt: now, updatedAt: now }).run();
+  db.insert(playlists)
+    .values({ id, userId, name, createdAt: now, updatedAt: now })
+    .run();
   return { id, name, createdAt: now };
 }
 
 export function getPlaylist(id: string, userId: string): PlaylistDetail {
-  const playlist = db.select().from(playlists).where(eq(playlists.id, id)).get();
+  const playlist = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.id, id))
+    .get();
   assertOwnership(playlist, userId);
 
   const tracks = db
@@ -72,16 +85,27 @@ export function updatePlaylist(
   userId: string,
   name: string,
 ): { id: string; name: string; updatedAt: string } {
-  const playlist = db.select().from(playlists).where(eq(playlists.id, id)).get();
+  const playlist = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.id, id))
+    .get();
   assertOwnership(playlist, userId);
 
   const updatedAt = new Date().toISOString();
-  db.update(playlists).set({ name, updatedAt }).where(eq(playlists.id, id)).run();
+  db.update(playlists)
+    .set({ name, updatedAt })
+    .where(eq(playlists.id, id))
+    .run();
   return { id, name, updatedAt };
 }
 
 export function deletePlaylist(id: string, userId: string): void {
-  const playlist = db.select().from(playlists).where(eq(playlists.id, id)).get();
+  const playlist = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.id, id))
+    .get();
   assertOwnership(playlist, userId);
   db.delete(playlists).where(eq(playlists.id, id)).run();
 }
@@ -92,7 +116,11 @@ export function addTracks(
   trackIds: number[],
   insertPosition?: number,
 ): number {
-  const playlist = db.select().from(playlists).where(eq(playlists.id, playlistId)).get();
+  const playlist = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.id, playlistId))
+    .get();
   assertOwnership(playlist, userId);
 
   const maxRow = db
@@ -124,7 +152,12 @@ export function addTracks(
     if (trackId === undefined) continue;
     try {
       db.insert(playlistTracks)
-        .values({ id: randomUUID(), playlistId, lidarrTrackId: trackId, position: startPosition + i })
+        .values({
+          id: randomUUID(),
+          playlistId,
+          lidarrTrackId: trackId,
+          position: startPosition + i,
+        })
         .run();
       added++;
     } catch {
@@ -134,8 +167,16 @@ export function addTracks(
   return added;
 }
 
-export function removeTrack(playlistId: string, userId: string, lidarrTrackId: number): void {
-  const playlist = db.select().from(playlists).where(eq(playlists.id, playlistId)).get();
+export function removeTrack(
+  playlistId: string,
+  userId: string,
+  lidarrTrackId: number,
+): void {
+  const playlist = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.id, playlistId))
+    .get();
   assertOwnership(playlist, userId);
 
   const track = db
@@ -150,7 +191,7 @@ export function removeTrack(playlistId: string, userId: string, lidarrTrackId: n
     .get();
 
   if (!track) {
-    throw createError(404, 'NOT_FOUND', 'Track not found in playlist');
+    throw createError(404, "NOT_FOUND", "Track not found in playlist");
   }
 
   const { position } = track;
@@ -180,7 +221,11 @@ export function reorderTracks(
   userId: string,
   orderedTrackIds: number[],
 ): void {
-  const playlist = db.select().from(playlists).where(eq(playlists.id, playlistId)).get();
+  const playlist = db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.id, playlistId))
+    .get();
   assertOwnership(playlist, userId);
 
   const existing = db
@@ -192,7 +237,11 @@ export function reorderTracks(
   const existingSet = new Set(existing.map((t) => t.lidarrTrackId));
   for (const id of orderedTrackIds) {
     if (!existingSet.has(id)) {
-      throw createError(400, 'VALIDATION_ERROR', `Track ${id} is not in this playlist`);
+      throw createError(
+        400,
+        "VALIDATION_ERROR",
+        `Track ${id} is not in this playlist`,
+      );
     }
   }
 

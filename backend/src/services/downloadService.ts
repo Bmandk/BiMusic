@@ -1,14 +1,18 @@
-import { randomUUID } from 'crypto';
-import { mkdirSync, statSync, unlinkSync } from 'fs';
-import path from 'path';
-import { eq, and, asc } from 'drizzle-orm';
-import ffmpeg from 'fluent-ffmpeg';
-import { db } from '../db/connection.js';
-import { offlineTracks } from '../db/schema.js';
-import { createError } from '../middleware/errorHandler.js';
-import { resolveFilePath, registerFfmpegCommand, unregisterFfmpegCommand } from './streamService.js';
-import { env } from '../config/env.js';
-import { logger } from '../utils/logger.js';
+import { randomUUID } from "crypto";
+import { mkdirSync, statSync, unlinkSync } from "fs";
+import path from "path";
+import { eq, and, asc } from "drizzle-orm";
+import ffmpeg from "fluent-ffmpeg";
+import { db } from "../db/connection.js";
+import { offlineTracks } from "../db/schema.js";
+import { createError } from "../middleware/errorHandler.js";
+import {
+  resolveFilePath,
+  registerFfmpegCommand,
+  unregisterFfmpegCommand,
+} from "./streamService.js";
+import { env } from "../config/env.js";
+import { logger } from "../utils/logger.js";
 
 export interface DownloadRecord {
   id: string;
@@ -22,8 +26,16 @@ export interface DownloadRecord {
   completedAt: string | null;
 }
 
-function getOfflineFilePath(userId: string, trackId: number, bitrate: number): string {
-  return path.join(env.OFFLINE_STORAGE_PATH, userId, `${trackId}-${bitrate}.mp3`);
+function getOfflineFilePath(
+  userId: string,
+  trackId: number,
+  bitrate: number,
+): string {
+  return path.join(
+    env.OFFLINE_STORAGE_PATH,
+    userId,
+    `${trackId}-${bitrate}.mp3`,
+  );
 }
 
 function rowToRecord(row: typeof offlineTracks.$inferSelect): DownloadRecord {
@@ -66,7 +78,15 @@ export function requestDownload(
   const id = randomUUID();
   const now = new Date().toISOString();
   db.insert(offlineTracks)
-    .values({ id, userId, lidarrTrackId: trackId, deviceId, bitrate, status: 'pending', requestedAt: now })
+    .values({
+      id,
+      userId,
+      lidarrTrackId: trackId,
+      deviceId,
+      bitrate,
+      status: "pending",
+      requestedAt: now,
+    })
     .run();
 
   return {
@@ -76,36 +96,52 @@ export function requestDownload(
     bitrate,
     filePath: null,
     fileSize: null,
-    status: 'pending',
+    status: "pending",
     requestedAt: now,
     completedAt: null,
   };
 }
 
 /** List all downloads for a user + device. */
-export function listDownloads(userId: string, deviceId: string): DownloadRecord[] {
+export function listDownloads(
+  userId: string,
+  deviceId: string,
+): DownloadRecord[] {
   const rows = db
     .select()
     .from(offlineTracks)
-    .where(and(eq(offlineTracks.userId, userId), eq(offlineTracks.deviceId, deviceId)))
+    .where(
+      and(
+        eq(offlineTracks.userId, userId),
+        eq(offlineTracks.deviceId, deviceId),
+      ),
+    )
     .all();
   return rows.map(rowToRecord);
 }
 
 /** Get a single download record, verifying ownership. */
 export function getDownload(id: string, userId: string): DownloadRecord {
-  const row = db.select().from(offlineTracks).where(eq(offlineTracks.id, id)).get();
+  const row = db
+    .select()
+    .from(offlineTracks)
+    .where(eq(offlineTracks.id, id))
+    .get();
   if (!row || row.userId !== userId) {
-    throw createError(404, 'NOT_FOUND', 'Download not found');
+    throw createError(404, "NOT_FOUND", "Download not found");
   }
   return rowToRecord(row);
 }
 
 /** Delete a download record and its associated file. */
 export function deleteDownload(id: string, userId: string): void {
-  const row = db.select().from(offlineTracks).where(eq(offlineTracks.id, id)).get();
+  const row = db
+    .select()
+    .from(offlineTracks)
+    .where(eq(offlineTracks.id, id))
+    .get();
   if (!row || row.userId !== userId) {
-    throw createError(404, 'NOT_FOUND', 'Download not found');
+    throw createError(404, "NOT_FOUND", "Download not found");
   }
 
   if (row.filePath) {
@@ -122,25 +158,33 @@ export function deleteDownload(id: string, userId: string): void {
 /** Mark a download as complete (file has been served and saved by the client). */
 export function markDownloadComplete(id: string): void {
   db.update(offlineTracks)
-    .set({ status: 'complete', completedAt: new Date().toISOString() })
+    .set({ status: "complete", completedAt: new Date().toISOString() })
     .where(eq(offlineTracks.id, id))
     .run();
 }
 
-function transcodeToFile(sourcePath: string, bitrate: number, outputPath: string): Promise<void> {
+function transcodeToFile(
+  sourcePath: string,
+  bitrate: number,
+  outputPath: string,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const cmd = ffmpeg(sourcePath)
       .noVideo()
-      .audioCodec('libmp3lame')
+      .audioCodec("libmp3lame")
       .audioBitrate(bitrate)
       .output(outputPath)
-      .on('end', () => {
+      .on("end", () => {
         unregisterFfmpegCommand(cmd);
         resolve();
       })
-      .on('error', (err: Error) => {
+      .on("error", (err: Error) => {
         unregisterFfmpegCommand(cmd);
-        try { unlinkSync(outputPath); } catch { /* ignore partial file */ }
+        try {
+          unlinkSync(outputPath);
+        } catch {
+          /* ignore partial file */
+        }
         reject(err);
       });
 
@@ -157,17 +201,20 @@ export async function processOnePendingDownload(): Promise<void> {
   const pending = db
     .select()
     .from(offlineTracks)
-    .where(eq(offlineTracks.status, 'pending'))
+    .where(eq(offlineTracks.status, "pending"))
     .orderBy(asc(offlineTracks.requestedAt))
     .limit(1)
     .get();
 
   if (!pending) return;
 
-  logger.info({ id: pending.id, trackId: pending.lidarrTrackId }, 'Processing pending download');
+  logger.info(
+    { id: pending.id, trackId: pending.lidarrTrackId },
+    "Processing pending download",
+  );
 
   db.update(offlineTracks)
-    .set({ status: 'processing' })
+    .set({ status: "processing" })
     .where(eq(offlineTracks.id, pending.id))
     .run();
 
@@ -175,22 +222,31 @@ export async function processOnePendingDownload(): Promise<void> {
     const sourcePath = await resolveFilePath(pending.lidarrTrackId);
     const outputDir = path.join(env.OFFLINE_STORAGE_PATH, pending.userId);
     mkdirSync(outputDir, { recursive: true });
-    const outputPath = getOfflineFilePath(pending.userId, pending.lidarrTrackId, pending.bitrate);
+    const outputPath = getOfflineFilePath(
+      pending.userId,
+      pending.lidarrTrackId,
+      pending.bitrate,
+    );
 
     await transcodeToFile(sourcePath, pending.bitrate, outputPath);
 
     const stat = statSync(outputPath);
     const now = new Date().toISOString();
     db.update(offlineTracks)
-      .set({ status: 'ready', filePath: outputPath, fileSize: stat.size, completedAt: now })
+      .set({
+        status: "ready",
+        filePath: outputPath,
+        fileSize: stat.size,
+        completedAt: now,
+      })
       .where(eq(offlineTracks.id, pending.id))
       .run();
 
-    logger.info({ id: pending.id, outputPath }, 'Download processing complete');
+    logger.info({ id: pending.id, outputPath }, "Download processing complete");
   } catch (err) {
-    logger.error({ err, id: pending.id }, 'Download processing failed');
+    logger.error({ err, id: pending.id }, "Download processing failed");
     db.update(offlineTracks)
-      .set({ status: 'failed', completedAt: new Date().toISOString() })
+      .set({ status: "failed", completedAt: new Date().toISOString() })
       .where(eq(offlineTracks.id, pending.id))
       .run();
   }
@@ -202,9 +258,9 @@ export function startDownloadWorker(): void {
 
   setInterval(() => {
     processOnePendingDownload().catch((err) => {
-      logger.error({ err }, 'Download worker error');
+      logger.error({ err }, "Download worker error");
     });
   }, INTERVAL);
 
-  logger.info('Download worker started');
+  logger.info("Download worker started");
 }

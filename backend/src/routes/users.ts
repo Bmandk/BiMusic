@@ -1,8 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import * as userService from '../services/userService.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
-import { createError } from '../middleware/errorHandler.js';
+import { Router, Request, Response, NextFunction } from "express";
+import { z } from "zod";
+import * as userService from "../services/userService.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { createError } from "../middleware/errorHandler.js";
 
 const router = Router();
 router.use(authenticate, requireAdmin);
@@ -13,14 +13,14 @@ const createUserSchema = z.object({
   isAdmin: z.boolean().optional().default(false),
 });
 
-router.get('/', (_req: Request, res: Response) => {
+router.get("/", (_req: Request, res: Response) => {
   res.json(userService.listUsers());
 });
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   const parsed = createUserSchema.safeParse(req.body);
   if (!parsed.success) {
-    next(createError(400, 'VALIDATION_ERROR', 'Invalid request body'));
+    next(createError(400, "VALIDATION_ERROR", "Invalid request body"));
     return;
   }
   try {
@@ -35,8 +35,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.delete('/:id', (req: Request, res: Response) => {
-  userService.deleteUser(req.params['id'] as string);
+router.delete("/:id", (req: Request, res: Response) => {
+  userService.deleteUser(req.params["id"] as string);
   res.status(204).send();
 });
 

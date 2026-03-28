@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
-import { createError } from './errorHandler.js';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
+import { createError } from "./errorHandler.js";
 
 export interface AuthUser {
   userId: string;
@@ -9,33 +9,50 @@ export interface AuthUser {
   isAdmin: boolean;
 }
 
-export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+export function authenticate(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
   const header = req.headers.authorization;
-  const queryToken = typeof req.query['token'] === 'string' ? req.query['token'] : undefined;
+  const queryToken =
+    typeof req.query["token"] === "string" ? req.query["token"] : undefined;
 
   let token: string | undefined;
-  if (header?.startsWith('Bearer ')) {
+  if (header?.startsWith("Bearer ")) {
     token = header.slice(7);
   } else if (queryToken) {
     token = queryToken;
   }
 
   if (!token) {
-    next(createError(401, 'UNAUTHORIZED', 'Missing or invalid Authorization header'));
+    next(
+      createError(
+        401,
+        "UNAUTHORIZED",
+        "Missing or invalid Authorization header",
+      ),
+    );
     return;
   }
   try {
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] }) as AuthUser;
+    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET, {
+      algorithms: ["HS256"],
+    }) as AuthUser;
     req.user = payload;
     next();
   } catch {
-    next(createError(401, 'UNAUTHORIZED', 'Invalid or expired access token'));
+    next(createError(401, "UNAUTHORIZED", "Invalid or expired access token"));
   }
 }
 
-export function requireAdmin(req: Request, _res: Response, next: NextFunction): void {
+export function requireAdmin(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
   if (!req.user?.isAdmin) {
-    next(createError(403, 'FORBIDDEN', 'Admin access required'));
+    next(createError(403, "FORBIDDEN", "Admin access required"));
     return;
   }
   next();

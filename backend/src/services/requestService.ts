@@ -1,9 +1,9 @@
-import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
-import { db } from '../db/connection.js';
-import { requests } from '../db/schema.js';
-import * as lidarrClient from './lidarrClient.js';
-import type { MusicRequest } from '../types/api.js';
+import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
+import { db } from "../db/connection.js";
+import { requests } from "../db/schema.js";
+import * as lidarrClient from "./lidarrClient.js";
+import type { MusicRequest } from "../types/api.js";
 
 type RequestRow = typeof requests.$inferSelect;
 
@@ -18,16 +18,33 @@ function toDto(r: RequestRow): MusicRequest {
   };
 }
 
-export function createRequest(userId: string, type: string, lidarrId: number): MusicRequest {
+export function createRequest(
+  userId: string,
+  type: string,
+  lidarrId: number,
+): MusicRequest {
   const id = randomUUID();
   const requestedAt = new Date().toISOString();
-  db.insert(requests).values({ id, userId, type, lidarrId, status: 'pending', requestedAt }).run();
-  return { id, type, lidarrId, status: 'pending', requestedAt, resolvedAt: null };
+  db.insert(requests)
+    .values({ id, userId, type, lidarrId, status: "pending", requestedAt })
+    .run();
+  return {
+    id,
+    type,
+    lidarrId,
+    status: "pending",
+    requestedAt,
+    resolvedAt: null,
+  };
 }
 
 export async function listRequests(userId: string): Promise<MusicRequest[]> {
-  const rows = db.select().from(requests).where(eq(requests.userId, userId)).all();
-  const pending = rows.filter((r) => r.status !== 'available');
+  const rows = db
+    .select()
+    .from(requests)
+    .where(eq(requests.userId, userId))
+    .all();
+  const pending = rows.filter((r) => r.status !== "available");
 
   if (pending.length === 0) {
     return rows.map(toDto);
@@ -49,19 +66,19 @@ export async function listRequests(userId: string): Promise<MusicRequest[]> {
   for (const row of pending) {
     let newStatus = row.status;
     try {
-      if (row.type === 'artist') {
+      if (row.type === "artist") {
         const artist = await lidarrClient.getArtist(row.lidarrId);
         if ((artist.statistics?.trackFileCount ?? 0) > 0) {
-          newStatus = 'available';
+          newStatus = "available";
         } else if (queueArtistIds.has(row.lidarrId)) {
-          newStatus = 'downloading';
+          newStatus = "downloading";
         }
-      } else if (row.type === 'album') {
+      } else if (row.type === "album") {
         const album = await lidarrClient.getAlbum(row.lidarrId);
         if ((album.statistics?.trackFileCount ?? 0) > 0) {
-          newStatus = 'available';
+          newStatus = "available";
         } else if (queueAlbumIds.has(row.lidarrId)) {
-          newStatus = 'downloading';
+          newStatus = "downloading";
         }
       }
     } catch {
@@ -69,7 +86,8 @@ export async function listRequests(userId: string): Promise<MusicRequest[]> {
     }
 
     if (newStatus !== row.status) {
-      const resolvedAt = newStatus === 'available' ? new Date().toISOString() : null;
+      const resolvedAt =
+        newStatus === "available" ? new Date().toISOString() : null;
       db.update(requests)
         .set({ status: newStatus, resolvedAt })
         .where(eq(requests.id, row.id))

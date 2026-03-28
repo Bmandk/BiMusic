@@ -1,22 +1,30 @@
-import type { AxiosResponse } from 'axios';
-import type { Readable } from 'stream';
-import * as lidarrClient from './lidarrClient.js';
-import { env } from '../config/env.js';
-import type { LidarrArtist, LidarrAlbum, LidarrTrack, LidarrMediaCover } from '../types/lidarr.js';
-import type { Artist, Album, Track, SearchResults } from '../types/api.js';
+import type { AxiosResponse } from "axios";
+import type { Readable } from "stream";
+import * as lidarrClient from "./lidarrClient.js";
+import { env } from "../config/env.js";
+import type {
+  LidarrArtist,
+  LidarrAlbum,
+  LidarrTrack,
+  LidarrMediaCover,
+} from "../types/lidarr.js";
+import type { Artist, Album, Track, SearchResults } from "../types/api.js";
 
-function getImageFilename(images: LidarrMediaCover[] | null, coverType: string): string {
-  const image = images?.find(img => img.coverType === coverType);
+function getImageFilename(
+  images: LidarrMediaCover[] | null,
+  coverType: string,
+): string {
+  const image = images?.find((img) => img.coverType === coverType);
   if (!image?.url) return `${coverType}.jpg`;
-  const urlPath = image.url.split('?')[0] ?? '';
-  const parts = urlPath.split('/');
+  const urlPath = image.url.split("?")[0] ?? "";
+  const parts = urlPath.split("/");
   return parts[parts.length - 1] || `${coverType}.jpg`;
 }
 
 function shapeArtist(a: LidarrArtist, albumCount: number): Artist {
   return {
     id: a.id,
-    name: a.artistName ?? 'Unknown Artist',
+    name: a.artistName ?? "Unknown Artist",
     overview: a.overview,
     imageUrl: `${env.API_BASE_URL}/api/library/artists/${a.id}/image`,
     albumCount,
@@ -26,9 +34,9 @@ function shapeArtist(a: LidarrArtist, albumCount: number): Artist {
 function shapeAlbum(a: LidarrAlbum, trackCount: number): Album {
   return {
     id: a.id,
-    title: a.title ?? 'Unknown Album',
+    title: a.title ?? "Unknown Album",
     artistId: a.artistId,
-    artistName: a.artist?.artistName ?? 'Unknown Artist',
+    artistName: a.artist?.artistName ?? "Unknown Artist",
     imageUrl: `${env.API_BASE_URL}/api/library/albums/${a.id}/image`,
     releaseDate: a.releaseDate,
     genres: a.genres ?? [],
@@ -40,8 +48,8 @@ function shapeAlbum(a: LidarrAlbum, trackCount: number): Album {
 function shapeTrack(t: LidarrTrack): Track {
   return {
     id: t.id,
-    title: t.title ?? 'Unknown Track',
-    trackNumber: t.trackNumber ?? '0',
+    title: t.title ?? "Unknown Track",
+    trackNumber: t.trackNumber ?? "0",
     duration: t.duration,
     albumId: t.albumId,
     artistId: t.artistId,
@@ -57,9 +65,14 @@ export async function getArtists(): Promise<Artist[]> {
   ]);
   const albumCountByArtistId = new Map<number, number>();
   for (const album of albums) {
-    albumCountByArtistId.set(album.artistId, (albumCountByArtistId.get(album.artistId) ?? 0) + 1);
+    albumCountByArtistId.set(
+      album.artistId,
+      (albumCountByArtistId.get(album.artistId) ?? 0) + 1,
+    );
   }
-  return artists.map(a => shapeArtist(a, albumCountByArtistId.get(a.id) ?? 0));
+  return artists.map((a) =>
+    shapeArtist(a, albumCountByArtistId.get(a.id) ?? 0),
+  );
 }
 
 export async function getArtist(id: number): Promise<Artist> {
@@ -73,7 +86,7 @@ export async function getArtist(id: number): Promise<Artist> {
 export async function getArtistAlbums(artistId: number): Promise<Album[]> {
   const albums = await lidarrClient.getAlbums(artistId);
   // trackCount not fetched here to avoid N+1 calls; populated in getAlbum()
-  return albums.map(a => shapeAlbum(a, 0));
+  return albums.map((a) => shapeAlbum(a, 0));
 }
 
 export async function getAlbum(id: number): Promise<Album> {
@@ -86,7 +99,7 @@ export async function getAlbum(id: number): Promise<Album> {
 
 export async function getAlbumTracks(albumId: number): Promise<Track[]> {
   const tracks = await lidarrClient.getTracks(albumId);
-  return tracks.map(t => shapeTrack(t));
+  return tracks.map((t) => shapeTrack(t));
 }
 
 export async function getTrack(id: number): Promise<Track> {
@@ -109,14 +122,18 @@ export async function search(term: string): Promise<SearchResults> {
   return { artists: Array.from(artistMap.values()), albums };
 }
 
-export async function getArtistImageStream(artistId: number): Promise<AxiosResponse<Readable>> {
+export async function getArtistImageStream(
+  artistId: number,
+): Promise<AxiosResponse<Readable>> {
   const artist = await lidarrClient.getArtist(artistId);
-  const filename = getImageFilename(artist.images, 'poster');
+  const filename = getImageFilename(artist.images, "poster");
   return lidarrClient.getArtistCover(artistId, filename);
 }
 
-export async function getAlbumImageStream(albumId: number): Promise<AxiosResponse<Readable>> {
+export async function getAlbumImageStream(
+  albumId: number,
+): Promise<AxiosResponse<Readable>> {
   const album = await lidarrClient.getAlbum(albumId);
-  const filename = getImageFilename(album.images, 'cover');
+  const filename = getImageFilename(album.images, "cover");
   return lidarrClient.getAlbumCover(albumId, filename);
 }

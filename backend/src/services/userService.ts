@@ -1,9 +1,9 @@
-import bcrypt from 'bcrypt';
-import { eq } from 'drizzle-orm';
-import { db } from '../db/connection.js';
-import { users } from '../db/schema.js';
-import { env } from '../config/env.js';
-import { logger } from '../utils/logger.js';
+import bcrypt from "bcrypt";
+import { eq } from "drizzle-orm";
+import { db } from "../db/connection.js";
+import { users } from "../db/schema.js";
+import { env } from "../config/env.js";
+import { logger } from "../utils/logger.js";
 
 const userPublicFields = {
   id: users.id,
@@ -13,7 +13,11 @@ const userPublicFields = {
   createdAt: users.createdAt,
 };
 
-export async function createUser(username: string, password: string, isAdmin = false) {
+export async function createUser(
+  username: string,
+  password: string,
+  isAdmin = false,
+) {
   const passwordHash = await bcrypt.hash(password, 12);
   return db
     .insert(users)
@@ -42,7 +46,7 @@ export function deleteUser(id: string): void {
 export async function bootstrapAdminIfNeeded(): Promise<void> {
   const existing = db.select({ id: users.id }).from(users).limit(1).get();
   if (existing) return;
-  logger.info('No users found — bootstrapping admin user');
+  logger.info("No users found — bootstrapping admin user");
   await createUser(env.ADMIN_USERNAME, env.ADMIN_PASSWORD, true);
-  logger.info({ username: env.ADMIN_USERNAME }, 'Admin user created');
+  logger.info({ username: env.ADMIN_USERNAME }, "Admin user created");
 }
