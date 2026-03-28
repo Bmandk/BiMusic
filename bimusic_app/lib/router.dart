@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'providers/auth_provider.dart';
 import 'ui/screens/album_detail_screen.dart';
 import 'ui/screens/artist_detail_screen.dart';
 import 'ui/screens/downloads_screen.dart';
@@ -12,11 +15,46 @@ import 'ui/screens/search_screen.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/widgets/adaptive_scaffold.dart';
 
-class AppRouter {
-  const AppRouter._();
+// ---------------------------------------------------------------------------
+// Refresh notifier — bridges Riverpod auth state to GoRouter's listenable.
+// ---------------------------------------------------------------------------
 
-  static final GoRouter router = GoRouter(
-    initialLocation: '/home',
+class _RouterNotifier extends ChangeNotifier {
+  _RouterNotifier(this._ref) {
+    _ref.listen<AuthState>(
+      authNotifierProvider,
+      (_, __) => notifyListeners(),
+    );
+  }
+
+  final Ref _ref;
+
+  String? redirect(BuildContext context, GoRouterState state) {
+    final authState = _ref.read(authNotifierProvider);
+
+    // Don't redirect while startup validation is in progress.
+    if (authState is AuthStateLoading) return null;
+
+    final isAuthenticated = authState is AuthStateAuthenticated;
+    final isLoginRoute = state.matchedLocation == '/login';
+
+    if (!isAuthenticated && !isLoginRoute) return '/login';
+    if (isAuthenticated && isLoginRoute) return '/home';
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Router provider
+// ---------------------------------------------------------------------------
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final notifier = _RouterNotifier(ref);
+
+  final router = GoRouter(
+    initialLocation: '/login',
+    refreshListenable: notifier,
+    redirect: notifier.redirect,
     routes: [
       GoRoute(
         path: '/login',
@@ -102,4 +140,7 @@ class AppRouter {
       ),
     ],
   );
-}
+
+  ref.onDispose(notifier.dispose);
+  return router;
+});

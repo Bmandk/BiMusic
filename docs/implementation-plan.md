@@ -383,6 +383,10 @@ All search and request integration tests pass.
 
 ## Phase 10 — Flutter Scaffold
 
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `bimusic_app/pubspec.yaml`, `bimusic_app/build.yaml`, `bimusic_app/lib/config/api_config.dart`, `bimusic_app/lib/config/theme.dart`, `bimusic_app/lib/app.dart`, `bimusic_app/lib/main.dart`, `bimusic_app/lib/router.dart`, `bimusic_app/lib/ui/layouts/breakpoints.dart`, `bimusic_app/lib/ui/layouts/mobile_layout.dart`, `bimusic_app/lib/ui/layouts/desktop_layout.dart`, `bimusic_app/lib/ui/widgets/adaptive_scaffold.dart`, `bimusic_app/lib/ui/screens/{login,home,library,artist_detail,album_detail,search,playlists,playlist_detail,downloads,settings}_screen.dart`.
+> `flutter analyze --fatal-infos` passes. All nav tabs switch screens. Dark mode works.
+
 **Goal:** Flutter app builds for all targets, navigation shell works, theme is set.
 
 ### Tasks
@@ -412,6 +416,10 @@ App launches. Nav tabs switch screens. Dark mode works. Analyze passes.
 ---
 
 ## Phase 11 — Flutter Auth
+
+> **Status: COMPLETED** — 2026-03-28
+> Files created: `bimusic_app/lib/models/user.dart`, `bimusic_app/lib/models/auth_tokens.dart`, `bimusic_app/lib/services/auth_service.dart`, `bimusic_app/lib/services/api_client.dart`, `bimusic_app/lib/providers/auth_provider.dart`, `bimusic_app/test/providers/auth_notifier_test.dart`, `bimusic_app/test/services/auth_interceptor_test.dart`. Updated: `bimusic_app/lib/router.dart`, `bimusic_app/lib/app.dart`, `bimusic_app/lib/ui/screens/login_screen.dart`.
+> All 13 unit tests pass. `flutter analyze --fatal-infos` passes.
 
 **Goal:** Login screen, secure token storage, auto-refresh, and auth-guarded routing work end-to-end.
 

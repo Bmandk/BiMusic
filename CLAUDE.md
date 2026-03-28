@@ -72,8 +72,10 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Routing:** go_router ^14.6 — `StatefulShellRoute.indexedStack` with 6 branches; shell builder delegates to `AdaptiveScaffold`
 - **Offline storage:** Isar 3.1.0 (pinned — 4.x not yet on pub.dev)
 - **Background downloads:** flutter_background_service ^5.0
-- **HTTP:** Dio ^5.7 with auth interceptor (future phase)
-- **Code gen:** freezed ^2.5 + json_serializable ^6.8 + riverpod_generator. Run `dart run build_runner build --delete-conflicting-outputs` after model changes.
+- **HTTP:** Dio ^5.7. `apiClientProvider` (`lib/services/api_client.dart`) provides a Dio instance with `AuthInterceptor` pre-attached. Use this for all authenticated API calls.
+- **Auth:** `AuthService` (`lib/services/auth_service.dart`) handles token storage (`flutter_secure_storage`) and auth API calls using its own private Dio instance (never the intercepted one — avoids circular refresh loops). User info is decoded from the JWT payload locally, no extra `/api/auth/me` call. `AuthNotifier` (`lib/providers/auth_provider.dart`) manages `AuthState` (sealed class: `AuthStateLoading`, `AuthStateUnauthenticated`, `AuthStateAuthenticated`). `authNotifierProvider.notifier.initialized` is a `Future<void>` that resolves once the startup token check completes — await it in tests.
+- **Routing:** `routerProvider` (`lib/router.dart`) is a Riverpod `Provider<GoRouter>`. The `_RouterNotifier` (ChangeNotifier) bridges `authNotifierProvider` to GoRouter's `refreshListenable`, triggering redirects on auth state changes.
+- **Code gen:** freezed ^2.5 + json_serializable ^6.8 + riverpod_generator. Run `dart run build_runner build --delete-conflicting-outputs` after model changes. **Providers use manual Riverpod 2 style** (`NotifierProvider`, `Provider`, etc.) — not `@Riverpod` codegen. Only freezed models require build_runner.
 - **Theme:** Material 3, `ColorScheme.fromSeed(seedColor: Colors.deepPurple)`, light + dark, `ThemeMode.system`
 - **API config:** `lib/config/api_config.dart` — base URL via `--dart-define=API_BASE_URL=...` (default `http://localhost:3000`)
 
@@ -81,7 +83,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - `< 1024` → `MobileLayout` — 5-tab `NavigationBar` (Home/Library/Search/Playlists/Settings); Downloads tab omitted on mobile
 - `≥ 1024` → `DesktopLayout` — 220 px fixed sidebar with all 6 nav items + 80 px bottom player bar
 
-**Entry point:** `main.dart` wraps `ProviderScope(child: BiMusicApp())`. `BiMusicApp` lives in `lib/app.dart`.
+**Entry point:** `main.dart` wraps `ProviderScope(child: BiMusicApp())`. `BiMusicApp` is a `ConsumerWidget` in `lib/app.dart` that watches `routerProvider`.
 
 ### Testing
 
@@ -89,7 +91,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Unit tests:** `src/**/__tests__/**/*.test.ts` — colocated with source. Mock env with `vi.mock('../../config/env.js', ...)`. Use `nock` to stub outbound HTTP (lidarrClient tests); use `vi.mock` for DB/logger.
 - **Integration tests:** `tests/integration/**/*.test.ts` — use setup file (`tests/setup.ts`), run in forked processes, 15s timeout. Library integration tests use `nock` to stub Lidarr HTTP calls; call `nock.cleanAll()` in `afterEach`.
 
-**Flutter tests:** `test/*_test.dart`
+**Flutter tests:** `test/**/*_test.dart`. Tests are organised into subdirectories by layer (e.g. `test/providers/`, `test/services/`). Use `mocktail` for mocks; register fallback values with `setUpAll(() => registerFallbackValue(...))` for any non-primitive types passed to `any()`.
 
 ### CI Pipeline (`.github/workflows/ci.yml`)
 
