@@ -123,29 +123,33 @@ beforeEach(() => {
 
 describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTranscodes", () => {
   it("tracks and kills registered commands", () => {
-    const cmd = { kill: vi.fn() } as unknown as FfmpegCommand;
+    const kill = vi.fn();
+    const cmd = { kill } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd);
     killAllActiveTranscodes();
-    expect(cmd.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(kill).toHaveBeenCalledWith("SIGTERM");
   });
 
   it("does not kill unregistered commands", () => {
-    const cmd1 = { kill: vi.fn() } as unknown as FfmpegCommand;
-    const cmd2 = { kill: vi.fn() } as unknown as FfmpegCommand;
+    const kill1 = vi.fn();
+    const kill2 = vi.fn();
+    const cmd1 = { kill: kill1 } as unknown as FfmpegCommand;
+    const cmd2 = { kill: kill2 } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd1);
     registerFfmpegCommand(cmd2);
     unregisterFfmpegCommand(cmd1);
     killAllActiveTranscodes();
-    expect(cmd1.kill).not.toHaveBeenCalled();
-    expect(cmd2.kill).toHaveBeenCalled();
+    expect(kill1).not.toHaveBeenCalled();
+    expect(kill2).toHaveBeenCalled();
   });
 
   it("killAllActiveTranscodes clears the set (no double-kill)", () => {
-    const cmd = { kill: vi.fn() } as unknown as FfmpegCommand;
+    const kill = vi.fn();
+    const cmd = { kill } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd);
     killAllActiveTranscodes();
     killAllActiveTranscodes(); // second call: set is now empty
-    expect(cmd.kill).toHaveBeenCalledTimes(1);
+    expect(kill).toHaveBeenCalledTimes(1);
   });
 
   it("swallows errors thrown by cmd.kill", () => {
