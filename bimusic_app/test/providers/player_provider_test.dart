@@ -56,11 +56,11 @@ class _FakeAuthNotifier extends Notifier<AuthState> implements AuthNotifier {
   Future<void> get initialized async {}
 
   @override
-  AuthState build() => AuthStateAuthenticated(
+  AuthState build() => const AuthStateAuthenticated(
         AuthTokens(
           accessToken: 'tok',
           refreshToken: 'rtok',
-          user: const User(userId: 'u1', username: 'tester', isAdmin: false),
+          user: User(userId: 'u1', username: 'tester', isAdmin: false),
         ),
       );
 

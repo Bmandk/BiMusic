@@ -18,30 +18,6 @@ class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
   BitratePreference build() => _pref;
 }
 
-// ---------------------------------------------------------------------------
-// Helper to build a container with stubbed preference and connectivity
-// ---------------------------------------------------------------------------
-
-ProviderContainer _container({
-  required BitratePreference pref,
-  AsyncValue<ConnectivityResult>? connectivity,
-}) {
-  return ProviderContainer(
-    overrides: [
-      bitratePreferenceProvider
-          .overrideWith(() => _StubBitratePreferenceNotifier(pref)),
-      if (connectivity != null)
-        connectivityProvider.overrideWith((_) => Stream.fromIterable(
-              connectivity.when(
-                data: (v) => [v],
-                loading: () => [],
-                error: (e, _) => throw e,
-              ),
-            )),
-    ],
-  );
-}
-
 void main() {
   setUpAll(() {
     // connectivity_provider uses EventChannel — need binding for platform mocks.
@@ -163,7 +139,7 @@ void main() {
           ),
           // Never-completing stream keeps loading state.
           connectivityProvider.overrideWith(
-            (_) => Stream<ConnectivityResult>.empty(),
+            (_) => const Stream<ConnectivityResult>.empty(),
           ),
         ],
       );

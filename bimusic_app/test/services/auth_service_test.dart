@@ -175,4 +175,35 @@ void main() {
       expect(result!.user.isAdmin, isTrue);
     });
   });
+
+  group('refresh', () {
+    test('returns null immediately when no refresh token is stored', () async {
+      // Storage is empty — no HTTP call should be made.
+      final result = await service.refresh();
+      expect(result, isNull);
+    });
+  });
+
+  group('logout', () {
+    test('clears tokens even when no tokens are stored', () async {
+      // Neither storage entry nor in-memory token exists — no HTTP call.
+      await service.logout();
+
+      // Storage should still be clean.
+      expect(fakeStorage._store.containsKey('bimusic_access_token'), isFalse);
+      expect(fakeStorage._store.containsKey('bimusic_refresh_token'), isFalse);
+      expect(service.accessToken, isNull);
+    });
+
+    test('clears tokens when refresh is stored but in-memory token is null',
+        () async {
+      // Store a refresh token but leave _accessToken null — HTTP call is skipped.
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      await service.logout();
+
+      expect(fakeStorage._store.containsKey('bimusic_refresh_token'), isFalse);
+      expect(service.accessToken, isNull);
+    });
+  });
 }

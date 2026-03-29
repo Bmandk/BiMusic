@@ -83,6 +83,7 @@ vi.mock("fs/promises", () => ({
   constants: { R_OK: 4 },
 }));
 
+import type { FfmpegCommand } from "fluent-ffmpeg";
 import * as lidarrClient from "../lidarrClient.js";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
@@ -122,15 +123,15 @@ beforeEach(() => {
 
 describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTranscodes", () => {
   it("tracks and kills registered commands", () => {
-    const cmd = { kill: vi.fn() } as never;
+    const cmd = { kill: vi.fn() } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd);
     killAllActiveTranscodes();
     expect(cmd.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
   it("does not kill unregistered commands", () => {
-    const cmd1 = { kill: vi.fn() } as never;
-    const cmd2 = { kill: vi.fn() } as never;
+    const cmd1 = { kill: vi.fn() } as unknown as FfmpegCommand;
+    const cmd2 = { kill: vi.fn() } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd1);
     registerFfmpegCommand(cmd2);
     unregisterFfmpegCommand(cmd1);
@@ -140,7 +141,7 @@ describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTransco
   });
 
   it("killAllActiveTranscodes clears the set (no double-kill)", () => {
-    const cmd = { kill: vi.fn() } as never;
+    const cmd = { kill: vi.fn() } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd);
     killAllActiveTranscodes();
     killAllActiveTranscodes(); // second call: set is now empty
@@ -152,7 +153,7 @@ describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTransco
       kill: vi.fn(() => {
         throw new Error("kill failed");
       }),
-    } as never;
+    } as unknown as FfmpegCommand;
     registerFfmpegCommand(badCmd);
     expect(() => killAllActiveTranscodes()).not.toThrow();
   });

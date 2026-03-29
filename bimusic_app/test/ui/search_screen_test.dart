@@ -96,7 +96,7 @@ const _availableRequest = MusicRequest(
 // Widget helpers
 // ---------------------------------------------------------------------------
 
-Widget buildSubject({
+Widget _buildSubject({
   required _MockSearchService searchService,
   SearchState? searchState,
   List<MusicRequest> requests = const [],
@@ -130,13 +130,13 @@ void main() {
   // ---------------------------------------------------------------------------
 
   testWidgets('renders search text field with hint', (tester) async {
-    await tester.pumpWidget(buildSubject(searchService: mockSearchService));
+    await tester.pumpWidget(_buildSubject(searchService: mockSearchService));
     expect(find.text('Search artists, albums...'), findsOneWidget);
   });
 
   testWidgets('renders Library, Request Music and My Requests tabs',
       (tester) async {
-    await tester.pumpWidget(buildSubject(searchService: mockSearchService));
+    await tester.pumpWidget(_buildSubject(searchService: mockSearchService));
     expect(find.text('Library'), findsOneWidget);
     expect(find.text('Request Music'), findsOneWidget);
     expect(find.text('My Requests'), findsOneWidget);
@@ -148,7 +148,7 @@ void main() {
 
   testWidgets('shows "Search your library" prompt when query is empty',
       (tester) async {
-    await tester.pumpWidget(buildSubject(searchService: mockSearchService));
+    await tester.pumpWidget(_buildSubject(searchService: mockSearchService));
     expect(find.text('Search your library'), findsOneWidget);
   });
 
@@ -158,7 +158,7 @@ void main() {
       isSearchingLibrary: true,
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     expect(find.byType(CircularProgressIndicator), findsWidgets);
   });
@@ -172,7 +172,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -190,7 +190,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -208,7 +208,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -224,7 +224,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -238,7 +238,7 @@ void main() {
       libraryResults: SearchResults(artists: [], albums: []),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -251,7 +251,7 @@ void main() {
       libraryError: 'Network error',
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -262,7 +262,7 @@ void main() {
   testWidgets('shows clear button when query is not empty', (tester) async {
     final state = const SearchState(query: 'test');
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.pump();
 
@@ -274,7 +274,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   testWidgets('shows Lidarr empty state when query is empty', (tester) async {
-    await tester.pumpWidget(buildSubject(searchService: mockSearchService));
+    await tester.pumpWidget(_buildSubject(searchService: mockSearchService));
 
     // Tap the "Request Music" tab and wait for animation.
     await tester.tap(find.text('Request Music'));
@@ -290,7 +290,7 @@ void main() {
       (tester) async {
     final state = const SearchState(query: 'metal');
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
     await tester.tap(find.text('Request Music'));
     await tester.pumpAndSettle();
@@ -308,7 +308,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
 
     await tester.tap(find.text('Request Music'));
@@ -324,7 +324,7 @@ void main() {
       lidarrResults: LidarrSearchResults(artists: [], albums: []),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
 
     await tester.tap(find.text('Request Music'));
@@ -342,7 +342,7 @@ void main() {
       lidarrResults: LidarrSearchResults(artists: [], albums: []),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
 
     await tester.tap(find.text('Request Music'));
@@ -358,7 +358,7 @@ void main() {
       isSearchingLidarr: true,
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
 
     await tester.tap(find.text('Request Music'));
@@ -378,7 +378,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
 
     await tester.tap(find.text('Request Music'));
@@ -396,7 +396,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, searchState: state),
+      _buildSubject(searchService: mockSearchService, searchState: state),
     );
 
     await tester.tap(find.text('Request Music'));
@@ -414,7 +414,7 @@ void main() {
   testWidgets('shows "No pending requests" when requests list is empty',
       (tester) async {
     await tester.pumpWidget(
-      buildSubject(searchService: mockSearchService, requests: []),
+      _buildSubject(searchService: mockSearchService, requests: []),
     );
     await tester.tap(find.text('My Requests'));
     await tester.pumpAndSettle();
@@ -424,7 +424,7 @@ void main() {
 
   testWidgets('shows pending request in My Requests tab', (tester) async {
     await tester.pumpWidget(
-      buildSubject(
+      _buildSubject(
         searchService: mockSearchService,
         requests: [_pendingRequest],
       ),
@@ -438,7 +438,7 @@ void main() {
 
   testWidgets('shows Downloading badge for downloading request', (tester) async {
     await tester.pumpWidget(
-      buildSubject(
+      _buildSubject(
         searchService: mockSearchService,
         requests: [_downloadingRequest],
       ),
@@ -451,7 +451,7 @@ void main() {
 
   testWidgets('shows Available badge for available request', (tester) async {
     await tester.pumpWidget(
-      buildSubject(
+      _buildSubject(
         searchService: mockSearchService,
         requests: [_availableRequest],
       ),
@@ -464,7 +464,7 @@ void main() {
 
   testWidgets('shows multiple requests in list', (tester) async {
     await tester.pumpWidget(
-      buildSubject(
+      _buildSubject(
         searchService: mockSearchService,
         requests: [_pendingRequest, _downloadingRequest, _availableRequest],
       ),

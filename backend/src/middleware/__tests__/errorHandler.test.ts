@@ -179,8 +179,8 @@ describe("errorHandler", () => {
 
   it("returns generic message for 5xx in production environment", async () => {
     // Temporarily override the env mock for this test
-    const envModule = (await import("../../config/env.js")) as {
-      env: Record<string, string>;
+    const envModule = (await import("../../config/env.js")) as unknown as {
+      env: Record<string, unknown>;
     };
     const originalEnv = envModule.env["NODE_ENV"];
     envModule.env["NODE_ENV"] = "production";

@@ -1,17 +1,30 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:bimusic_app/models/auth_tokens.dart';
 import 'package:bimusic_app/models/user.dart';
+import 'package:bimusic_app/providers/auth_provider.dart';
 import 'package:bimusic_app/services/api_client.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 
 class MockDio extends Mock implements Dio {}
+
+class _StubAuthNotifier extends Notifier<AuthState> implements AuthNotifier {
+  @override
+  Future<void> get initialized async {}
+  @override
+  AuthState build() => const AuthStateUnauthenticated();
+  @override
+  Future<void> login(String u, String p) async {}
+  @override
+  Future<void> logout() async {}
+}
 
 class _FakeRequestOptions extends Fake implements RequestOptions {}
 
@@ -140,6 +153,36 @@ void main() {
       expect(handler.forwarded, err);
     });
 
+    test('401 calls onLogout and forwards error when refresh throws', () async {
+      when(() => mockAuthService.refresh()).thenThrow(Exception('network'));
+
+      final err = make401();
+      final handler = _FakeErrorHandler();
+
+      await interceptor.onError(err, handler);
+
+      expect(logoutCalled, isTrue);
+      expect(handler.forwarded, err);
+    });
+
+    test('401 forwards retry DioException when retry fetch fails', () async {
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => testTokens);
+      when(() => mockAuthService.accessToken).thenReturn('new_access');
+      final retryErr = DioException(
+        requestOptions: RequestOptions(path: '/api/test'),
+        type: DioExceptionType.connectionError,
+      );
+      when(() => mockDio.fetch<dynamic>(any())).thenThrow(retryErr);
+
+      final err = make401();
+      final handler = _FakeErrorHandler();
+
+      await interceptor.onError(err, handler);
+
+      expect(handler.forwarded, retryErr);
+      expect(handler.resolved, isNull);
+    });
+
     test('concurrent 401s only trigger one refresh', () async {
       int refreshCount = 0;
       final firstStarted = Completer<void>();
@@ -175,6 +218,25 @@ void main() {
       expect(refreshCount, 1, reason: 'only one refresh should be attempted');
       expect(handler1.resolved?.statusCode, 200);
       expect(handler2.resolved?.statusCode, 200);
+    });
+  });
+
+  group('apiClientProvider', () {
+    test('provides a configured Dio instance with AuthInterceptor', () {
+      final fakeAuthService = MockAuthService();
+      final container = ProviderContainer(overrides: [
+        authServiceProvider.overrideWith((_) => fakeAuthService),
+        authNotifierProvider.overrideWith(() => _StubAuthNotifier()),
+      ]);
+      addTearDown(container.dispose);
+
+      final dio = container.read(apiClientProvider);
+
+      expect(dio, isA<Dio>());
+      expect(
+        dio.interceptors.whereType<AuthInterceptor>().length,
+        1,
+      );
     });
   });
 }

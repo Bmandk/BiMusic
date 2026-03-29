@@ -106,7 +106,7 @@ class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
 // Helper
 // ---------------------------------------------------------------------------
 
-Widget buildSubject({
+Widget _buildSubject({
   bool isAdmin = false,
   BitratePreference bitratePref = BitratePreference.auto,
   _MockAuthService? authService,
@@ -142,43 +142,43 @@ void main() {
   });
 
   testWidgets('renders Settings title', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Settings'), findsOneWidget);
   });
 
   testWidgets('renders username', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('testuser'), findsOneWidget);
   });
 
   testWidgets('renders Sign Out option', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Sign Out'), findsOneWidget);
   });
 
   testWidgets('renders Playback section', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Playback'), findsOneWidget);
   });
 
   testWidgets('renders Streaming Quality tile', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Streaming Quality'), findsOneWidget);
   });
 
   testWidgets('renders Account section header', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Account'), findsOneWidget);
   });
 
   testWidgets('renders About section', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     // About section is at the bottom of the ListView — scroll to reveal it.
     await tester.drag(find.byType(ListView), const Offset(0, -600));
@@ -187,7 +187,7 @@ void main() {
   });
 
   testWidgets('renders App Version tile', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pump();
@@ -195,7 +195,7 @@ void main() {
   });
 
   testWidgets('renders Backend URL tile', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pump();
@@ -203,7 +203,7 @@ void main() {
   });
 
   testWidgets('renders Open Source Licenses tile', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pump();
@@ -211,25 +211,25 @@ void main() {
   });
 
   testWidgets('renders Offline Downloads section on non-web', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Offline Downloads'), findsOneWidget);
   });
 
   testWidgets('renders Offline Music storage tile', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Offline Music'), findsOneWidget);
   });
 
   testWidgets('renders Clear All Downloads tile', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Clear All Downloads'), findsOneWidget);
   });
 
   testWidgets('does NOT render Debug section for non-admin user', (tester) async {
-    await tester.pumpWidget(buildSubject(isAdmin: false));
+    await tester.pumpWidget(_buildSubject(isAdmin: false));
     await tester.pump();
     expect(find.text('Debug'), findsNothing);
     expect(find.text('Backend'), findsNothing);
@@ -238,7 +238,7 @@ void main() {
 
   testWidgets('shows auto bitrate label when preference is auto', (tester) async {
     await tester.pumpWidget(
-      buildSubject(bitratePref: BitratePreference.auto),
+      _buildSubject(bitratePref: BitratePreference.auto),
     );
     await tester.pump();
     expect(
@@ -250,7 +250,7 @@ void main() {
   testWidgets('shows always low label when preference is alwaysLow',
       (tester) async {
     await tester.pumpWidget(
-      buildSubject(bitratePref: BitratePreference.alwaysLow),
+      _buildSubject(bitratePref: BitratePreference.alwaysLow),
     );
     await tester.pump();
     expect(find.textContaining('Always Low'), findsOneWidget);
@@ -259,14 +259,14 @@ void main() {
   testWidgets('shows always high label when preference is alwaysHigh',
       (tester) async {
     await tester.pumpWidget(
-      buildSubject(bitratePref: BitratePreference.alwaysHigh),
+      _buildSubject(bitratePref: BitratePreference.alwaysHigh),
     );
     await tester.pump();
     expect(find.textContaining('Always High'), findsOneWidget);
   });
 
   testWidgets('tapping Sign Out shows confirmation dialog', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
 
     await tester.tap(find.text('Sign Out'));
@@ -279,7 +279,7 @@ void main() {
 
   testWidgets('cancelling logout dialog closes it without action',
       (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
 
     await tester.tap(find.text('Sign Out'));
@@ -294,7 +294,7 @@ void main() {
   });
 
   testWidgets('tapping Streaming Quality opens picker dialog', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
 
     await tester.tap(find.text('Streaming Quality'));
@@ -310,7 +310,7 @@ void main() {
 
   testWidgets('tapping Clear All Downloads shows confirmation dialog',
       (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
 
     await tester.tap(find.text('Clear All Downloads'));
@@ -322,7 +322,7 @@ void main() {
   });
 
   testWidgets('Crossfade tile is visible but disabled', (tester) async {
-    await tester.pumpWidget(buildSubject());
+    await tester.pumpWidget(_buildSubject());
     await tester.pump();
     expect(find.text('Crossfade'), findsOneWidget);
     expect(find.text('Coming soon'), findsOneWidget);

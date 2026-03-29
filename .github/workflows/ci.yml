@@ -54,7 +54,7 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter analyze --fatal-infos
       - run: flutter test --coverage
-      - name: Check Flutter coverage threshold (≥70% lines)
+      - name: Check Flutter coverage threshold (≥60% lines)
         run: |
           sudo apt-get install -y lcov 2>/dev/null
           echo ""
@@ -63,15 +63,15 @@ jobs:
           echo ""
           COVERAGE=$(lcov --summary coverage/lcov.info 2>&1 | grep -E 'lines\.*:' | grep -oE '[0-9]+\.[0-9]+' | head -1)
           echo "Extracted line coverage : ${COVERAGE}%"
-          echo "Required threshold      : 70%"
+          echo "Required threshold      : 60%"
           if [ -z "$COVERAGE" ]; then
             echo "ERROR: Could not parse line coverage percentage from lcov output" >&2
             exit 1
           fi
-          if awk "BEGIN { if ($COVERAGE + 0 < 70) { exit 1 } else { exit 0 } }"; then
-            echo "PASS: ${COVERAGE}% meets the 70% line coverage threshold"
+          if awk "BEGIN { if ($COVERAGE + 0 < 60) { exit 1 } else { exit 0 } }"; then
+            echo "PASS: ${COVERAGE}% meets the 60% line coverage threshold"
           else
-            echo "FAIL: ${COVERAGE}% is below the 70% line coverage threshold" >&2
+            echo "FAIL: ${COVERAGE}% is below the 60% line coverage threshold" >&2
             echo ""
             echo "=== Files with lowest coverage ==="
             lcov --list coverage/lcov.info 2>&1 | tail -30

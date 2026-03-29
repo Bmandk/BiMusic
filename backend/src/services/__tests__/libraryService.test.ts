@@ -48,6 +48,12 @@ vi.mock("../lidarrClient.js", () => ({
   getAlbumCover: vi.fn(),
 }));
 
+import type {
+  LidarrArtist,
+  LidarrAlbum,
+  LidarrTrack,
+  LidarrSearchResult,
+} from "../../types/lidarr.js";
 import * as lidarrClient from "../lidarrClient.js";
 import {
   getArtists,
@@ -67,7 +73,7 @@ const mockArtist = {
   overview: "Bio",
   images: [{ coverType: "poster", url: "/api/mediacover/1/poster.jpg" }],
   statistics: { albumCount: 2, trackFileCount: 10 },
-};
+} as unknown as LidarrArtist;
 
 const mockAlbum = {
   id: 10,
@@ -79,7 +85,7 @@ const mockAlbum = {
   duration: 3600,
   statistics: { trackFileCount: 5 },
   images: [{ coverType: "cover", url: "/api/mediacover/10/cover.jpg" }],
-};
+} as unknown as LidarrAlbum;
 
 const mockTrack = {
   id: 100,
@@ -90,7 +96,7 @@ const mockTrack = {
   artistId: 1,
   hasFile: true,
   trackFileId: 200,
-};
+} as unknown as LidarrTrack;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -200,8 +206,8 @@ describe("getArtistAlbums", () => {
   it("uses 'Unknown Artist' when artist.artistName is missing", async () => {
     const albumNoArtist = {
       ...mockAlbum,
-      artist: undefined as unknown as { artistName: string },
-    };
+      artist: undefined,
+    } as unknown as LidarrAlbum;
     vi.mocked(lidarrClient.getAlbums).mockResolvedValue([albumNoArtist]);
 
     const result = await getArtistAlbums(1);
@@ -314,7 +320,9 @@ describe("search", () => {
       artist: mockArtist,
       album: mockAlbum,
     };
-    vi.mocked(lidarrClient.search).mockResolvedValue([searchResult]);
+    vi.mocked(lidarrClient.search).mockResolvedValue(
+      [searchResult] as unknown as LidarrSearchResult[],
+    );
 
     const result = await search("test");
 
@@ -329,7 +337,9 @@ describe("search", () => {
       { artist: mockArtist, album: mockAlbum },
       { artist: mockArtist, album: { ...mockAlbum, id: 11 } },
     ];
-    vi.mocked(lidarrClient.search).mockResolvedValue(results);
+    vi.mocked(lidarrClient.search).mockResolvedValue(
+      results as unknown as LidarrSearchResult[],
+    );
 
     const result = await search("test");
 
@@ -340,7 +350,7 @@ describe("search", () => {
   it("handles results with only artist (no album)", async () => {
     vi.mocked(lidarrClient.search).mockResolvedValue([
       { artist: mockArtist, album: undefined as unknown as typeof mockAlbum },
-    ]);
+    ] as unknown as LidarrSearchResult[]);
 
     const result = await search("artist only");
     expect(result.artists).toHaveLength(1);
@@ -350,7 +360,7 @@ describe("search", () => {
   it("handles results with only album (no artist)", async () => {
     vi.mocked(lidarrClient.search).mockResolvedValue([
       { artist: undefined as unknown as typeof mockArtist, album: mockAlbum },
-    ]);
+    ] as unknown as LidarrSearchResult[]);
 
     const result = await search("album only");
     expect(result.artists).toHaveLength(0);
