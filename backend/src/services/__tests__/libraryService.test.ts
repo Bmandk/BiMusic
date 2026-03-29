@@ -320,9 +320,9 @@ describe("search", () => {
       artist: mockArtist,
       album: mockAlbum,
     };
-    vi.mocked(lidarrClient.search).mockResolvedValue(
-      [searchResult] as unknown as LidarrSearchResult[],
-    );
+    vi.mocked(lidarrClient.search).mockResolvedValue([
+      searchResult,
+    ] as unknown as LidarrSearchResult[]);
 
     const result = await search("test");
 
