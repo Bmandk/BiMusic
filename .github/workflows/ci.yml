@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Stage 1: Lint & Unit (parallel) ──────────────────────────
+  # ── Stage 1: Lint & All Tests (parallel) ─────────────────────
   backend-lint-unit:
-    name: Backend Lint & Unit Tests
+    name: Backend Lint & Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,12 +26,12 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - name: Install ffmpeg
+        run: sudo apt-get install -y ffmpeg
       - run: npm run lint
       - run: npm run format:check
       - run: npm run build
-      - run: npm run test:unit -- --coverage
-      - name: Check backend coverage threshold (≥80% lines)
-        run: npx c8 check-coverage --lines 80 --branches 75
+      - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
@@ -82,7 +82,7 @@ jobs:
           name: flutter-coverage
           path: bimusic_app/coverage/
 
-  # ── Stage 2: Integration (depends on stage 1) ───────────────
+  # ── Stage 2: Integration (redundant safety check) ────────────
   backend-integration:
     name: Backend Integration Tests
     needs: [backend-lint-unit]

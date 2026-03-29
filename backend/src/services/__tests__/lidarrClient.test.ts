@@ -383,6 +383,74 @@ describe("lidarrClient", () => {
     });
   });
 
+  describe("getQueue", () => {
+    it("returns queue items from GET /queue", async () => {
+      const stubQueue = [
+        {
+          id: 1,
+          artistId: 1,
+          albumId: 10,
+          title: "Test Album",
+          status: "downloading",
+          trackedDownloadStatus: "ok",
+          trackedDownloadState: "downloading",
+          size: 100000000,
+          sizeleft: 50000000,
+          timeleft: "00:05:00",
+        },
+      ];
+      nock(BASE).get("/api/v1/queue").reply(200, stubQueue);
+
+      const { getQueue } = await import("../lidarrClient.js");
+      const result = await getQueue();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe("downloading");
+    });
+  });
+
+  describe("getRootFolders", () => {
+    it("returns root folders from GET /rootfolder", async () => {
+      const stubFolders = [{ id: 1, path: "/music" }];
+      nock(BASE).get("/api/v1/rootfolder").reply(200, stubFolders);
+
+      const { getRootFolders } = await import("../lidarrClient.js");
+      const result = await getRootFolders();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].path).toBe("/music");
+    });
+  });
+
+  describe("getQualityProfiles", () => {
+    it("returns quality profiles from GET /qualityprofile", async () => {
+      const stubProfiles = [
+        { id: 1, name: "Lossless" },
+        { id: 2, name: "Standard" },
+      ];
+      nock(BASE).get("/api/v1/qualityprofile").reply(200, stubProfiles);
+
+      const { getQualityProfiles } = await import("../lidarrClient.js");
+      const result = await getQualityProfiles();
+
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe("Lossless");
+    });
+  });
+
+  describe("getMetadataProfiles", () => {
+    it("returns metadata profiles from GET /metadataprofile", async () => {
+      const stubProfiles = [{ id: 1, name: "Standard" }];
+      nock(BASE).get("/api/v1/metadataprofile").reply(200, stubProfiles);
+
+      const { getMetadataProfiles } = await import("../lidarrClient.js");
+      const result = await getMetadataProfiles();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Standard");
+    });
+  });
+
   describe("runCommand", () => {
     it("POSTs to /command with name and returns command resource", async () => {
       nock(BASE)
