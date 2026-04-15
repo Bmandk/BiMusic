@@ -8,10 +8,7 @@ import '../models/track.dart';
 
 class BiMusicAudioHandler extends BaseAudioHandler {
   final AudioPlayer _player = AudioPlayer();
-  final ConcatenatingAudioSource _playlist =
-      ConcatenatingAudioSource(children: []);
   final Completer<void> _initCompleter = Completer();
-  bool _sourceSet = false;
 
   List<Track> _tracks = [];
   String? _accessToken;
@@ -82,16 +79,8 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     queue.add(tracks.map(_trackToMediaItem).toList());
     mediaItem.add(_trackToMediaItem(tracks[startIndex]));
 
-    if (!_sourceSet) {
-      _sourceSet = true;
-      await _playlist.addAll(sources);
-      await _player.setAudioSource(_playlist, initialIndex: startIndex);
-    } else {
-      await _playlist.clear();
-      await _playlist.addAll(sources);
-      await _player.seek(Duration.zero, index: startIndex);
-    }
-
+    final playlist = ConcatenatingAudioSource(children: sources);
+    await _player.setAudioSource(playlist, initialIndex: startIndex);
     await _player.play();
   }
 

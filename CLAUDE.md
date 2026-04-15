@@ -10,12 +10,6 @@ BiMusic is a self-hosted music streaming app with a **Node.js/TypeScript backend
 
 ### Backend (`backend/`)
 
-Node.js is managed via nvm and is **not on the default PATH**. Prefix all node/npm commands:
-
-```bash
-export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && nvm use --lts
-```
-
 | Task | Command |
 |---|---|
 | Install deps | `npm ci` |
