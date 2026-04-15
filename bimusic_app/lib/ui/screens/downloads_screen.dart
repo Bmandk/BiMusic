@@ -392,6 +392,7 @@ class _TrackDownloadTile extends ConsumerWidget {
   Widget _statusIcon(BuildContext context, WidgetRef ref) {
     switch (task.status) {
       case DownloadStatus.pending:
+      case DownloadStatus.ready:
         return const Icon(Icons.schedule, size: 18);
       case DownloadStatus.downloading:
         return SizedBox(
@@ -416,7 +417,7 @@ class _TrackDownloadTile extends ConsumerWidget {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           onPressed: () =>
-              ref.read(downloadProvider.notifier).cancelDownload(task.serverId),
+              ref.read(downloadProvider.notifier).retryDownload(task.serverId),
         );
     }
   }

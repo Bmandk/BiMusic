@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/library_provider.dart';
+import '../layouts/breakpoints.dart';
 import '../widgets/artist_card.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -35,22 +36,32 @@ class LibraryScreen extends ConsumerWidget {
           onRefresh: () => ref.read(libraryProvider.notifier).refresh(),
           child: artists.isEmpty
               ? const Center(child: Text('No artists in library'))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: artists.length,
-                  itemBuilder: (context, index) {
-                    final artist = artists[index];
-                    return ArtistCard(
-                      artist: artist,
-                      onTap: () =>
-                          context.go('/library/artist/${artist.id}'),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    final crossAxisCount = width >= Breakpoints.desktop
+                        ? 5
+                        : width >= Breakpoints.tablet
+                            ? 4
+                            : 2;
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemCount: artists.length,
+                      itemBuilder: (context, index) {
+                        final artist = artists[index];
+                        return ArtistCard(
+                          artist: artist,
+                          onTap: () =>
+                              context.go('/library/artist/${artist.id}'),
+                        );
+                      },
                     );
                   },
                 ),

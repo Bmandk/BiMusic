@@ -118,26 +118,47 @@ class AlbumDetailScreen extends ConsumerWidget {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 ),
-                error: (err, _) => const SliverToBoxAdapter(
-                  child: Center(child: Text('Failed to load tracks')),
-                ),
-                data: (tracks) => SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => TrackTile(
-                      track: tracks[index],
-                      onTap: () {
-                        ref.read(playerNotifierProvider.notifier).play(
-                          tracks[index],
-                          tracks,
-                          artistName: album.artistName,
-                          albumTitle: album.title,
-                          imageUrl: album.imageUrl,
-                        );
-                      },
+                error: (err, _) => SliverToBoxAdapter(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48),
+                        const SizedBox(height: 8),
+                        const Text('Failed to load tracks'),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: () =>
+                              ref.invalidate(albumTracksProvider(albumId)),
+                          child: const Text('Retry'),
+                        ),
+                      ],
                     ),
-                    childCount: tracks.length,
                   ),
                 ),
+                data: (tracks) => tracks.isEmpty
+                    ? const SliverFillRemaining(
+                        child: Center(
+                          child: Text('No tracks yet'),
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => TrackTile(
+                            track: tracks[index],
+                            onTap: () {
+                              ref.read(playerNotifierProvider.notifier).play(
+                                tracks[index],
+                                tracks,
+                                artistName: album.artistName,
+                                albumTitle: album.title,
+                                imageUrl: album.imageUrl,
+                              );
+                            },
+                          ),
+                          childCount: tracks.length,
+                        ),
+                      ),
               ),
             ],
           );

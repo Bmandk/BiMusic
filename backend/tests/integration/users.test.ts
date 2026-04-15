@@ -102,6 +102,29 @@ describe('DELETE /api/users/:id', () => {
     expect(usernames).not.toContain('todelete');
   });
 
+  it('returns 400 when admin tries to delete their own account', async () => {
+    // Get the admin's own ID from the user list
+    const listRes = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const adminUser = (listRes.body as { username: string; id: string }[]).find(
+      (u) => u.username === ADMIN.username,
+    );
+    expect(adminUser).toBeDefined();
+
+    const res = await request(app)
+      .delete(`/api/users/${adminUser!.id}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when deleting a nonexistent user', async () => {
+    const res = await request(app)
+      .delete('/api/users/00000000000000000000000000000000')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+
   it('returns 401 without token', async () => {
     const res = await request(app).delete('/api/users/nonexistent-id');
     expect(res.status).toBe(401);

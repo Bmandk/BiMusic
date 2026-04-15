@@ -73,6 +73,20 @@ String _makeJwt({
   return 'eyJhbGciOiJIUzI1NiJ9.$payload.fakesig';
 }
 
+/// Builds a fake JWT where [isAdminRaw] is an arbitrary JSON value
+/// (e.g. integer 1, integer 0) rather than a Dart bool literal.
+String _makeJwtRaw({
+  required String userId,
+  required String username,
+  required String isAdminRaw,
+}) {
+  final payloadJson =
+      '{"userId":"$userId","username":"$username","isAdmin":$isAdminRaw}';
+  final payload =
+      base64Url.encode(utf8.encode(payloadJson)).replaceAll('=', '');
+  return 'eyJhbGciOiJIUzI1NiJ9.$payload.fakesig';
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -173,6 +187,30 @@ void main() {
       final result = await service.readStoredTokens();
 
       expect(result!.user.isAdmin, isTrue);
+    });
+
+    test('decodes integer 1 isAdmin as true without throwing', () async {
+      // Backend encodes isAdmin as a boolean, but hand-crafted or legacy JWTs
+      // might contain integer 1. The safe cast (== true) must handle this.
+      final access = _makeJwtRaw(userId: 'u4', username: 'admin2', isAdminRaw: '1');
+      fakeStorage._store['bimusic_access_token'] = access;
+      fakeStorage._store['bimusic_refresh_token'] = 'r';
+
+      final result = await service.readStoredTokens();
+
+      // Integer 1 is not equal to true in Dart, so isAdmin should be false
+      // (not throw). The important thing is no TypeError is raised.
+      expect(result!.user.isAdmin, isFalse);
+    });
+
+    test('decodes integer 0 isAdmin as false without throwing', () async {
+      final access = _makeJwtRaw(userId: 'u5', username: 'user2', isAdminRaw: '0');
+      fakeStorage._store['bimusic_access_token'] = access;
+      fakeStorage._store['bimusic_refresh_token'] = 'r';
+
+      final result = await service.readStoredTokens();
+
+      expect(result!.user.isAdmin, isFalse);
     });
   });
 

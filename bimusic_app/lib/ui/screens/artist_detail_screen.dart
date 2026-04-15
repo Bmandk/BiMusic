@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../providers/library_provider.dart';
 import '../../services/auth_service.dart';
+import '../layouts/breakpoints.dart';
 import '../widgets/album_card.dart';
 
 class ArtistDetailScreen extends ConsumerWidget {
@@ -89,32 +90,63 @@ class ArtistDetailScreen extends ConsumerWidget {
                   child: Center(child: CircularProgressIndicator()),
                 ),
               ),
-              error: (err, _) => const SliverToBoxAdapter(
-                child: Center(child: Text('Failed to load albums')),
-              ),
-              data: (albums) => SliverPadding(
-                padding: const EdgeInsets.all(12),
-                sliver: SliverGrid(
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.75,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final album = albums[index];
-                      return AlbumCard(
-                        album: album,
-                        onTap: () =>
-                            context.go('/library/album/${album.id}'),
-                      );
-                    },
-                    childCount: albums.length,
+              error: (err, _) => SliverToBoxAdapter(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48),
+                      const SizedBox(height: 8),
+                      const Text('Failed to load albums'),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: () =>
+                            ref.invalidate(artistAlbumsProvider(artistId)),
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
                 ),
               ),
+              data: (albums) => albums.isEmpty
+                  ? const SliverFillRemaining(
+                      child: Center(
+                        child: Text('No albums yet'),
+                      ),
+                    )
+                  : SliverLayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.crossAxisExtent;
+                        final crossAxisCount = width >= Breakpoints.desktop
+                            ? 5
+                            : width >= Breakpoints.tablet
+                                ? 4
+                                : 2;
+                        return SliverPadding(
+                          padding: const EdgeInsets.all(12),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 0.75,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final album = albums[index];
+                                return AlbumCard(
+                                  album: album,
+                                  onTap: () =>
+                                      context.go('/library/album/${album.id}'),
+                                );
+                              },
+                              childCount: albums.length,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

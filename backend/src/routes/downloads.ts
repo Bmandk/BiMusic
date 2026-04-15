@@ -81,7 +81,7 @@ router.get(
       return;
     }
 
-    if (record.status !== "ready" && record.status !== "complete") {
+    if (record.status !== "ready" && record.status !== "completed") {
       next(
         createError(
           409,
@@ -100,7 +100,9 @@ router.get(
     const filename = `${record.lidarrTrackId}-${record.bitrate}.mp3`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    markDownloadComplete(id);
+    res.on("finish", () => {
+      markDownloadComplete(id);
+    });
 
     serveFile(record.filePath, req, res);
   },

@@ -14,6 +14,7 @@ class FullPlayer extends ConsumerStatefulWidget {
 
 class _FullPlayerState extends ConsumerState<FullPlayer> {
   double? _dragValue;
+  bool _showQueue = false;
 
   String _formatDuration(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -55,6 +56,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
       builder: (context, scrollController) => Scaffold(
         appBar: AppBar(
           leading: IconButton(
+            tooltip: 'Collapse player',
             icon: const Icon(Icons.keyboard_arrow_down_rounded),
             onPressed: () => Navigator.of(context).pop(),
           ),
@@ -65,174 +67,258 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
           centerTitle: true,
           backgroundColor: Colors.transparent,
           elevation: 0,
+          actions: [
+            IconButton(
+              tooltip: 'Up Next',
+              icon: Icon(
+                Icons.queue_music_rounded,
+                color: _showQueue ? colorScheme.primary : null,
+              ),
+              onPressed: () => setState(() => _showQueue = !_showQueue),
+            ),
+          ],
         ),
-        body: SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            children: [
-              const SizedBox(height: 24),
-              // Album art
-              AspectRatio(
-                aspectRatio: 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: playerState.imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: playerState.imageUrl!,
-                          httpHeaders: headers,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => ColoredBox(
-                            color: colorScheme.surfaceContainerHighest,
-                          ),
-                          errorWidget: (_, __, ___) => ColoredBox(
-                            color: colorScheme.surfaceContainerHighest,
-                            child: const Icon(Icons.album, size: 80),
-                          ),
-                        )
-                      : ColoredBox(
-                          color: colorScheme.surfaceContainerHighest,
-                          child: const Icon(Icons.album, size: 80),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Track title and artist
-              Text(
-                track.title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                playerState.artistName ?? '',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Progress bar
-              Slider(
-                value: sliderValue.clamp(0.0, 1.0),
-                onChanged: (v) => setState(() => _dragValue = v),
-                onChangeEnd: (v) {
-                  ref.read(playerNotifierProvider.notifier).seekTo(
-                    Duration(
-                      milliseconds: (v * maxMs).round(),
-                    ),
-                  );
-                  setState(() => _dragValue = null);
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: _showQueue
+            ? _QueuePanel(
+                scrollController: scrollController,
+                playerState: playerState,
+              )
+            : SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
                   children: [
-                    Text(
-                      _formatDuration(
-                        _dragValue != null
-                            ? Duration(
-                                milliseconds:
-                                    (_dragValue! * maxMs).round(),
+                    const SizedBox(height: 24),
+                    // Album art
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: playerState.imageUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: playerState.imageUrl!,
+                                httpHeaders: headers,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => ColoredBox(
+                                  color: colorScheme.surfaceContainerHighest,
+                                ),
+                                errorWidget: (_, __, ___) => ColoredBox(
+                                  color: colorScheme.surfaceContainerHighest,
+                                  child: const Icon(Icons.album, size: 80),
+                                ),
                               )
-                            : position,
+                            : ColoredBox(
+                                color: colorScheme.surfaceContainerHighest,
+                                child: const Icon(Icons.album, size: 80),
+                              ),
                       ),
-                      style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    const SizedBox(height: 32),
+                    // Track title and artist
                     Text(
-                      _formatDuration(duration),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      track.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      playerState.artistName ?? '',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Progress bar
+                    Slider(
+                      value: sliderValue.clamp(0.0, 1.0),
+                      onChanged: (v) => setState(() => _dragValue = v),
+                      onChangeEnd: (v) {
+                        ref.read(playerNotifierProvider.notifier).seekTo(
+                          Duration(
+                            milliseconds: (v * maxMs).round(),
+                          ),
+                        );
+                        setState(() => _dragValue = null);
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _formatDuration(
+                              _dragValue != null
+                                  ? Duration(
+                                      milliseconds:
+                                          (_dragValue! * maxMs).round(),
+                                    )
+                                  : position,
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            _formatDuration(duration),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Transport controls row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Shuffle
+                        IconButton(
+                          tooltip: playerState.isShuffled ? 'Shuffle on' : 'Shuffle off',
+                          icon: Icon(
+                            Icons.shuffle_rounded,
+                            color: playerState.isShuffled
+                                ? colorScheme.primary
+                                : null,
+                          ),
+                          onPressed: () => ref
+                              .read(playerNotifierProvider.notifier)
+                              .toggleShuffle(),
+                        ),
+                        // Skip previous
+                        IconButton(
+                          tooltip: 'Skip previous',
+                          iconSize: 40,
+                          icon: const Icon(Icons.skip_previous_rounded),
+                          onPressed: () =>
+                              ref.read(playerNotifierProvider.notifier).skipPrev(),
+                        ),
+                        // Play / pause
+                        Semantics(
+                          button: true,
+                          label: playerState.isPlaying ? 'Pause' : 'Play',
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              shape: const CircleBorder(),
+                              padding: const EdgeInsets.all(16),
+                            ),
+                            onPressed: () {
+                              final notifier =
+                                  ref.read(playerNotifierProvider.notifier);
+                              if (playerState.isPlaying) {
+                                notifier.pause();
+                              } else {
+                                notifier.resume();
+                              }
+                            },
+                            child: Icon(
+                              playerState.isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              size: 36,
+                            ),
+                          ),
+                        ),
+                        // Skip next
+                        IconButton(
+                          tooltip: 'Skip next',
+                          iconSize: 40,
+                          icon: const Icon(Icons.skip_next_rounded),
+                          onPressed: () =>
+                              ref.read(playerNotifierProvider.notifier).skipNext(),
+                        ),
+                        // Repeat
+                        IconButton(
+                          tooltip: switch (playerState.repeatMode) {
+                            AudioServiceRepeatMode.none => 'Repeat off',
+                            AudioServiceRepeatMode.group => 'Repeat all',
+                            _ => 'Repeat one',
+                          },
+                          icon: Icon(
+                            playerState.repeatMode == AudioServiceRepeatMode.one
+                                ? Icons.repeat_one_rounded
+                                : Icons.repeat_rounded,
+                            color: playerState.repeatMode != AudioServiceRepeatMode.none
+                                ? colorScheme.primary
+                                : null,
+                          ),
+                          onPressed: () {
+                            final next = switch (playerState.repeatMode) {
+                              AudioServiceRepeatMode.none =>
+                                AudioServiceRepeatMode.group,
+                              AudioServiceRepeatMode.group =>
+                                AudioServiceRepeatMode.one,
+                              _ => AudioServiceRepeatMode.none,
+                            };
+                            ref.read(playerNotifierProvider.notifier).setRepeat(next);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              // Transport controls row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Shuffle
-                  IconButton(
-                    icon: Icon(
-                      Icons.shuffle_rounded,
-                      color: playerState.isShuffled
-                          ? colorScheme.primary
-                          : null,
-                    ),
-                    onPressed: () => ref
-                        .read(playerNotifierProvider.notifier)
-                        .toggleShuffle(),
-                  ),
-                  // Skip previous
-                  IconButton(
-                    iconSize: 40,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                    onPressed: () =>
-                        ref.read(playerNotifierProvider.notifier).skipPrev(),
-                  ),
-                  // Play / pause
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(16),
-                    ),
-                    onPressed: () {
-                      final notifier =
-                          ref.read(playerNotifierProvider.notifier);
-                      if (playerState.isPlaying) {
-                        notifier.pause();
-                      } else {
-                        notifier.resume();
-                      }
-                    },
-                    child: Icon(
-                      playerState.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      size: 36,
-                    ),
-                  ),
-                  // Skip next
-                  IconButton(
-                    iconSize: 40,
-                    icon: const Icon(Icons.skip_next_rounded),
-                    onPressed: () =>
-                        ref.read(playerNotifierProvider.notifier).skipNext(),
-                  ),
-                  // Repeat
-                  IconButton(
-                    icon: Icon(
-                      playerState.repeatMode == AudioServiceRepeatMode.one
-                          ? Icons.repeat_one_rounded
-                          : Icons.repeat_rounded,
-                      color: playerState.repeatMode != AudioServiceRepeatMode.none
-                          ? colorScheme.primary
-                          : null,
-                    ),
-                    onPressed: () {
-                      final next = switch (playerState.repeatMode) {
-                        AudioServiceRepeatMode.none =>
-                          AudioServiceRepeatMode.group,
-                        AudioServiceRepeatMode.group =>
-                          AudioServiceRepeatMode.one,
-                        _ => AudioServiceRepeatMode.none,
-                      };
-                      ref.read(playerNotifierProvider.notifier).setRepeat(next);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-            ],
+      ),
+    );
+  }
+}
+
+/// Shows the current play queue with the active track highlighted.
+class _QueuePanel extends StatelessWidget {
+  const _QueuePanel({
+    required this.scrollController,
+    required this.playerState,
+  });
+
+  final ScrollController scrollController;
+  final PlayerState playerState;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final queue = playerState.queue;
+
+    if (queue.isEmpty) {
+      return Center(
+        child: Text(
+          'Queue is empty',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
-      ),
+      );
+    }
+
+    return ListView.builder(
+      controller: scrollController,
+      itemCount: queue.length,
+      itemBuilder: (context, index) {
+        final t = queue[index];
+        final isCurrent = playerState.currentTrack?.id == t.id;
+        return ListTile(
+          leading: isCurrent
+              ? Icon(Icons.equalizer_rounded, color: colorScheme.primary)
+              : const Icon(Icons.music_note_outlined),
+          title: Text(
+            t.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: isCurrent ? FontWeight.bold : null,
+              color: isCurrent ? colorScheme.primary : null,
+            ),
+          ),
+          subtitle: Text(
+            playerState.artistName ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        );
+      },
     );
   }
 }

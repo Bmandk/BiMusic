@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { mkdirSync, statSync, unlinkSync } from "fs";
+import { copyFile } from "fs/promises";
 import path from "path";
 import { eq, and, asc } from "drizzle-orm";
 import ffmpeg from "fluent-ffmpeg";
@@ -8,6 +9,7 @@ import { offlineTracks } from "../db/schema.js";
 import { createError } from "../middleware/errorHandler.js";
 import {
   resolveFilePath,
+  isPassthrough,
   registerFfmpegCommand,
   unregisterFfmpegCommand,
 } from "./streamService.js";
@@ -158,7 +160,7 @@ export function deleteDownload(id: string, userId: string): void {
 /** Mark a download as complete (file has been served and saved by the client). */
 export function markDownloadComplete(id: string): void {
   db.update(offlineTracks)
-    .set({ status: "complete", completedAt: new Date().toISOString() })
+    .set({ status: "completed", completedAt: new Date().toISOString() })
     .where(eq(offlineTracks.id, id))
     .run();
 }
@@ -214,7 +216,7 @@ export async function processOnePendingDownload(): Promise<void> {
   );
 
   db.update(offlineTracks)
-    .set({ status: "processing" })
+    .set({ status: "downloading" })
     .where(eq(offlineTracks.id, pending.id))
     .run();
 
@@ -228,7 +230,11 @@ export async function processOnePendingDownload(): Promise<void> {
       pending.bitrate,
     );
 
-    await transcodeToFile(sourcePath, pending.bitrate, outputPath);
+    if (isPassthrough(sourcePath)) {
+      await copyFile(sourcePath, outputPath);
+    } else {
+      await transcodeToFile(sourcePath, pending.bitrate, outputPath);
+    }
 
     const stat = statSync(outputPath);
     const now = new Date().toISOString();
@@ -249,6 +255,25 @@ export async function processOnePendingDownload(): Promise<void> {
       .set({ status: "failed", completedAt: new Date().toISOString() })
       .where(eq(offlineTracks.id, pending.id))
       .run();
+  }
+}
+
+/**
+ * Reset any rows stuck in "downloading" status back to "pending" so they are
+ * retried after a server crash or ungraceful shutdown.
+ * Call this once at startup, after migrations, before starting the worker.
+ */
+export function resetStuckDownloads(): void {
+  const result = db
+    .update(offlineTracks)
+    .set({ status: "pending" })
+    .where(eq(offlineTracks.status, "downloading"))
+    .run();
+  if (result.changes > 0) {
+    logger.warn(
+      { count: result.changes },
+      "Reset stuck downloading rows to pending",
+    );
   }
 }
 

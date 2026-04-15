@@ -3,10 +3,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
+import '../layouts/breakpoints.dart';
 import 'full_player.dart';
 
 class PlayerBar extends ConsumerWidget {
   const PlayerBar({super.key});
+
+  void _openFullPlayer(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= Breakpoints.desktop) {
+      // On desktop, show as a dialog panel (centered, constrained width)
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 80,
+            vertical: 24,
+          ),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const SizedBox(
+            width: 480,
+            height: 700,
+            child: FullPlayer(),
+          ),
+        ),
+      );
+    } else {
+      // On mobile/tablet, keep the bottom sheet approach
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (_) => const FullPlayer(),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,12 +63,7 @@ class PlayerBar extends ConsumerWidget {
         : 0.0;
 
     return GestureDetector(
-      onTap: () => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (_) => const FullPlayer(),
-      ),
+      onTap: () => _openFullPlayer(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -115,6 +144,7 @@ class PlayerBar extends ConsumerWidget {
                 ),
                 // Play/pause button
                 IconButton(
+                  tooltip: playerState.isPlaying ? 'Pause' : 'Play',
                   icon: Icon(
                     playerState.isPlaying
                         ? Icons.pause_rounded
@@ -132,6 +162,7 @@ class PlayerBar extends ConsumerWidget {
                 ),
                 // Skip next
                 IconButton(
+                  tooltip: 'Skip next',
                   icon: const Icon(Icons.skip_next_rounded),
                   onPressed: () =>
                       ref.read(playerNotifierProvider.notifier).skipNext(),

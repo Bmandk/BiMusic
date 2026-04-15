@@ -9,7 +9,10 @@ import {
   startTempFileCleanup,
   killAllActiveTranscodes,
 } from "./services/streamService.js";
-import { startDownloadWorker } from "./services/downloadService.js";
+import {
+  startDownloadWorker,
+  resetStuckDownloads,
+} from "./services/downloadService.js";
 
 process.on("unhandledRejection", (reason) => {
   logger.error({ reason }, "Unhandled promise rejection");
@@ -58,6 +61,7 @@ async function main() {
   await bootstrapAdminIfNeeded();
   initTempDir();
   startTempFileCleanup();
+  resetStuckDownloads();
   startDownloadWorker();
   await startServer();
 }

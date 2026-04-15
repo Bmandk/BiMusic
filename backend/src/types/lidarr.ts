@@ -99,6 +99,11 @@ export interface LidarrQueue {
   errorMessage: string | null;
 }
 
+export interface LidarrQueueResponse {
+  totalRecords: number;
+  records: LidarrQueue[];
+}
+
 export interface LidarrCommand {
   id: number;
   name: string | null;

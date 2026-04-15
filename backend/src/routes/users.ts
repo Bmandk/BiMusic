@@ -35,9 +35,21 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.delete("/:id", (req: Request, res: Response) => {
-  userService.deleteUser(req.params["id"] as string);
-  res.status(204).send();
-});
+router.delete(
+  "/:id",
+  (req: Request, res: Response, next: NextFunction) => {
+    const targetId = req.params["id"] as string;
+    if (req.user!.userId === targetId) {
+      next(createError(400, "SELF_DELETE_FORBIDDEN", "Cannot delete your own account"));
+      return;
+    }
+    const deleted = userService.deleteUser(targetId);
+    if (!deleted) {
+      next(createError(404, "USER_NOT_FOUND", "User not found"));
+      return;
+    }
+    res.status(204).send();
+  },
+);
 
 export default router;

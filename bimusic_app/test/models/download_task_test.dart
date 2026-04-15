@@ -263,13 +263,14 @@ void main() {
   });
 
   group('DownloadStatus', () {
-    test('has 4 values', () {
-      expect(DownloadStatus.values.length, 4);
+    test('has 5 values', () {
+      expect(DownloadStatus.values.length, 5);
     });
 
     test('names match expected strings', () {
       expect(DownloadStatus.pending.name, 'pending');
       expect(DownloadStatus.downloading.name, 'downloading');
+      expect(DownloadStatus.ready.name, 'ready');
       expect(DownloadStatus.completed.name, 'completed');
       expect(DownloadStatus.failed.name, 'failed');
     });

@@ -4,6 +4,30 @@ import { authenticate } from "../middleware/auth.js";
 import * as lidarrClient from "../services/lidarrClient.js";
 import { createRequest, listRequests } from "../services/requestService.js";
 import { createError } from "../middleware/errorHandler.js";
+import type { LidarrArtist, LidarrAlbum } from "../types/lidarr.js";
+
+/** Safe artist projection — strips internal fields (path, statistics, etc.) */
+function projectArtist(a: LidarrArtist) {
+  return {
+    id: a.id,
+    artistName: a.artistName,
+    foreignArtistId: a.foreignArtistId,
+    overview: a.overview,
+    images: a.images,
+  };
+}
+
+/** Safe album projection — strips internal fields (statistics, etc.) */
+function projectAlbum(a: LidarrAlbum) {
+  return {
+    id: a.id,
+    title: a.title,
+    foreignAlbumId: a.foreignAlbumId,
+    releaseDate: a.releaseDate,
+    images: a.images,
+    artist: projectArtist(a.artist),
+  };
+}
 
 /** Fetch the first available quality profile, metadata profile, and root folder from Lidarr. */
 async function getLidarrDefaults(): Promise<{
@@ -60,7 +84,10 @@ router.get(
         lidarrClient.lookupArtist(term),
         lidarrClient.lookupAlbum(term),
       ]);
-      res.json({ artists, albums });
+      res.json({
+        artists: artists.map(projectArtist),
+        albums: albums.map(projectAlbum),
+      });
     } catch (err) {
       next(err);
     }
@@ -119,7 +146,7 @@ router.post(
 
       await lidarrClient.runCommand("ArtistSearch", { artistId: artist.id });
 
-      const record = createRequest(req.user!.userId, "artist", artist.id);
+      const record = createRequest(req.user!.userId, "artist", artist.id, artistName);
       res.status(201).json(record);
     } catch (err) {
       next(err);
@@ -150,10 +177,14 @@ router.post(
 
       const { albumId } = parsed.data;
 
-      await lidarrClient.monitorAlbum([albumId], true);
+      const [album] = await Promise.all([
+        lidarrClient.getAlbum(albumId),
+        lidarrClient.monitorAlbum([albumId], true),
+      ]);
       await lidarrClient.runCommand("AlbumSearch", { albumIds: [albumId] });
 
-      const record = createRequest(req.user!.userId, "album", albumId);
+      const albumName = album.title ?? `Album #${albumId}`;
+      const record = createRequest(req.user!.userId, "album", albumId, albumName);
       res.status(201).json(record);
     } catch (err) {
       next(err);

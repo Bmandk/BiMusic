@@ -12,6 +12,7 @@ function toDto(r: RequestRow): MusicRequest {
     id: r.id,
     type: r.type,
     lidarrId: r.lidarrId,
+    name: r.name,
     status: r.status,
     requestedAt: r.requestedAt,
     resolvedAt: r.resolvedAt,
@@ -22,16 +23,18 @@ export function createRequest(
   userId: string,
   type: string,
   lidarrId: number,
+  name: string,
 ): MusicRequest {
   const id = randomUUID();
   const requestedAt = new Date().toISOString();
   db.insert(requests)
-    .values({ id, userId, type, lidarrId, status: "pending", requestedAt })
+    .values({ id, userId, type, lidarrId, name, status: "pending", requestedAt })
     .run();
   return {
     id,
     type,
     lidarrId,
+    name,
     status: "pending",
     requestedAt,
     resolvedAt: null,
@@ -55,7 +58,7 @@ export async function listRequests(userId: string): Promise<MusicRequest[]> {
   const queueArtistIds = new Set<number>();
   try {
     const queue = await lidarrClient.getQueue();
-    for (const item of queue) {
+    for (const item of queue.records) {
       if (item.albumId != null) queueAlbumIds.add(item.albumId);
       if (item.artistId != null) queueArtistIds.add(item.artistId);
     }

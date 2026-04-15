@@ -72,6 +72,7 @@ const _pendingRequest = MusicRequest(
   id: 'req-1',
   type: 'artist',
   lidarrId: 42,
+  name: 'Test Artist',
   status: 'pending',
   requestedAt: '2026-03-28T00:00:00Z',
 );
@@ -80,6 +81,7 @@ const _downloadingRequest = MusicRequest(
   id: 'req-2',
   type: 'album',
   lidarrId: 10,
+  name: 'Test Album',
   status: 'downloading',
   requestedAt: '2026-03-28T01:00:00Z',
 );
@@ -88,6 +90,7 @@ const _availableRequest = MusicRequest(
   id: 'req-3',
   type: 'artist',
   lidarrId: 99,
+  name: 'Another Artist',
   status: 'available',
   requestedAt: '2026-03-27T00:00:00Z',
 );
@@ -432,7 +435,7 @@ void main() {
     await tester.tap(find.text('My Requests'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Artist #42'), findsOneWidget);
+    expect(find.text('Test Artist'), findsWidgets);
     expect(find.text('Pending'), findsOneWidget);
   });
 

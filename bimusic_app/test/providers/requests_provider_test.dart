@@ -16,6 +16,7 @@ void main() {
     id: 'req-1',
     type: 'artist',
     lidarrId: 42,
+    name: 'Test Artist',
     status: 'pending',
     requestedAt: '2026-03-28T00:00:00Z',
   );
@@ -24,6 +25,7 @@ void main() {
     id: 'req-2',
     type: 'album',
     lidarrId: 10,
+    name: 'Test Album',
     status: 'available',
     requestedAt: '2026-03-28T01:00:00Z',
   );

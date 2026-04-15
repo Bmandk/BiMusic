@@ -41,6 +41,7 @@ export interface MusicRequest {
   id: string;
   type: string;
   lidarrId: number;
+  name: string;
   status: string;
   requestedAt: string;
   resolvedAt: string | null;

@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,7 +23,7 @@ class BiMusicApp extends ConsumerWidget {
     // Work around a Flutter Windows accessibility bridge bug where
     // OverlayPortal semantics nodes get reparented on any tree change,
     // causing "Failed to update ui::AXTree" errors in the engine.
-    if (Platform.isWindows) {
+    if (!kIsWeb && Platform.isWindows) {
       app = ExcludeSemantics(child: app);
     }
 

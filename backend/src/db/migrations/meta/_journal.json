@@ -15,6 +15,13 @@
       "when": 1743206400000,
       "tag": "0001_add_offline_tracks_bitrate",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1744761600000,
+      "tag": "0002_add_requests_name",
+      "breakpoints": true
     }
   ]
 }

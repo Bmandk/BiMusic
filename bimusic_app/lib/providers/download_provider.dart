@@ -127,9 +127,11 @@ class DownloadNotifier extends Notifier<DownloadState> {
           .map(DownloadTask.fromJson)
           .toList();
 
-      // Any task that was mid-download when the app died is reset to pending.
+      // Any task that was mid-download (or waiting for server transcode) when
+      // the app died is reset to pending so the queue can retry it.
       final reset = tasks.map((t) {
-        if (t.status == DownloadStatus.downloading) {
+        if (t.status == DownloadStatus.downloading ||
+            t.status == DownloadStatus.ready) {
           return t.copyWith(status: DownloadStatus.pending);
         }
         return t;
@@ -260,6 +262,16 @@ class DownloadNotifier extends Notifier<DownloadState> {
     _cancelTokens.remove(serverId)?.cancel('Cancelled by user');
     _updateTask(serverId, (t) => t.copyWith(status: DownloadStatus.pending));
     await _persist();
+  }
+
+  /// Reset a failed download back to [DownloadStatus.pending] and re-queue it.
+  Future<void> retryDownload(String serverId) async {
+    _updateTask(
+      serverId,
+      (t) => t.copyWith(status: DownloadStatus.pending),
+    );
+    await _persist();
+    _processQueue();
   }
 
   /// Cancel all active downloads, delete all local files, remove all backend

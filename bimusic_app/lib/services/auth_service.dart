@@ -129,7 +129,7 @@ class AuthService {
     return User(
       userId: map['userId'] as String,
       username: map['username'] as String,
-      isAdmin: map['isAdmin'] as bool,
+      isAdmin: map['isAdmin'] == true,
     );
   }
 }

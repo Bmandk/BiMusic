@@ -162,7 +162,7 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _showLogs(BuildContext context, WidgetRef ref) async {
     await showDialog<void>(
       context: context,
-      builder: (ctx) => _LogViewerDialog(ref: ref),
+      builder: (ctx) => const _LogViewerDialog(),
     );
   }
 }
@@ -404,9 +404,7 @@ class _AboutSection extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _LogViewerDialog extends ConsumerWidget {
-  const _LogViewerDialog({required this.ref});
-
-  final WidgetRef ref;
+  const _LogViewerDialog();
 
   @override
   Widget build(BuildContext context, WidgetRef widgetRef) {

@@ -38,6 +38,7 @@ void main() {
     id: 'req-1',
     type: 'artist',
     lidarrId: 42,
+    name: 'Test Artist',
     status: 'pending',
     requestedAt: '2026-03-28T00:00:00Z',
   );

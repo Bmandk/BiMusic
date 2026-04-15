@@ -124,6 +124,19 @@ describe("login", () => {
     const row = db.select().from(refreshTokens).get();
     expect(row?.token_hash).toBe(hash);
   });
+
+  it("sets expiresAt based on JWT_REFRESH_EXPIRY env var (30d ≈ 30 days from now)", async () => {
+    await seedUser("alice", "correctpassword");
+    const before = Date.now();
+    await login("alice", "correctpassword");
+    const after = Date.now();
+    const row = db.select().from(refreshTokens).get();
+    const expiresAt = new Date(row!.expiresAt).getTime();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    // expiresAt should be approximately 30 days from now (within a 5s tolerance)
+    expect(expiresAt).toBeGreaterThanOrEqual(before + thirtyDaysMs - 5000);
+    expect(expiresAt).toBeLessThanOrEqual(after + thirtyDaysMs + 5000);
+  });
 });
 
 describe("refresh", () => {

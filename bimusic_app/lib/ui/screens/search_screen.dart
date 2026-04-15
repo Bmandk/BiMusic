@@ -560,12 +560,15 @@ class _RequestTile extends StatelessWidget {
     final icon = request.type == 'artist' ? Icons.person : Icons.album;
     final date = _formatDate(request.requestedAt);
 
+    final typeLabel =
+        '${request.type[0].toUpperCase()}${request.type.substring(1)}';
+    final displayName =
+        request.name.isNotEmpty ? request.name : '#${request.lidarrId}';
+
     return ListTile(
       leading: CircleAvatar(child: Icon(icon)),
-      title: Text(
-        '${request.type[0].toUpperCase()}${request.type.substring(1)} #${request.lidarrId}',
-      ),
-      subtitle: Text('Requested $date'),
+      title: Text(displayName),
+      subtitle: Text('$typeLabel · Requested $date'),
       trailing: _StatusBadge(label: statusLabel, color: statusColor),
     );
   }

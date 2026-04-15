@@ -57,6 +57,7 @@ vi.mock("../../db/connection.js", async () => {
       userId TEXT NOT NULL,
       type TEXT NOT NULL,
       lidarrId INTEGER NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'pending',
       requestedAt TEXT NOT NULL,
       resolvedAt TEXT
@@ -86,32 +87,35 @@ beforeEach(() => {
 
 describe("createRequest", () => {
   it("creates an artist request and returns a DTO", () => {
-    const result = createRequest(TEST_USER_ID, "artist", 42);
+    const result = createRequest(TEST_USER_ID, "artist", 42, "The Beatles");
 
     expect(result.id).toBeDefined();
     expect(result.type).toBe("artist");
     expect(result.lidarrId).toBe(42);
+    expect(result.name).toBe("The Beatles");
     expect(result.status).toBe("pending");
     expect(result.requestedAt).toBeDefined();
     expect(result.resolvedAt).toBeNull();
   });
 
   it("creates an album request", () => {
-    const result = createRequest(TEST_USER_ID, "album", 99);
+    const result = createRequest(TEST_USER_ID, "album", 99, "Abbey Road");
     expect(result.type).toBe("album");
     expect(result.lidarrId).toBe(99);
+    expect(result.name).toBe("Abbey Road");
   });
 
   it("persists the request to the database", () => {
-    createRequest(TEST_USER_ID, "artist", 1);
+    createRequest(TEST_USER_ID, "artist", 1, "Artist One");
     const rows = db.select().from(requests).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.userId).toBe(TEST_USER_ID);
+    expect(rows[0]?.name).toBe("Artist One");
   });
 
   it("each call returns a unique id", () => {
-    const r1 = createRequest(TEST_USER_ID, "artist", 1);
-    const r2 = createRequest(TEST_USER_ID, "artist", 2);
+    const r1 = createRequest(TEST_USER_ID, "artist", 1, "Artist A");
+    const r2 = createRequest(TEST_USER_ID, "artist", 2, "Artist B");
     expect(r1.id).not.toBe(r2.id);
   });
 });
@@ -130,6 +134,7 @@ describe("listRequests", () => {
         userId: TEST_USER_ID,
         type: "artist",
         lidarrId: 1,
+        name: "Artist One",
         status: "available",
         requestedAt: new Date().toISOString(),
         resolvedAt: new Date().toISOString(),
@@ -144,8 +149,11 @@ describe("listRequests", () => {
   });
 
   it("polls Lidarr for pending artist requests and marks available when trackFileCount > 0", async () => {
-    createRequest(TEST_USER_ID, "artist", 10);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    createRequest(TEST_USER_ID, "artist", 10, "Artist Ten");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 10,
       artistName: "Artist",
@@ -158,10 +166,11 @@ describe("listRequests", () => {
   });
 
   it("marks artist as downloading when in queue", async () => {
-    createRequest(TEST_USER_ID, "artist", 10);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([
-      { artistId: 10, albumId: null },
-    ] as never);
+    createRequest(TEST_USER_ID, "artist", 10, "Artist Ten");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 1,
+      records: [{ artistId: 10, albumId: null }],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 10,
       artistName: "Artist",
@@ -173,8 +182,11 @@ describe("listRequests", () => {
   });
 
   it("polls Lidarr for pending album requests and marks available when trackFileCount > 0", async () => {
-    createRequest(TEST_USER_ID, "album", 20);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    createRequest(TEST_USER_ID, "album", 20, "Album Twenty");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getAlbum).mockResolvedValue({
       id: 20,
       title: "Album",
@@ -186,10 +198,11 @@ describe("listRequests", () => {
   });
 
   it("marks album as downloading when in queue", async () => {
-    createRequest(TEST_USER_ID, "album", 20);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([
-      { albumId: 20, artistId: null },
-    ] as never);
+    createRequest(TEST_USER_ID, "album", 20, "Album Twenty");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 1,
+      records: [{ albumId: 20, artistId: null }],
+    } as never);
     vi.mocked(lidarrClient.getAlbum).mockResolvedValue({
       id: 20,
       title: "Album",
@@ -201,7 +214,7 @@ describe("listRequests", () => {
   });
 
   it("swallows queue fetch errors and proceeds with pending status", async () => {
-    createRequest(TEST_USER_ID, "artist", 10);
+    createRequest(TEST_USER_ID, "artist", 10, "Artist Ten");
     vi.mocked(lidarrClient.getQueue).mockRejectedValue(
       new Error("Queue unavailable"),
     );
@@ -217,8 +230,11 @@ describe("listRequests", () => {
   });
 
   it("swallows individual status check errors and leaves request as pending", async () => {
-    createRequest(TEST_USER_ID, "artist", 10);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    createRequest(TEST_USER_ID, "artist", 10, "Artist Ten");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockRejectedValue(
       new Error("Lidarr down"),
     );
@@ -228,8 +244,11 @@ describe("listRequests", () => {
   });
 
   it("leaves request pending when trackFileCount is 0 and not in queue", async () => {
-    createRequest(TEST_USER_ID, "artist", 10);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    createRequest(TEST_USER_ID, "artist", 10, "Artist Ten");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 10,
       artistName: "Artist",
@@ -241,8 +260,11 @@ describe("listRequests", () => {
   });
 
   it("handles statistics being undefined/null gracefully", async () => {
-    createRequest(TEST_USER_ID, "artist", 10);
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    createRequest(TEST_USER_ID, "artist", 10, "Artist Ten");
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 10,
       artistName: "Artist",
@@ -260,14 +282,18 @@ describe("listRequests", () => {
         userId: TEST_USER_ID,
         type: "artist",
         lidarrId: 1,
+        name: "Artist One",
         status: "available",
         requestedAt: new Date().toISOString(),
         resolvedAt: new Date().toISOString(),
       })
       .run();
-    createRequest(TEST_USER_ID, "artist", 2);
+    createRequest(TEST_USER_ID, "artist", 2, "Artist Two");
 
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 2,
       artistName: "Artist 2",
@@ -282,10 +308,13 @@ describe("listRequests", () => {
   });
 
   it("only returns requests for the specified user", async () => {
-    createRequest(TEST_USER_ID, "artist", 1);
-    createRequest("other-user", "artist", 2);
+    createRequest(TEST_USER_ID, "artist", 1, "Artist One");
+    createRequest("other-user", "artist", 2, "Artist Two");
 
-    vi.mocked(lidarrClient.getQueue).mockResolvedValue([]);
+    vi.mocked(lidarrClient.getQueue).mockResolvedValue({
+      totalRecords: 0,
+      records: [],
+    } as never);
     vi.mocked(lidarrClient.getArtist).mockResolvedValue({
       id: 1,
       artistName: "Artist",

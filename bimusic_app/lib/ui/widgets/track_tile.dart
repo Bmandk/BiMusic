@@ -102,6 +102,7 @@ class TrackTile extends ConsumerWidget {
           ),
         );
       case DownloadStatus.pending:
+      case DownloadStatus.ready:
         return Icon(
           Icons.schedule,
           size: 16,

@@ -384,28 +384,31 @@ describe("lidarrClient", () => {
   });
 
   describe("getQueue", () => {
-    it("returns queue items from GET /queue", async () => {
-      const stubQueue = [
-        {
-          id: 1,
-          artistId: 1,
-          albumId: 10,
-          title: "Test Album",
-          status: "downloading",
-          trackedDownloadStatus: "ok",
-          trackedDownloadState: "downloading",
-          size: 100000000,
-          sizeleft: 50000000,
-          timeleft: "00:05:00",
-        },
-      ];
-      nock(BASE).get("/api/v1/queue").reply(200, stubQueue);
+    it("returns queue envelope from GET /queue", async () => {
+      const stubQueueItem = {
+        id: 1,
+        artistId: 1,
+        albumId: 10,
+        title: "Test Album",
+        status: "downloading",
+        trackedDownloadStatus: "ok",
+        trackedDownloadState: "downloading",
+        size: 100000000,
+        sizeleft: 50000000,
+        timeleft: "00:05:00",
+      };
+      const stubQueueResponse = {
+        totalRecords: 1,
+        records: [stubQueueItem],
+      };
+      nock(BASE).get("/api/v1/queue").reply(200, stubQueueResponse);
 
       const { getQueue } = await import("../lidarrClient.js");
       const result = await getQueue();
 
-      expect(result).toHaveLength(1);
-      expect(result[0].status).toBe("downloading");
+      expect(result.totalRecords).toBe(1);
+      expect(result.records).toHaveLength(1);
+      expect(result.records[0].status).toBe("downloading");
     });
   });
 

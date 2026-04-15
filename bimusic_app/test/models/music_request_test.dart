@@ -9,6 +9,7 @@ void main() {
         'id': 'req-uuid',
         'type': 'artist',
         'lidarrId': 42,
+        'name': 'The Beatles',
         'status': 'pending',
         'requestedAt': '2026-03-28T00:00:00Z',
         'resolvedAt': null,
@@ -17,9 +18,22 @@ void main() {
       expect(request.id, 'req-uuid');
       expect(request.type, 'artist');
       expect(request.lidarrId, 42);
+      expect(request.name, 'The Beatles');
       expect(request.status, 'pending');
       expect(request.requestedAt, '2026-03-28T00:00:00Z');
       expect(request.resolvedAt, isNull);
+    });
+
+    test('defaults name to empty string when absent', () {
+      final request = MusicRequest.fromJson({
+        'id': 'req-old',
+        'type': 'artist',
+        'lidarrId': 5,
+        'status': 'pending',
+        'requestedAt': '2026-03-28T00:00:00Z',
+      });
+
+      expect(request.name, '');
     });
 
     test('parses album type', () {
@@ -68,6 +82,7 @@ void main() {
         id: 'req-1',
         type: 'artist',
         lidarrId: 10,
+        name: 'Test Artist',
         status: 'pending',
         requestedAt: '2026-03-28T00:00:00Z',
         resolvedAt: '2026-03-29T00:00:00Z',
@@ -76,6 +91,7 @@ void main() {
       expect(request.id, 'req-1');
       expect(request.type, 'artist');
       expect(request.lidarrId, 10);
+      expect(request.name, 'Test Artist');
       expect(request.status, 'pending');
       expect(request.requestedAt, '2026-03-28T00:00:00Z');
       expect(request.resolvedAt, '2026-03-29T00:00:00Z');
@@ -86,6 +102,7 @@ void main() {
         id: 'req-1',
         type: 'artist',
         lidarrId: 10,
+        name: 'Test Artist',
         status: 'pending',
         requestedAt: '2026-03-28T00:00:00Z',
       );

@@ -104,6 +104,7 @@ export const requests = sqliteTable("requests", {
     .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   lidarrId: integer("lidarrId").notNull(),
+  name: text("name").notNull().default(""),
   status: text("status").notNull().default("pending"),
   requestedAt: text("requestedAt")
     .notNull()

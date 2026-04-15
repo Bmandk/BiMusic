@@ -93,8 +93,13 @@ vi.mock("fluent-ffmpeg", () => ({
 
 vi.mock("../streamService.js", () => ({
   resolveFilePath: vi.fn(),
+  isPassthrough: vi.fn(() => false),
   registerFfmpegCommand: vi.fn(),
   unregisterFfmpegCommand: vi.fn(),
+}));
+
+vi.mock("fs/promises", () => ({
+  copyFile: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("fs", async (importOriginal) => {
@@ -111,6 +116,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db/connection.js";
 import { offlineTracks } from "../../db/schema.js";
 import * as streamService from "../streamService.js";
+import * as fsPromises from "fs/promises";
 import {
   requestDownload,
   listDownloads,
@@ -118,6 +124,7 @@ import {
   deleteDownload,
   markDownloadComplete,
   processOnePendingDownload,
+  resetStuckDownloads,
 } from "../downloadService.js";
 
 const TEST_USER = "user-dl-1";
@@ -270,7 +277,7 @@ describe("deleteDownload", () => {
 });
 
 describe("markDownloadComplete", () => {
-  it("updates status to 'complete' and sets completedAt", () => {
+  it("updates status to 'completed' and sets completedAt", () => {
     requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
     const before = listDownloads(TEST_USER, TEST_DEVICE);
     expect(before[0]?.status).toBe("pending");
@@ -278,8 +285,59 @@ describe("markDownloadComplete", () => {
     markDownloadComplete(before[0].id);
 
     const after = listDownloads(TEST_USER, TEST_DEVICE);
-    expect(after[0]?.status).toBe("complete");
+    expect(after[0]?.status).toBe("completed");
     expect(after[0]?.completedAt).toBeDefined();
+  });
+});
+
+describe("resetStuckDownloads", () => {
+  it("resets all 'downloading' rows back to 'pending'", () => {
+    // Insert one row directly as 'downloading'
+    db.insert(offlineTracks)
+      .values({
+        id: "stuck-id",
+        userId: TEST_USER,
+        lidarrTrackId: 999,
+        deviceId: TEST_DEVICE,
+        bitrate: 320,
+        status: "downloading",
+        requestedAt: new Date().toISOString(),
+      })
+      .run();
+
+    resetStuckDownloads();
+
+    const row = db
+      .select()
+      .from(offlineTracks)
+      .where(eq(offlineTracks.id, "stuck-id"))
+      .get();
+    expect(row?.status).toBe("pending");
+  });
+
+  it("does not affect rows in other statuses", () => {
+    requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
+    const [row] = listDownloads(TEST_USER, TEST_DEVICE);
+
+    // Mark it ready
+    db.update(offlineTracks)
+      .set({ status: "ready" })
+      .where(eq(offlineTracks.id, row!.id))
+      .run();
+
+    resetStuckDownloads();
+
+    const after = db
+      .select()
+      .from(offlineTracks)
+      .where(eq(offlineTracks.id, row!.id))
+      .get();
+    expect(after?.status).toBe("ready");
+  });
+
+  it("is a no-op when there are no stuck rows", () => {
+    // Should not throw even when table is empty
+    expect(() => resetStuckDownloads()).not.toThrow();
   });
 });
 
@@ -395,5 +453,47 @@ describe("processOnePendingDownload", () => {
 
     expect(streamService.registerFfmpegCommand).toHaveBeenCalled();
     expect(streamService.unregisterFfmpegCommand).toHaveBeenCalled();
+  });
+
+  it("copies MP3 source directly without transcoding (passthrough)", async () => {
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
+      "/music/track.mp3",
+    );
+    vi.mocked(streamService.isPassthrough).mockReturnValue(true);
+
+    requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
+    await processOnePendingDownload();
+
+    // copyFile should have been used instead of ffmpeg
+    expect(fsPromises.copyFile).toHaveBeenCalledWith(
+      "/music/track.mp3",
+      expect.stringContaining("100-320.mp3"),
+    );
+    // ffmpeg should NOT have been invoked
+    const ffmpegMock = (await import("fluent-ffmpeg")).default as ReturnType<typeof vi.fn>;
+    expect(ffmpegMock).not.toHaveBeenCalled();
+
+    // Record should still be marked ready
+    const all = listDownloads(TEST_USER, TEST_DEVICE);
+    expect(all[0]?.status).toBe("ready");
+    expect(all[0]?.filePath).toBeDefined();
+  });
+
+  it("transcodes non-MP3 source via ffmpeg", async () => {
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
+      "/music/track.flac",
+    );
+    vi.mocked(streamService.isPassthrough).mockReturnValue(false);
+
+    requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
+    await processOnePendingDownload();
+
+    // ffmpeg should have been invoked for non-MP3
+    expect(streamService.registerFfmpegCommand).toHaveBeenCalled();
+    // copyFile should NOT have been used
+    expect(fsPromises.copyFile).not.toHaveBeenCalled();
+
+    const all = listDownloads(TEST_USER, TEST_DEVICE);
+    expect(all[0]?.status).toBe("ready");
   });
 });

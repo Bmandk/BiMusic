@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { eq, and, gte, sql, asc } from "drizzle-orm";
+import { eq, and, gte, sql, asc, count } from "drizzle-orm";
 import { db } from "../db/connection.js";
 import { playlists, playlistTracks } from "../db/schema.js";
 import { createError } from "../middleware/errorHandler.js";
@@ -28,23 +28,23 @@ function assertOwnership(
 
 export function listPlaylists(userId: string): PlaylistSummary[] {
   const rows = db
-    .select()
+    .select({
+      id: playlists.id,
+      name: playlists.name,
+      createdAt: playlists.createdAt,
+      trackCount: count(playlistTracks.id),
+    })
     .from(playlists)
+    .leftJoin(playlistTracks, eq(playlistTracks.playlistId, playlists.id))
     .where(eq(playlists.userId, userId))
+    .groupBy(playlists.id)
     .all();
-  return rows.map((p) => {
-    const countRow = db
-      .select({ count: sql<number>`count(*)` })
-      .from(playlistTracks)
-      .where(eq(playlistTracks.playlistId, p.id))
-      .get();
-    return {
-      id: p.id,
-      name: p.name,
-      trackCount: countRow?.count ?? 0,
-      createdAt: p.createdAt,
-    };
-  });
+  return rows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    trackCount: p.trackCount,
+    createdAt: p.createdAt,
+  }));
 }
 
 export function createPlaylist(

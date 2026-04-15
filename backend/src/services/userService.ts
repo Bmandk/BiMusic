@@ -39,8 +39,9 @@ export function listUsers() {
   return db.select(userPublicFields).from(users).all();
 }
 
-export function deleteUser(id: string): void {
-  db.delete(users).where(eq(users.id, id)).run();
+export function deleteUser(id: string): boolean {
+  const result = db.delete(users).where(eq(users.id, id)).run();
+  return result.changes > 0;
 }
 
 export async function bootstrapAdminIfNeeded(): Promise<void> {

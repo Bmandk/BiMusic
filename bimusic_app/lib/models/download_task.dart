@@ -29,12 +29,12 @@ class DownloadTask {
   final int artistId;
   final String userId;
   final String deviceId;
-  DownloadStatus status;
-  double? progress;
-  String? filePath;
-  int? fileSizeBytes;
-  DateTime? completedAt;
-  String? errorMessage;
+  final DownloadStatus status;
+  final double? progress;
+  final String? filePath;
+  final int? fileSizeBytes;
+  final DateTime? completedAt;
+  final String? errorMessage;
 
   // Denormalised metadata kept for display (avoids extra Lidarr fetches).
   final String trackTitle;
@@ -118,4 +118,4 @@ class DownloadTask {
       };
 }
 
-enum DownloadStatus { pending, downloading, completed, failed }
+enum DownloadStatus { pending, downloading, ready, completed, failed }

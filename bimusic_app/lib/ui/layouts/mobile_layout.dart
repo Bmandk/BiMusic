@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../providers/player_provider.dart';
 import '../widgets/player_bar.dart';
 
-/// Maps the 5 visible mobile tab indices to shell branch indices.
+/// Maps the 6 visible mobile tab indices to shell branch indices.
 /// Shell branches: 0=Home, 1=Library, 2=Search, 3=Playlists, 4=Downloads, 5=Settings
-/// Mobile tabs:    0=Home, 1=Library, 2=Search, 3=Playlists, 4=Settings
-const List<int> _mobileToBranchIndex = [0, 1, 2, 3, 5];
+/// Mobile tabs:    0=Home, 1=Library, 2=Search, 3=Playlists, 4=Downloads, 5=Settings
+const List<int> _mobileToBranchIndex = [0, 1, 2, 3, 4, 5];
 
 class MobileLayout extends ConsumerWidget {
   const MobileLayout({
@@ -66,6 +66,11 @@ class MobileLayout extends ConsumerWidget {
             icon: Icon(Icons.queue_music_outlined),
             selectedIcon: Icon(Icons.queue_music),
             label: 'Playlists',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.download_outlined),
+            selectedIcon: Icon(Icons.download),
+            label: 'Downloads',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

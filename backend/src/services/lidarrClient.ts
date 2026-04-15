@@ -8,7 +8,7 @@ import type {
   LidarrTrack,
   LidarrTrackFile,
   LidarrSearchResult,
-  LidarrQueue,
+  LidarrQueueResponse,
   LidarrCommand,
 } from "../types/lidarr.js";
 
@@ -214,9 +214,9 @@ export async function runCommand(
   }
 }
 
-export async function getQueue(): Promise<LidarrQueue[]> {
+export async function getQueue(): Promise<LidarrQueueResponse> {
   try {
-    const res = await lidarrApi.get<LidarrQueue[]>("/queue");
+    const res = await lidarrApi.get<LidarrQueueResponse>("/queue");
     return res.data;
   } catch (err) {
     return mapError(err);

@@ -126,15 +126,17 @@ describe("userService", () => {
   });
 
   describe("deleteUser", () => {
-    it("removes the user from the list", async () => {
+    it("removes the user from the list and returns true", async () => {
       const user = await userService.createUser("eve", "password123");
-      userService.deleteUser(user.id);
+      const deleted = userService.deleteUser(user.id);
+      expect(deleted).toBe(true);
       const all = userService.listUsers();
       expect(all.map((u) => u.username)).not.toContain("eve");
     });
 
-    it("is a no-op for an id that does not exist", () => {
-      expect(() => userService.deleteUser("nonexistent-id")).not.toThrow();
+    it("returns false for an id that does not exist", () => {
+      const deleted = userService.deleteUser("nonexistent-id");
+      expect(deleted).toBe(false);
     });
   });
 

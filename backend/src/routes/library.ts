@@ -52,7 +52,15 @@ router.get(
       if (imageRes.headers["content-type"]) {
         res.setHeader("Content-Type", String(imageRes.headers["content-type"]));
       }
-      imageRes.data.pipe(res);
+      imageRes.data
+        .on("error", () => {
+          if (!res.headersSent) {
+            res.status(502).end();
+          } else {
+            res.destroy();
+          }
+        })
+        .pipe(res);
     } catch (err) {
       next(err);
     }
@@ -112,7 +120,15 @@ router.get(
       if (imageRes.headers["content-type"]) {
         res.setHeader("Content-Type", String(imageRes.headers["content-type"]));
       }
-      imageRes.data.pipe(res);
+      imageRes.data
+        .on("error", () => {
+          if (!res.headersSent) {
+            res.status(502).end();
+          } else {
+            res.destroy();
+          }
+        })
+        .pipe(res);
     } catch (err) {
       next(err);
     }
