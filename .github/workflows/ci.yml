@@ -118,7 +118,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci --omit=dev
+      - run: npm ci
       - run: npm run build
+      - run: npm prune --omit=dev
       - name: Restart service
         run: pm2 reload bimusic-backend || pm2 start dist/index.js --name bimusic-backend
