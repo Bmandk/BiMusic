@@ -50,6 +50,7 @@ class PlaylistNotifier extends AsyncNotifier<List<PlaylistSummary>> {
   Future<void> reorderTracks(String playlistId, List<int> trackIds) async {
     await ref.read(playlistServiceProvider).reorderTracks(playlistId, trackIds);
     ref.invalidate(playlistDetailProvider(playlistId));
+    await refresh();
   }
 }
 

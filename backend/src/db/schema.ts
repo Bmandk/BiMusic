@@ -105,6 +105,7 @@ export const requests = sqliteTable("requests", {
   type: text("type").notNull(),
   lidarrId: integer("lidarrId").notNull(),
   name: text("name").notNull().default(""),
+  coverUrl: text("coverUrl"),
   status: text("status").notNull().default("pending"),
   requestedAt: text("requestedAt")
     .notNull()

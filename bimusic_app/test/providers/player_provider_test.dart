@@ -472,6 +472,53 @@ void main() {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Offline localFilePaths assertion
+  // ---------------------------------------------------------------------------
+
+  group('play() with offline tracks', () {
+    test('passes localFilePaths for completed downloads', () async {
+      // Build a container whose downloadProvider is seeded with a completed
+      // DownloadTask for _track1 (id=1, filePath='/local/track1.mp3').
+      final localContainer = ProviderContainer(
+        overrides: [
+          audioHandlerProvider.overrideWithValue(mockHandler),
+          authServiceProvider.overrideWith((_) => _FakeAuthService()),
+          authNotifierProvider.overrideWith(() => _FakeAuthNotifier()),
+          downloadProvider.overrideWith(() => _StubDownloadNotifierWithTask()),
+          bitratePreferenceProvider.overrideWith(
+            () => _StubBitratePreferenceNotifier(),
+          ),
+          deviceIdProvider.overrideWith((_) async => 'test-dev'),
+        ],
+      );
+      addTearDown(localContainer.dispose);
+
+      await localContainer.read(playerNotifierProvider.notifier).play(
+            _track1,
+            [_track1],
+            artistName: 'Test Artist',
+            albumTitle: 'Test Album',
+            imageUrl: 'http://img.jpg',
+          );
+
+      // Verify playQueue was called with localFilePaths containing the
+      // expected trackId → filePath mapping for the completed download.
+      verify(
+        () => mockHandler.playQueue(
+          any(),
+          any(),
+          any(),
+          any(),
+          artistName: any(named: 'artistName'),
+          albumTitle: any(named: 'albumTitle'),
+          imageUrl: any(named: 'imageUrl'),
+          localFilePaths: {1: '/local/track1.mp3'},
+        ),
+      ).called(1);
+    });
+  });
+
   group('playerPositionProvider', () {
     test('returns an AsyncValue backed by positionStream', () async {
       final c = ProviderContainer(overrides: [

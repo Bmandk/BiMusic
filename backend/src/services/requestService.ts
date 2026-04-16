@@ -13,6 +13,7 @@ function toDto(r: RequestRow): MusicRequest {
     type: r.type,
     lidarrId: r.lidarrId,
     name: r.name,
+    coverUrl: r.coverUrl ?? null,
     status: r.status,
     requestedAt: r.requestedAt,
     resolvedAt: r.resolvedAt,
@@ -24,17 +25,19 @@ export function createRequest(
   type: string,
   lidarrId: number,
   name: string,
+  coverUrl: string | null = null,
 ): MusicRequest {
   const id = randomUUID();
   const requestedAt = new Date().toISOString();
   db.insert(requests)
-    .values({ id, userId, type, lidarrId, name, status: "pending", requestedAt })
+    .values({ id, userId, type, lidarrId, name, coverUrl, status: "pending", requestedAt })
     .run();
   return {
     id,
     type,
     lidarrId,
     name,
+    coverUrl,
     status: "pending",
     requestedAt,
     resolvedAt: null,

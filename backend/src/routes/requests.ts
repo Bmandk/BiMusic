@@ -97,6 +97,7 @@ router.get(
 const artistRequestSchema = z.object({
   foreignArtistId: z.string().min(1),
   artistName: z.string().min(1),
+  coverUrl: z.string().url().optional().nullable(),
   qualityProfileId: z.number().int().positive().optional(),
   metadataProfileId: z.number().int().positive().optional(),
   rootFolderPath: z.string().min(1).optional(),
@@ -120,7 +121,7 @@ router.post(
         return;
       }
 
-      const { foreignArtistId, artistName, monitored } = parsed.data;
+      const { foreignArtistId, artistName, coverUrl, monitored } = parsed.data;
       let { qualityProfileId, metadataProfileId, rootFolderPath } = parsed.data;
 
       if (
@@ -146,7 +147,7 @@ router.post(
 
       await lidarrClient.runCommand("ArtistSearch", { artistId: artist.id });
 
-      const record = createRequest(req.user!.userId, "artist", artist.id, artistName);
+      const record = createRequest(req.user!.userId, "artist", artist.id, artistName, coverUrl ?? null);
       res.status(201).json(record);
     } catch (err) {
       next(err);
@@ -156,6 +157,7 @@ router.post(
 
 const albumRequestSchema = z.object({
   albumId: z.number().int().positive(),
+  coverUrl: z.string().url().optional().nullable(),
 });
 
 /** POST /api/requests/album — monitor album in Lidarr and create request record */
@@ -175,7 +177,7 @@ router.post(
         return;
       }
 
-      const { albumId } = parsed.data;
+      const { albumId, coverUrl } = parsed.data;
 
       const [album] = await Promise.all([
         lidarrClient.getAlbum(albumId),
@@ -184,7 +186,7 @@ router.post(
       await lidarrClient.runCommand("AlbumSearch", { albumIds: [albumId] });
 
       const albumName = album.title ?? `Album #${albumId}`;
-      const record = createRequest(req.user!.userId, "album", albumId, albumName);
+      const record = createRequest(req.user!.userId, "album", albumId, albumName, coverUrl ?? null);
       res.status(201).json(record);
     } catch (err) {
       next(err);

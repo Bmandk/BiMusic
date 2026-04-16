@@ -154,6 +154,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
       await _searchService.requestArtist(
         foreignArtistId: foreignId,
         artistName: artist.artistName,
+        coverUrl: artist.coverUrl,
       );
       _setRequestStatus(key, RequestSubmitStatus.submitted);
     } catch (_) {
@@ -166,7 +167,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
     final key = 'album:${album.id}';
     _setRequestStatus(key, RequestSubmitStatus.submitting);
     try {
-      await _searchService.requestAlbum(album.id);
+      await _searchService.requestAlbum(album.id, coverUrl: album.coverUrl);
       _setRequestStatus(key, RequestSubmitStatus.submitted);
     } catch (_) {
       _setRequestStatus(key, RequestSubmitStatus.error);

@@ -58,6 +58,7 @@ vi.mock("../../db/connection.js", async () => {
       type TEXT NOT NULL,
       lidarrId INTEGER NOT NULL,
       name TEXT NOT NULL DEFAULT '',
+      coverUrl TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
       requestedAt TEXT NOT NULL,
       resolvedAt TEXT

@@ -14,6 +14,13 @@ beforeAll(async () => {
   app = createApp();
 });
 
+// Isolated app instance for rate-limit tests so the MemoryStore counter
+// starts at zero regardless of how many login requests the other describes fire.
+let rateLimitApp: Express;
+beforeAll(() => {
+  rateLimitApp = createApp();
+});
+
 const ADMIN = { username: 'admin', password: 'adminpassword123' };
 
 async function loginAs(creds: { username: string; password: string }) {
@@ -114,5 +121,24 @@ describe('POST /api/auth/logout', () => {
       .post('/api/auth/logout')
       .send({ refreshToken: 'some-token' });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/auth/login rate limiting', () => {
+  it('returns 429 after 10 failed login attempts within one minute', async () => {
+    // Fire 10 requests that will be processed (even if they return 401).
+    // The 11th must be blocked by the rate limiter with 429.
+    for (let i = 0; i < 10; i++) {
+      await request(rateLimitApp)
+        .post('/api/auth/login')
+        .send({ username: 'admin', password: 'wrongpassword' });
+    }
+
+    const res = await request(rateLimitApp)
+      .post('/api/auth/login')
+      .send({ username: 'admin', password: 'wrongpassword' });
+
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe('RATE_LIMITED');
   });
 });

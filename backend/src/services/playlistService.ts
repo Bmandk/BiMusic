@@ -42,7 +42,7 @@ export function listPlaylists(userId: string): PlaylistSummary[] {
   return rows.map((p) => ({
     id: p.id,
     name: p.name,
-    trackCount: p.trackCount,
+    trackCount: Number(p.trackCount),
     createdAt: p.createdAt,
   }));
 }

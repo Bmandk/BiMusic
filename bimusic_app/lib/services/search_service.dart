@@ -35,22 +35,27 @@ class SearchService {
   Future<MusicRequest> requestArtist({
     required String foreignArtistId,
     required String artistName,
+    String? coverUrl,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/requests/artist',
       data: {
         'foreignArtistId': foreignArtistId,
         'artistName': artistName,
+        if (coverUrl != null) 'coverUrl': coverUrl,
       },
     );
     return MusicRequest.fromJson(response.data!);
   }
 
   /// Request an album via POST /api/requests/album
-  Future<MusicRequest> requestAlbum(int albumId) async {
+  Future<MusicRequest> requestAlbum(int albumId, {String? coverUrl}) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/requests/album',
-      data: {'albumId': albumId},
+      data: {
+        'albumId': albumId,
+        if (coverUrl != null) 'coverUrl': coverUrl,
+      },
     );
     return MusicRequest.fromJson(response.data!);
   }

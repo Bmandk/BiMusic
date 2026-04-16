@@ -17,7 +17,7 @@ class PlaylistSummary {
     return PlaylistSummary(
       id: json['id'] as String,
       name: json['name'] as String,
-      trackCount: json['trackCount'] as int,
+      trackCount: (json['trackCount'] as num).toInt(),
       createdAt: json['createdAt'] as String,
     );
   }
