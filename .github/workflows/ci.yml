@@ -127,6 +127,7 @@ jobs:
       - run: npm prune --omit=dev
       - name: Restart service
         run: |
+          set -a && source /etc/bimusic/.env && set +a
           pm2 delete bimusic-backend 2>/dev/null || true
-          pm2 start dist/index.js --name bimusic-backend --node-args="--env-file /etc/bimusic/.env"
+          pm2 start dist/index.js --name bimusic-backend
           pm2 save

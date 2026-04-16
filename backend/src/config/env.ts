@@ -1,4 +1,27 @@
 import { z } from "zod";
+import fs from "fs";
+import path from "path";
+
+// Load .env from the project root (backend/) if vars aren't already set.
+// Compiled output lands in backend/dist, so __dirname/../.env = backend/.env.
+try {
+  const envFilePath = path.join(__dirname, "..", ".env");
+  const lines = fs.readFileSync(envFilePath, "utf8").split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const raw = trimmed.slice(eqIdx + 1).trim();
+    const value = raw.replace(/^(['"])(.*)\1$/, "$2");
+    if (key && !(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+} catch {
+  // No .env file — rely on process.env being pre-populated
+}
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),

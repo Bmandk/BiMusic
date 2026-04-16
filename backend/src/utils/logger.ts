@@ -5,7 +5,9 @@ import fs from "fs";
 function createLogger() {
   // During env validation, process.env may not be fully parsed yet.
   // Read NODE_ENV and LOG_PATH directly to avoid a circular import.
-  const isDev = process.env["NODE_ENV"] !== "production";
+  const isDev =
+    process.env["NODE_ENV"] === "development" ||
+    process.env["NODE_ENV"] === "test";
   const logPath = process.env["LOG_PATH"] ?? "./logs";
 
   if (isDev) {
