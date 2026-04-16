@@ -109,32 +109,22 @@ export async function getTrack(id: number): Promise<Track> {
 }
 
 export async function search(term: string): Promise<SearchResults> {
-  const lower = term.toLowerCase();
-  logger.debug({ term }, "libraryService.search: fetching local library");
-  const [allArtists, allAlbums] = await Promise.all([
-    lidarrClient.getArtists(),
-    lidarrClient.getAlbums(),
-  ]);
-  logger.debug(
-    { term, totalArtists: allArtists.length, totalAlbums: allAlbums.length },
-    "libraryService.search: local library fetched",
-  );
+  logger.debug({ term }, "libraryService.search: calling Lidarr search");
+  const results = await lidarrClient.search(term);
 
-  const albumCountByArtistId = new Map<number, number>();
-  for (const album of allAlbums) {
-    albumCountByArtistId.set(
-      album.artistId,
-      (albumCountByArtistId.get(album.artistId) ?? 0) + 1,
-    );
+  const artistsMap = new Map<number, LidarrArtist>();
+  const albums: Album[] = [];
+
+  for (const result of results) {
+    if (result.artist) {
+      artistsMap.set(result.artist.id, result.artist);
+    }
+    if (result.album) {
+      albums.push(shapeAlbum(result.album, 0));
+    }
   }
 
-  const artists = allArtists
-    .filter((a) => (a.artistName ?? "").toLowerCase().includes(lower))
-    .map((a) => shapeArtist(a, albumCountByArtistId.get(a.id) ?? 0));
-
-  const albums = allAlbums
-    .filter((a) => (a.title ?? "").toLowerCase().includes(lower))
-    .map((a) => shapeAlbum(a, 0));
+  const artists = Array.from(artistsMap.values()).map((a) => shapeArtist(a, 0));
 
   logger.debug(
     { term, artistCount: artists.length, albumCount: albums.length },
