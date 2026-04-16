@@ -106,3 +106,19 @@ jobs:
         with:
           name: integration-results
           path: backend/test-results/
+
+  # ── Stage 3: Deploy (main pushes only) ───────────────────────
+  deploy-backend:
+    name: Deploy Backend
+    if: github.event_name == 'push'
+    needs: [backend-integration, flutter-lint-unit]
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --omit=dev
+      - run: npm run build
+      - name: Restart service
+        run: pm2 reload bimusic-backend || pm2 start dist/index.js --name bimusic-backend
