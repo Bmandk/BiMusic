@@ -124,7 +124,7 @@ jobs:
         run: cp /etc/bimusic/.env .env
       - run: npm ci
       - run: npx tsc
-      - run: cp -r src/db/migrations dist/src/db/migrations
+      - run: mkdir -p dist/src/db && cp -r src/db/migrations dist/src/db/
       - run: npm prune --omit=dev
       - name: Restart service
         run: |
