@@ -118,6 +118,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - name: Copy env file
+        run: cp /etc/bimusic/.env .env
       - run: npm ci
       - run: npx tsc
       - run: npm prune --omit=dev
