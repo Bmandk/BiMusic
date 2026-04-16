@@ -24,7 +24,7 @@ cd bimusic_app
 export PATH="/c/dev/flutter/bin:$PATH"
 flutter pub get        # first time only
 dart run build_runner build --delete-conflicting-outputs  # first time only
-flutter run --dart-define=API_BASE_URL=http://127.0.0.1:3000
+flutter run -d windows --dart-define=API_BASE_URL=http://127.0.0.1:3000
 
 ## Running Tests
 

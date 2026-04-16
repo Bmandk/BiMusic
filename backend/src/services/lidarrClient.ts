@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 import type { Readable } from "stream";
 import { env } from "../config/env.js";
 import { createError } from "../middleware/errorHandler.js";
+import { logger } from "../utils/logger.js";
 import type {
   LidarrArtist,
   LidarrAlbum,
@@ -159,12 +160,19 @@ export async function getTrackFiles(
 }
 
 export async function search(term: string): Promise<LidarrSearchResult[]> {
+  const url = `${env.LIDARR_URL}/api/v1/search`;
+  logger.debug({ term, url }, "lidarrClient.search: sending request");
   try {
     const res = await lidarrApi.get<LidarrSearchResult[]>("/search", {
       params: { term },
     });
+    logger.debug(
+      { term, status: res.status, resultCount: res.data.length },
+      "lidarrClient.search: response received",
+    );
     return res.data;
   } catch (err) {
+    logger.error({ term, url, err }, "lidarrClient.search: request failed");
     return mapError(err);
   }
 }

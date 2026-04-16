@@ -38,7 +38,7 @@ export interface LidarrAlbum {
   artistId: number;
   foreignAlbumId: string | null;
   monitored: boolean;
-  duration: number;
+  duration: number | null;
   albumType: string | null;
   releaseDate: string | null;
   artist: LidarrArtist;

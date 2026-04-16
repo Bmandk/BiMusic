@@ -2,6 +2,7 @@ import type { AxiosResponse } from "axios";
 import type { Readable } from "stream";
 import * as lidarrClient from "./lidarrClient.js";
 import { env } from "../config/env.js";
+import { logger } from "../utils/logger.js";
 import type {
   LidarrArtist,
   LidarrAlbum,
@@ -41,7 +42,7 @@ function shapeAlbum(a: LidarrAlbum, trackCount: number): Album {
     releaseDate: a.releaseDate,
     genres: a.genres ?? [],
     trackCount,
-    duration: a.duration,
+    duration: a.duration ?? 0,
   };
 }
 
@@ -108,18 +109,38 @@ export async function getTrack(id: number): Promise<Track> {
 }
 
 export async function search(term: string): Promise<SearchResults> {
-  const results = await lidarrClient.search(term);
-  const artistMap = new Map<number, Artist>();
-  const albums: Album[] = [];
-  for (const result of results) {
-    if (result.artist && !artistMap.has(result.artist.id)) {
-      artistMap.set(result.artist.id, shapeArtist(result.artist, 0));
-    }
-    if (result.album) {
-      albums.push(shapeAlbum(result.album, 0));
-    }
+  const lower = term.toLowerCase();
+  logger.debug({ term }, "libraryService.search: fetching local library");
+  const [allArtists, allAlbums] = await Promise.all([
+    lidarrClient.getArtists(),
+    lidarrClient.getAlbums(),
+  ]);
+  logger.debug(
+    { term, totalArtists: allArtists.length, totalAlbums: allAlbums.length },
+    "libraryService.search: local library fetched",
+  );
+
+  const albumCountByArtistId = new Map<number, number>();
+  for (const album of allAlbums) {
+    albumCountByArtistId.set(
+      album.artistId,
+      (albumCountByArtistId.get(album.artistId) ?? 0) + 1,
+    );
   }
-  return { artists: Array.from(artistMap.values()), albums };
+
+  const artists = allArtists
+    .filter((a) => (a.artistName ?? "").toLowerCase().includes(lower))
+    .map((a) => shapeArtist(a, albumCountByArtistId.get(a.id) ?? 0));
+
+  const albums = allAlbums
+    .filter((a) => (a.title ?? "").toLowerCase().includes(lower))
+    .map((a) => shapeAlbum(a, 0));
+
+  logger.debug(
+    { term, artistCount: artists.length, albumCount: albums.length },
+    "libraryService.search: results",
+  );
+  return { artists, albums };
 }
 
 export async function getArtistImageStream(
