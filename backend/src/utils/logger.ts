@@ -24,7 +24,7 @@ function createLogger() {
     { level: "info" },
     pino.destination({
       dest: path.join(logPath, "app.log"),
-      sync: false,
+      sync: true,
     }),
   );
 }
