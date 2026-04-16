@@ -15,7 +15,7 @@ const envSchema = z.object({
   MUSIC_LIBRARY_PATH: z.string().min(1),
   OFFLINE_STORAGE_PATH: z.string().default("./data/offline"),
   DB_PATH: z.string().default("./data/bimusic.db"),
-  LOG_PATH: z.string().default("./logs"),
+  PM2_LOG_PATH: z.string().optional(),
   ADMIN_USERNAME: z.string().default("admin"),
   ADMIN_PASSWORD: z.string().min(8),
   TEMP_DIR: z.string().default("/tmp/bimusic"),

@@ -1,29 +1,32 @@
-// tests/setup.ts sets env vars before this file loads (via vitest setupFiles)
-// LOG_PATH is set to './logs' in setup.ts; this test creates and removes app.log there.
+// tests/setup.ts sets env vars before this file loads (via vitest setupFiles).
+// This suite writes a temporary log file and points PM2_LOG_PATH at it for the
+// happy-path test, then clears it to exercise the 404 branches.
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import type { Express } from 'express';
-import { createApp } from '../../src/app.js';
-import { runMigrations } from '../../src/db/migrate.js';
-import { bootstrapAdminIfNeeded } from '../../src/services/userService.js';
 
 let app: Express;
 let adminToken: string;
 let userToken: string;
 
-/** Absolute path of the log file the admin route will read (matches LOG_PATH from setup.ts). */
-const LOG_DIR = path.resolve('./logs');
-const LOG_FILE = path.join(LOG_DIR, 'app.log');
+const LOG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'bimusic-admin-log-'));
+const LOG_FILE = path.join(LOG_DIR, 'pm2-out.log');
 
 const ADMIN = { username: 'admin', password: 'adminpassword123' };
 
 beforeAll(async () => {
-  // Create a deterministic app.log so the admin endpoint always returns 200
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+  // Point the admin route at our fixture log before env/app modules load.
+  process.env['PM2_LOG_PATH'] = LOG_FILE;
+
   const fakeLogLine = JSON.stringify({ level: 30, time: Date.now(), msg: 'test log entry' });
   fs.writeFileSync(LOG_FILE, fakeLogLine + '\n');
+
+  const { createApp } = await import('../../src/app.js');
+  const { runMigrations } = await import('../../src/db/migrate.js');
+  const { bootstrapAdminIfNeeded } = await import('../../src/services/userService.js');
 
   runMigrations();
   await bootstrapAdminIfNeeded();
@@ -32,7 +35,6 @@ beforeAll(async () => {
   const adminRes = await request(app).post('/api/auth/login').send(ADMIN);
   adminToken = adminRes.body.accessToken as string;
 
-  // Create a non-admin user and log in as them
   await request(app)
     .post('/api/users')
     .set('Authorization', `Bearer ${adminToken}`)
@@ -45,10 +47,8 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  // Remove the app.log created by this test suite
-  if (fs.existsSync(LOG_FILE)) {
-    fs.rmSync(LOG_FILE);
-  }
+  if (fs.existsSync(LOG_FILE)) fs.rmSync(LOG_FILE);
+  fs.rmdirSync(LOG_DIR);
 });
 
 describe('GET /api/admin/logs', () => {
@@ -74,7 +74,6 @@ describe('GET /api/admin/logs', () => {
   });
 
   it('returns 404 for admin when log file does not exist', async () => {
-    // Temporarily remove app.log to exercise the 404 branch
     fs.rmSync(LOG_FILE);
     try {
       const res = await request(app)
@@ -83,7 +82,6 @@ describe('GET /api/admin/logs', () => {
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('NOT_FOUND');
     } finally {
-      // Restore so subsequent tests (or re-runs) still find the file
       const fakeLogLine = JSON.stringify({ level: 30, time: Date.now(), msg: 'test log entry' });
       fs.writeFileSync(LOG_FILE, fakeLogLine + '\n');
     }

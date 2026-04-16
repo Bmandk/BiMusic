@@ -8,7 +8,6 @@ process.env['JWT_REFRESH_SECRET'] = 'integration-test-refresh-secret-32chars';
 process.env['JWT_ACCESS_EXPIRY'] = '15m';
 process.env['JWT_REFRESH_EXPIRY'] = '30d';
 process.env['DB_PATH'] = ':memory:';
-process.env['LOG_PATH'] = './logs';
 process.env['LIDARR_URL'] = 'http://localhost:8686';
 process.env['LIDARR_API_KEY'] = 'test-api-key';
 process.env['MUSIC_LIBRARY_PATH'] = '/music';

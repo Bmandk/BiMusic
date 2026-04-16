@@ -1,14 +1,9 @@
 import pino from "pino";
-import path from "path";
-import fs from "fs";
 
 function createLogger() {
-  // During env validation, process.env may not be fully parsed yet.
-  // Read NODE_ENV and LOG_PATH directly to avoid a circular import.
   const isDev =
     process.env["NODE_ENV"] === "development" ||
     process.env["NODE_ENV"] === "test";
-  const logPath = process.env["LOG_PATH"] ?? "./logs";
 
   if (isDev) {
     return pino({
@@ -20,15 +15,7 @@ function createLogger() {
     });
   }
 
-  fs.mkdirSync(logPath, { recursive: true });
-
-  return pino(
-    { level: "info" },
-    pino.destination({
-      dest: path.join(logPath, "app.log"),
-      sync: true,
-    }),
-  );
+  return pino({ level: "info" });
 }
 
 export const logger = createLogger();

@@ -1,7 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
 
 describe("logger", () => {
   const originalEnv = { ...process.env };
@@ -14,17 +11,15 @@ describe("logger", () => {
     process.env = { ...originalEnv };
   });
 
-  it("creates a pretty-printed logger in development mode", async () => {
+  it("creates a pretty-printed debug logger in development mode", async () => {
     process.env["NODE_ENV"] = "development";
     const { logger } = await import("../../utils/logger.js");
     expect(logger).toBeDefined();
     expect(logger.level).toBe("debug");
   });
 
-  it("creates a file-based logger in production mode", async () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "bimusic-log-test-"));
+  it("creates a plain stdout info logger in production mode", async () => {
     process.env["NODE_ENV"] = "production";
-    process.env["LOG_PATH"] = tempDir;
     const { logger } = await import("../../utils/logger.js");
     expect(logger).toBeDefined();
     expect(logger.level).toBe("info");

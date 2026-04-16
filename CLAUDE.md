@@ -51,7 +51,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 - **Database:** SQLite via `better-sqlite3` + Drizzle ORM. Schema in `src/db/schema.ts`, migrations in `src/db/migrations/`
 - **Auth:** JWT with separate access/refresh secrets. Refresh tokens stored as HMAC-SHA256 hashes. The `authenticate` middleware accepts tokens via `Authorization: Bearer <token>` header **or** `?token=<jwt>` query parameter (fallback for clients like libmpv that don't support custom HTTP headers on media streams).
 - **Primary keys:** UUID TEXT via `lower(hex(randomblob(16)))` for all BiMusic tables; Lidarr IDs stay INTEGER
-- **Logging:** Pino with structured JSON output to file
+- **Logging:** Pino — structured JSON to stdout in production, pino-pretty (debug level) in dev/test. The process manager (PM2) is responsible for capturing/rotating stdout. There is no in-process file destination.
 - **Lidarr client:** `src/services/lidarrClient.ts` — typed axios wrapper for all Lidarr API calls. Routes must call lidarrClient methods, never axios directly. Lidarr errors are mapped: 404 → 404 `NOT_FOUND`, 5xx → 502 `LIDARR_ERROR`, timeout → 504 `LIDARR_TIMEOUT`. Cover art methods return `AxiosResponse<Readable>` for pipe-through (no buffering). Lidarr types are in `src/types/lidarr.ts`.
 - **Library service:** `src/services/libraryService.ts` — reshapes raw Lidarr responses into Flutter-facing types (`Artist`, `Album`, `Track` defined in `src/types/api.ts`), injects `imageUrl` (`/api/library/{artists|albums}/:id/image`) and `streamUrl` (`/api/stream/:id`) using `env.API_BASE_URL`. Image proxy methods fetch the Lidarr artist/album to determine the cover filename before streaming.
 - **Stream service:** `src/services/streamService.ts` — resolves Lidarr track → trackfile path, decides passthrough vs transcode, deduplicates concurrent transcodes via a `Map<tempPath, Promise<void>>`, serves files with full HTTP Range / 206 support. MP3 sources are always passed through without re-encoding. Non-MP3 sources are transcoded with `fluent-ffmpeg` to `TEMP_DIR/<sha256(path:bitrate)>.mp3`. `initTempDir()` clears the temp dir on startup; `startTempFileCleanup()` removes files older than 24 h on an hourly interval. **ffmpeg lifecycle:** all active `FfmpegCommand` instances (both stream and download) are tracked via `registerFfmpegCommand(cmd)` / `unregisterFfmpegCommand(cmd)` (exported from `streamService.ts`). Any new code that spawns an ffmpeg process must call these. `killAllActiveTranscodes()` kills all tracked processes — called on SIGTERM/SIGINT.
@@ -70,7 +70,7 @@ export PATH="/c/dev/flutter/bin:$PATH"
 
 **Route prefixes:** `/api/health`, `/api/auth`, `/api/library`, `/api/search`, `/api/stream`, `/api/downloads`, `/api/admin`, `/api/users`, `/api/playlists`, `/api/requests`
 
-**Admin route** (`src/routes/admin.ts`): all routes require `authenticate` + `requireAdmin`. `GET /api/admin/logs` reads `LOG_PATH/app.log` and returns the last 200 non-empty lines as `{ lines: string[] }`. Returns 404 if the log file doesn't exist (e.g. dev mode where pino writes to stdout instead of a file).
+**Admin route** (`src/routes/admin.ts`): all routes require `authenticate` + `requireAdmin`. `GET /api/admin/logs` reads the file at `env.PM2_LOG_PATH` (the PM2 out-log for the backend process, e.g. `/etc/.pm2/logs/bimusic-backend-out.log`) and returns the last 200 non-empty lines as `{ lines: string[] }`. Returns 404 if `PM2_LOG_PATH` is unset (dev mode) or the file doesn't exist.
 
 ### Flutter Client
 

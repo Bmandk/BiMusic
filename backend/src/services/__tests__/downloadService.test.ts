@@ -9,7 +9,6 @@ vi.mock("../../config/env.js", () => ({
     JWT_ACCESS_EXPIRY: "15m",
     JWT_REFRESH_EXPIRY: "30d",
     DB_PATH: ":memory:",
-    LOG_PATH: "./logs",
     LIDARR_URL: "http://localhost:8686",
     LIDARR_API_KEY: "test",
     MUSIC_LIBRARY_PATH: "/music",
