@@ -70,6 +70,8 @@ vi.mock("../../db/connection.js", async () => {
   return { db: drizzle(sqlite, { schema: schemaModule.schema }), sqlite };
 });
 
+const mockFfmpegFactory = vi.hoisted(() => vi.fn());
+
 const mockFfmpegCmd = vi.hoisted(() => ({
   noVideo: vi.fn().mockReturnThis(),
   audioCodec: vi.fn().mockReturnThis(),
@@ -88,7 +90,7 @@ const mockFfmpegCmd = vi.hoisted(() => ({
 }));
 
 vi.mock("fluent-ffmpeg", () => ({
-  default: vi.fn(() => mockFfmpegCmd),
+  default: mockFfmpegFactory.mockImplementation(() => mockFfmpegCmd),
 }));
 
 vi.mock("../streamService.js", () => ({
@@ -470,10 +472,7 @@ describe("processOnePendingDownload", () => {
       expect.stringContaining("100-320.mp3"),
     );
     // ffmpeg should NOT have been invoked
-    const ffmpegMock = (await import("fluent-ffmpeg")).default as ReturnType<
-      typeof vi.fn
-    >;
-    expect(ffmpegMock).not.toHaveBeenCalled();
+    expect(mockFfmpegFactory).not.toHaveBeenCalled();
 
     // Record should still be marked ready
     const all = listDownloads(TEST_USER, TEST_DEVICE);
