@@ -113,6 +113,8 @@ jobs:
     if: github.event_name == 'push'
     needs: [backend-integration, flutter-lint-unit]
     runs-on: self-hosted
+    env:
+      PM2_HOME: /etc/.pm2
     defaults:
       run:
         working-directory: backend
@@ -124,4 +126,4 @@ jobs:
       - run: npx tsc
       - run: npm prune --omit=dev
       - name: Restart service
-        run: pm2 reload bimusic-backend || pm2 start dist/index.js --name bimusic-backend
+        run: pm2 reload bimusic-backend || pm2 start dist/index.js --name bimusic-backend --node-args="--env-file /etc/bimusic/.env"
