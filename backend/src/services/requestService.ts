@@ -30,7 +30,16 @@ export function createRequest(
   const id = randomUUID();
   const requestedAt = new Date().toISOString();
   db.insert(requests)
-    .values({ id, userId, type, lidarrId, name, coverUrl, status: "pending", requestedAt })
+    .values({
+      id,
+      userId,
+      type,
+      lidarrId,
+      name,
+      coverUrl,
+      status: "pending",
+      requestedAt,
+    })
     .run();
   return {
     id,

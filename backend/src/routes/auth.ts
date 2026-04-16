@@ -12,7 +12,12 @@ const loginRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { code: "RATE_LIMITED", message: "Too many login attempts, please try again later" } },
+  message: {
+    error: {
+      code: "RATE_LIMITED",
+      message: "Too many login attempts, please try again later",
+    },
+  },
 });
 
 const loginSchema = z.object({

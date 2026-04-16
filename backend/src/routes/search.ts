@@ -24,12 +24,19 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     logger.debug({ term }, "search route: calling libraryService.search");
     const results = await libraryService.search(term);
     logger.debug(
-      { term, artistCount: results.artists.length, albumCount: results.albums.length },
+      {
+        term,
+        artistCount: results.artists.length,
+        albumCount: results.albums.length,
+      },
       "search route: returning results",
     );
     res.json(results);
   } catch (err) {
-    logger.error({ term: req.query["term"], err }, "search route: unhandled error");
+    logger.error(
+      { term: req.query["term"], err },
+      "search route: unhandled error",
+    );
     next(err);
   }
 });

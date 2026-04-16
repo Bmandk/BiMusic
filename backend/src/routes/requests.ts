@@ -147,7 +147,13 @@ router.post(
 
       await lidarrClient.runCommand("ArtistSearch", { artistId: artist.id });
 
-      const record = createRequest(req.user!.userId, "artist", artist.id, artistName, coverUrl ?? null);
+      const record = createRequest(
+        req.user!.userId,
+        "artist",
+        artist.id,
+        artistName,
+        coverUrl ?? null,
+      );
       res.status(201).json(record);
     } catch (err) {
       next(err);
@@ -186,7 +192,13 @@ router.post(
       await lidarrClient.runCommand("AlbumSearch", { albumIds: [albumId] });
 
       const albumName = album.title ?? `Album #${albumId}`;
-      const record = createRequest(req.user!.userId, "album", albumId, albumName, coverUrl ?? null);
+      const record = createRequest(
+        req.user!.userId,
+        "album",
+        albumId,
+        albumName,
+        coverUrl ?? null,
+      );
       res.status(201).json(record);
     } catch (err) {
       next(err);

@@ -80,7 +80,7 @@ export function refresh(rawToken: string): TokenPair {
   const newRaw = generateRefreshToken();
   const newHash = hashRefreshToken(newRaw);
 
-  let user: (typeof users.$inferSelect) | undefined;
+  let user: typeof users.$inferSelect | undefined;
 
   db.transaction((tx) => {
     const row = tx
@@ -94,14 +94,20 @@ export function refresh(rawToken: string): TokenPair {
       )
       .get();
     if (!row) {
-      throw createError(401, "UNAUTHORIZED", "Invalid or expired refresh token");
+      throw createError(
+        401,
+        "UNAUTHORIZED",
+        "Invalid or expired refresh token",
+      );
     }
     user = tx.select().from(users).where(eq(users.id, row.userId)).get();
     if (!user) {
       throw createError(401, "UNAUTHORIZED", "User not found");
     }
     // Rotate: delete old, insert new — all within a single transaction
-    tx.delete(refreshTokens).where(eq(refreshTokens.token_hash, tokenHash)).run();
+    tx.delete(refreshTokens)
+      .where(eq(refreshTokens.token_hash, tokenHash))
+      .run();
     tx.insert(refreshTokens)
       .values({
         userId: user.id,

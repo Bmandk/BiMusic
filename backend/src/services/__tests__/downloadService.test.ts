@@ -470,7 +470,9 @@ describe("processOnePendingDownload", () => {
       expect.stringContaining("100-320.mp3"),
     );
     // ffmpeg should NOT have been invoked
-    const ffmpegMock = (await import("fluent-ffmpeg")).default as ReturnType<typeof vi.fn>;
+    const ffmpegMock = (await import("fluent-ffmpeg")).default as ReturnType<
+      typeof vi.fn
+    >;
     expect(ffmpegMock).not.toHaveBeenCalled();
 
     // Record should still be marked ready
