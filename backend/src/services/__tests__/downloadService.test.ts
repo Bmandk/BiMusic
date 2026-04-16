@@ -322,7 +322,7 @@ describe("resetStuckDownloads", () => {
     // Mark it ready
     db.update(offlineTracks)
       .set({ status: "ready" })
-      .where(eq(offlineTracks.id, row!.id))
+      .where(eq(offlineTracks.id, row.id))
       .run();
 
     resetStuckDownloads();
@@ -330,7 +330,7 @@ describe("resetStuckDownloads", () => {
     const after = db
       .select()
       .from(offlineTracks)
-      .where(eq(offlineTracks.id, row!.id))
+      .where(eq(offlineTracks.id, row.id))
       .get();
     expect(after?.status).toBe("ready");
   });
