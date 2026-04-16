@@ -1,5 +1,6 @@
 import pino from "pino";
 import path from "path";
+import fs from "fs";
 
 function createLogger() {
   // During env validation, process.env may not be fully parsed yet.
@@ -16,6 +17,8 @@ function createLogger() {
       },
     });
   }
+
+  fs.mkdirSync(logPath, { recursive: true });
 
   return pino(
     { level: "info" },

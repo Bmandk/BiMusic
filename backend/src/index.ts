@@ -20,7 +20,7 @@ process.on("unhandledRejection", (reason) => {
 
 process.on("uncaughtException", (err) => {
   logger.error({ err }, "Uncaught exception");
-  process.exit(1);
+  logger.flush(() => process.exit(1));
 });
 
 function startServer(): Promise<void> {
@@ -39,7 +39,7 @@ function startServer(): Promise<void> {
       const forceKillTimer = setTimeout(() => {
         logger.warn("Graceful shutdown timed out, forcing exit");
         killAllActiveTranscodes();
-        process.exit(1);
+        logger.flush(() => process.exit(1));
       }, 5000);
       forceKillTimer.unref();
 
@@ -68,5 +68,5 @@ async function main() {
 
 main().catch((err) => {
   logger.error({ err }, "Fatal startup error");
-  process.exit(1);
+  logger.flush(() => process.exit(1));
 });
