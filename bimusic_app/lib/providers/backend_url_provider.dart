@@ -1,8 +1,23 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../config/api_config.dart';
+
+/// Normalises a raw URL string: trims whitespace, strips trailing slashes,
+/// and enforces http/https scheme. Throws a [String] error message on failure.
+@visibleForTesting
+String normalizeBackendUrl(String raw) {
+  var url = raw.trim();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    throw 'URL must start with http:// or https://';
+  }
+  while (url.endsWith('/')) {
+    url = url.substring(0, url.length - 1);
+  }
+  return url;
+}
 
 class BackendUrlNotifier extends AsyncNotifier<String?> {
   static const _kStorageKey = 'bimusic_backend_url';
@@ -16,7 +31,7 @@ class BackendUrlNotifier extends AsyncNotifier<String?> {
   /// Validates [raw] by pinging its /api/health endpoint, then persists it.
   /// Throws a [String] error message on validation failure.
   Future<void> setUrl(String raw) async {
-    final normalized = _normalize(raw);
+    final normalized = normalizeBackendUrl(raw);
 
     final dio = Dio(
       BaseOptions(
@@ -51,16 +66,6 @@ class BackendUrlNotifier extends AsyncNotifier<String?> {
     state = const AsyncData(null);
   }
 
-  String _normalize(String raw) {
-    var url = raw.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      throw 'URL must start with http:// or https://';
-    }
-    while (url.endsWith('/')) {
-      url = url.substring(0, url.length - 1);
-    }
-    return url;
-  }
 }
 
 final backendUrlProvider =

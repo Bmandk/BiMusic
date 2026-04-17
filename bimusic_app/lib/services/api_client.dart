@@ -94,7 +94,12 @@ class AuthInterceptor extends Interceptor {
 /// Dio instance pre-configured with [AuthInterceptor].
 /// Use this for all authenticated API calls.
 final apiClientProvider = Provider<Dio>((ref) {
-  final baseUrl = ref.watch(backendUrlProvider).valueOrNull ?? '';
+  final baseUrl = ref.watch(backendUrlProvider).valueOrNull;
+  if (baseUrl == null) {
+    throw StateError(
+      'apiClientProvider accessed before backend URL was configured',
+    );
+  }
   final authService = ref.read(authServiceProvider);
   final dio = Dio(
     BaseOptions(

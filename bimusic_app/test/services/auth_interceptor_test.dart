@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:bimusic_app/models/auth_tokens.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/providers/auth_provider.dart';
+import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/services/api_client.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 
@@ -24,6 +25,15 @@ class _StubAuthNotifier extends Notifier<AuthState> implements AuthNotifier {
   Future<void> login(String u, String p) async {}
   @override
   Future<void> logout() async {}
+}
+
+class _StubBackendUrlNotifier extends BackendUrlNotifier {
+  @override
+  Future<String?> build() async => 'http://test';
+  @override
+  Future<void> setUrl(String raw) async {}
+  @override
+  Future<void> clearUrl() async {}
 }
 
 class _FakeRequestOptions extends Fake implements RequestOptions {}
@@ -222,14 +232,18 @@ void main() {
   });
 
   group('apiClientProvider', () {
-    test('provides a configured Dio instance with AuthInterceptor', () {
+    test('provides a configured Dio instance with AuthInterceptor', () async {
       final fakeAuthService = MockAuthService();
       final container = ProviderContainer(overrides: [
+        backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
         authServiceProvider.overrideWith((_) => fakeAuthService),
         authNotifierProvider.overrideWith(() => _StubAuthNotifier()),
       ]);
       addTearDown(container.dispose);
 
+      // Wait for the async backendUrlProvider to resolve before reading
+      // apiClientProvider, which throws if the URL is not yet configured.
+      await container.read(backendUrlProvider.future);
       final dio = container.read(apiClientProvider);
 
       expect(dio, isA<Dio>());

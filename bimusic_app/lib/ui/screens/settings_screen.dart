@@ -211,9 +211,11 @@ class _EditBackendUrlDialogState extends ConsumerState<_EditBackendUrlDialog> {
     try {
       await ref.read(backendUrlProvider.notifier).setUrl(text);
       if (!mounted) return;
+      final player = ref.read(playerNotifierProvider.notifier);
+      final auth = ref.read(authNotifierProvider.notifier);
       Navigator.of(context).pop();
-      await ref.read(playerNotifierProvider.notifier).pause();
-      await ref.read(authNotifierProvider.notifier).logout();
+      await player.pause();
+      await auth.logout();
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {

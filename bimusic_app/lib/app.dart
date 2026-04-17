@@ -17,8 +17,11 @@ class BiMusicApp extends ConsumerWidget {
     final urlState = ref.watch(backendUrlProvider);
 
     Widget app = urlState.when(
-      loading: () => const MaterialApp(
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.system,
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
       error: (e, _) => MaterialApp(
         theme: AppTheme.light,
