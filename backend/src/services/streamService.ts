@@ -414,8 +414,8 @@ export async function streamTranscoded(
     settle(err);
   });
 
-  req.on("close", () => {
-    if (!ffmpegEnded) {
+  res.on("close", () => {
+    if (!ffmpegEnded && !res.writableEnded) {
       try {
         cmd.kill("SIGKILL");
       } catch {
