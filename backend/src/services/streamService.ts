@@ -308,12 +308,17 @@ export async function streamTranscoded(
   // First request: tee ffmpeg stdout → HTTP response + part file.
   const partPath = `${tempPath}.part`;
 
-  res.status(200);
-  res.setHeader("Content-Type", "audio/mpeg");
-  res.setHeader("Accept-Ranges", "none");
-  res.flushHeaders();
-
   const partStream = createWriteStream(partPath);
+
+  let headersFlushed = false;
+  const flushStreamingHeaders = () => {
+    if (headersFlushed) return;
+    headersFlushed = true;
+    res.status(200);
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Accept-Ranges", "none");
+    res.flushHeaders();
+  };
 
   let externalResolve!: () => void;
   let externalReject!: (err: Error) => void;
@@ -338,7 +343,16 @@ export async function streamTranscoded(
       } catch {
         /* ignore */
       }
-      if (!res.destroyed) res.destroy();
+      if (!headersFlushed && !res.headersSent) {
+        res.status(500).json({
+          error: {
+            code: "TRANSCODE_ERROR",
+            message: "Audio transcoding failed",
+          },
+        });
+      } else if (!res.destroyed) {
+        res.destroy();
+      }
       partStream.destroy();
       externalReject(err);
     } else {
@@ -385,14 +399,25 @@ export async function streamTranscoded(
     settle(err);
   });
 
+  let pendingDrains = 0;
+  const waitForDrain = (stream: NodeJS.WritableStream) => {
+    pendingDrains += 1;
+    ffmpegOut.pause();
+    stream.once("drain", () => {
+      pendingDrains -= 1;
+      if (pendingDrains === 0) ffmpegOut.resume();
+    });
+  };
+
   ffmpegOut.on("data", (chunk: Buffer) => {
-    if (!partStream.destroyed) partStream.write(chunk);
+    flushStreamingHeaders();
+    if (!partStream.destroyed) {
+      const partOk = partStream.write(chunk);
+      if (!partOk) waitForDrain(partStream);
+    }
     if (!res.destroyed && !res.writableEnded) {
       const ok = res.write(chunk);
-      if (!ok) {
-        ffmpegOut.pause();
-        res.once("drain", () => ffmpegOut.resume());
-      }
+      if (!ok) waitForDrain(res);
     }
   });
 
