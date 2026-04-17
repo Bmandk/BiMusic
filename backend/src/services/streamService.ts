@@ -344,13 +344,16 @@ export async function streamTranscoded(
     } else {
       try {
         renameSync(partPath, tempPath);
+        externalResolve();
       } catch (renameErr) {
         logger.warn(
           { renameErr, partPath, tempPath },
           "Failed to rename part file",
         );
+        externalReject(
+          renameErr instanceof Error ? renameErr : new Error(String(renameErr)),
+        );
       }
-      externalResolve();
     }
   };
 
@@ -377,6 +380,10 @@ export async function streamTranscoded(
   registerFfmpegCommand(cmd);
 
   const ffmpegOut = cmd.pipe() as PassThrough;
+
+  ffmpegOut.on("error", (err: Error) => {
+    settle(err);
+  });
 
   ffmpegOut.on("data", (chunk: Buffer) => {
     if (!partStream.destroyed) partStream.write(chunk);
