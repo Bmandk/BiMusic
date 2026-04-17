@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../config/api_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/backend_url_provider.dart';
 import '../../providers/bitrate_preference_provider.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/player_provider.dart';
@@ -163,6 +163,108 @@ class SettingsScreen extends ConsumerWidget {
     await showDialog<void>(
       context: context,
       builder: (ctx) => const _LogViewerDialog(),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Edit backend URL dialog
+// ---------------------------------------------------------------------------
+
+class _EditBackendUrlDialog extends ConsumerStatefulWidget {
+  const _EditBackendUrlDialog({required this.current});
+
+  final String current;
+
+  @override
+  ConsumerState<_EditBackendUrlDialog> createState() =>
+      _EditBackendUrlDialogState();
+}
+
+class _EditBackendUrlDialogState extends ConsumerState<_EditBackendUrlDialog> {
+  late final TextEditingController _controller;
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.current);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = 'Please enter a URL.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(backendUrlProvider.notifier).setUrl(text);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await ref.read(playerNotifierProvider.notifier).pause();
+      await ref.read(authNotifierProvider.notifier).logout();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Backend URL'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              labelText: 'Server URL',
+              hintText: 'http://192.168.1.10:3000',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            onSubmitted: (_) => _isLoading ? null : _save(),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _save,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
     );
   }
 }
@@ -359,6 +461,7 @@ class _AboutSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pkgInfo = ref.watch(_packageInfoProvider);
+    final url = ref.watch(backendUrlProvider).valueOrNull ?? '';
 
     final appVersion = pkgInfo.maybeWhen(
       data: (info) => '${info.version}+${info.buildNumber}',
@@ -375,10 +478,12 @@ class _AboutSection extends ConsumerWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
-        const ListTile(
-          leading: Icon(Icons.dns_outlined),
-          title: Text('Backend URL'),
-          subtitle: Text(ApiConfig.baseUrl),
+        ListTile(
+          leading: const Icon(Icons.dns_outlined),
+          title: const Text('Backend URL'),
+          subtitle: Text(url.isEmpty ? '—' : url),
+          trailing: const Icon(Icons.edit_outlined),
+          onTap: () => _showEditUrlDialog(context, ref, url),
         ),
         ListTile(
           leading: const Icon(Icons.gavel_outlined),
@@ -395,6 +500,17 @@ class _AboutSection extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  Future<void> _showEditUrlDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String current,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _EditBackendUrlDialog(current: current),
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:bimusic_app/models/download_task.dart';
 import 'package:bimusic_app/models/track.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/providers/auth_provider.dart';
+import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/bitrate_preference_provider.dart';
 import 'package:bimusic_app/providers/download_provider.dart';
 import 'package:bimusic_app/providers/player_provider.dart';
@@ -108,6 +109,17 @@ class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
   BitratePreference build() => BitratePreference.alwaysLow;
 }
 
+class _StubBackendUrlNotifier extends BackendUrlNotifier {
+  @override
+  Future<String?> build() async => 'http://test';
+
+  @override
+  Future<void> setUrl(String raw) async {}
+
+  @override
+  Future<void> clearUrl() async {}
+}
+
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
@@ -176,6 +188,7 @@ void main() {
           any(),
           any(),
           any(),
+          baseUrl: any(named: 'baseUrl'),
           artistName: any(named: 'artistName'),
           albumTitle: any(named: 'albumTitle'),
           imageUrl: any(named: 'imageUrl'),
@@ -194,6 +207,7 @@ void main() {
           () => _StubBitratePreferenceNotifier(),
         ),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
+        backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
       ],
     );
   });
@@ -363,6 +377,7 @@ void main() {
             0, // startIndex = 0 (track1 is first)
             'test-token',
             any(), // bitrate
+            baseUrl: any(named: 'baseUrl'),
             artistName: 'Test Artist',
             albumTitle: 'Test Album',
             imageUrl: 'http://img.jpg',
@@ -384,6 +399,7 @@ void main() {
             0, // -1 → clamped to 0
             any(),
             any(),
+            baseUrl: any(named: 'baseUrl'),
             artistName: any(named: 'artistName'),
             albumTitle: any(named: 'albumTitle'),
             imageUrl: any(named: 'imageUrl'),
@@ -405,6 +421,7 @@ void main() {
             1, // track2 is at index 1
             any(),
             any(),
+            baseUrl: any(named: 'baseUrl'),
             artistName: any(named: 'artistName'),
             albumTitle: any(named: 'albumTitle'),
             imageUrl: any(named: 'imageUrl'),
@@ -424,6 +441,7 @@ void main() {
             () => _StubBitratePreferenceNotifier(),
           ),
           deviceIdProvider.overrideWith((_) async => 'test-dev'),
+          backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
         ],
       );
       addTearDown(localContainer.dispose);
@@ -442,6 +460,7 @@ void main() {
             any(),
             any(),
             any(),
+            baseUrl: any(named: 'baseUrl'),
             artistName: any(named: 'artistName'),
             albumTitle: any(named: 'albumTitle'),
             imageUrl: any(named: 'imageUrl'),
@@ -492,6 +511,7 @@ void main() {
             () => _StubBitratePreferenceNotifier(),
           ),
           deviceIdProvider.overrideWith((_) async => 'test-dev'),
+          backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
         ],
       );
       addTearDown(localContainer.dispose);
@@ -512,6 +532,7 @@ void main() {
           any(),
           any(),
           any(),
+          baseUrl: any(named: 'baseUrl'),
           artistName: any(named: 'artistName'),
           albumTitle: any(named: 'albumTitle'),
           imageUrl: any(named: 'imageUrl'),
@@ -532,6 +553,7 @@ void main() {
           () => _StubBitratePreferenceNotifier(),
         ),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
+        backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
       ]);
       addTearDown(c.dispose);
 
@@ -552,6 +574,7 @@ void main() {
           () => _StubBitratePreferenceNotifier(),
         ),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
+        backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
       ]);
       addTearDown(c.dispose);
 

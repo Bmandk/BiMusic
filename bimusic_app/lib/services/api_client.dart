@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/api_config.dart';
 import '../providers/auth_provider.dart';
+import '../providers/backend_url_provider.dart';
 import 'auth_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -93,10 +94,11 @@ class AuthInterceptor extends Interceptor {
 /// Dio instance pre-configured with [AuthInterceptor].
 /// Use this for all authenticated API calls.
 final apiClientProvider = Provider<Dio>((ref) {
+  final baseUrl = ref.watch(backendUrlProvider).valueOrNull ?? '';
   final authService = ref.read(authServiceProvider);
   final dio = Dio(
     BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
+      baseUrl: baseUrl,
       connectTimeout: ApiConfig.connectTimeout,
       receiveTimeout: ApiConfig.receiveTimeout,
     ),

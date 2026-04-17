@@ -16,7 +16,6 @@ vi.mock("../../config/env.js", () => ({
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD: "adminpassword123",
     TEMP_DIR: "/tmp/bimusic",
-    API_BASE_URL: "http://localhost:3000",
   },
 }));
 

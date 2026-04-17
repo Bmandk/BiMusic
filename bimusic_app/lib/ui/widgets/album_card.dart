@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/album.dart';
+import '../../providers/backend_url_provider.dart';
 import '../../services/auth_service.dart';
+import '../../utils/url_resolver.dart';
 
 class AlbumCard extends ConsumerWidget {
   const AlbumCard({super.key, required this.album, required this.onTap});
@@ -14,6 +16,7 @@ class AlbumCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final token = ref.watch(authServiceProvider).accessToken;
+    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -35,7 +38,7 @@ class AlbumCard extends ConsumerWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: CachedNetworkImage(
-                  imageUrl: album.imageUrl,
+                  imageUrl: resolveBackendUrl(base, album.imageUrl),
                   httpHeaders: headers,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => ColoredBox(

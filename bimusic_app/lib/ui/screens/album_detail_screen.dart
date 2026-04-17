@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/album.dart';
 import '../../models/download_task.dart';
 import '../../models/track.dart';
+import '../../providers/backend_url_provider.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/library_provider.dart';
 import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
+import '../../utils/url_resolver.dart';
 import '../widgets/track_tile.dart';
 
 class AlbumDetailScreen extends ConsumerWidget {
@@ -23,6 +25,7 @@ class AlbumDetailScreen extends ConsumerWidget {
     final albumAsync = ref.watch(albumProvider(albumId));
     final tracksAsync = ref.watch(albumTracksProvider(albumId));
     final token = ref.watch(authServiceProvider).accessToken;
+    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -59,7 +62,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(album.title),
                   background: CachedNetworkImage(
-                    imageUrl: album.imageUrl,
+                    imageUrl: resolveBackendUrl(base, album.imageUrl),
                     httpHeaders: headers,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => ColoredBox(

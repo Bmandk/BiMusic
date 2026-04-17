@@ -5,19 +5,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/theme.dart';
+import 'providers/backend_url_provider.dart';
 import 'router.dart';
+import 'ui/screens/backend_setup_screen.dart';
 
 class BiMusicApp extends ConsumerWidget {
   const BiMusicApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    Widget app = MaterialApp.router(
-      title: 'BiMusic',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      routerConfig: ref.watch(routerProvider),
+    final urlState = ref.watch(backendUrlProvider);
+
+    Widget app = urlState.when(
+      loading: () => const MaterialApp(
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      ),
+      error: (e, _) => MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.system,
+        home: BackendSetupScreen(initialError: '$e'),
+      ),
+      data: (url) => url == null
+          ? MaterialApp(
+              theme: AppTheme.light,
+              darkTheme: AppTheme.dark,
+              themeMode: ThemeMode.system,
+              home: const BackendSetupScreen(),
+            )
+          : MaterialApp.router(
+              title: 'BiMusic',
+              theme: AppTheme.light,
+              darkTheme: AppTheme.dark,
+              themeMode: ThemeMode.system,
+              routerConfig: ref.watch(routerProvider),
+            ),
     );
 
     // Work around a Flutter Windows accessibility bridge bug where

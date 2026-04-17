@@ -16,7 +16,6 @@ vi.mock("../../config/env.js", () => ({
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD: "adminpassword123",
     TEMP_DIR: "/tmp/bimusic",
-    API_BASE_URL: "http://localhost:3000",
   },
 }));
 
@@ -113,7 +112,7 @@ describe("getArtists", () => {
       id: 1,
       name: "Test Artist",
       overview: "Bio",
-      imageUrl: "http://localhost:3000/api/library/artists/1/image",
+      imageUrl: "/api/library/artists/1/image",
       albumCount: 1,
     });
   });
@@ -185,7 +184,7 @@ describe("getArtistAlbums", () => {
       title: "Test Album",
       artistId: 1,
       artistName: "Test Artist",
-      imageUrl: "http://localhost:3000/api/library/albums/10/image",
+      imageUrl: "/api/library/albums/10/image",
       trackCount: 0, // not fetched to avoid N+1
       genres: ["Rock"],
     });
@@ -265,7 +264,7 @@ describe("getAlbumTracks", () => {
       albumId: 10,
       artistId: 1,
       hasFile: true,
-      streamUrl: "http://localhost:3000/api/stream/100",
+      streamUrl: "/api/stream/100",
     });
   });
 
@@ -301,7 +300,7 @@ describe("getTrack", () => {
     expect(result).toMatchObject({
       id: 100,
       title: "Test Track",
-      streamUrl: "http://localhost:3000/api/stream/100",
+      streamUrl: "/api/stream/100",
     });
   });
 

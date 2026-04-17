@@ -4,8 +4,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/backend_url_provider.dart';
 import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
+import '../../utils/url_resolver.dart';
 import '../layouts/breakpoints.dart';
 import 'full_player.dart';
 
@@ -58,6 +60,7 @@ class PlayerBar extends ConsumerWidget {
 
     final track = playerState.currentTrack!;
     final token = ref.watch(authServiceProvider).accessToken;
+    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -86,7 +89,7 @@ class PlayerBar extends ConsumerWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: CachedNetworkImage(
-                      imageUrl: playerState.imageUrl!,
+                      imageUrl: resolveBackendUrl(base, playerState.imageUrl!),
                       httpHeaders: headers,
                       width: 40,
                       height: 40,

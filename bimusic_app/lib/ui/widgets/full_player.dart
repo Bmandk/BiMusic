@@ -2,8 +2,10 @@ import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/backend_url_provider.dart';
 import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
+import '../../utils/url_resolver.dart';
 
 class FullPlayer extends ConsumerStatefulWidget {
   const FullPlayer({super.key});
@@ -28,6 +30,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final positionAsync = ref.watch(playerPositionProvider);
     final durationAsync = ref.watch(playerDurationProvider);
     final token = ref.watch(authServiceProvider).accessToken;
+    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -96,7 +99,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                         borderRadius: BorderRadius.circular(12),
                         child: playerState.imageUrl != null
                             ? CachedNetworkImage(
-                                imageUrl: playerState.imageUrl!,
+                                imageUrl: resolveBackendUrl(base, playerState.imageUrl!),
                                 httpHeaders: headers,
                                 fit: BoxFit.cover,
                                 placeholder: (_, __) => ColoredBox(
