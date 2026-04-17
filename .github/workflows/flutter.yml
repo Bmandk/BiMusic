@@ -1,0 +1,155 @@
+name: Flutter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bimusic_app/**"
+      - ".github/workflows/flutter.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "bimusic_app/**"
+      - ".github/workflows/flutter.yml"
+
+concurrency:
+  group: flutter-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  lint-unit:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bimusic_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.27.x"
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze --fatal-infos
+      - run: flutter test --coverage
+      - name: Check Flutter coverage threshold (≥70% lines)
+        run: |
+          sudo apt-get install -y lcov 2>/dev/null
+          echo ""
+          echo "=== lcov coverage summary ==="
+          lcov --summary coverage/lcov.info 2>&1
+          echo ""
+          COVERAGE=$(lcov --summary coverage/lcov.info 2>&1 | grep -E 'lines\.*:' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+          echo "Extracted line coverage : ${COVERAGE}%"
+          echo "Required threshold      : 70%"
+          if [ -z "$COVERAGE" ]; then
+            echo "ERROR: Could not parse line coverage percentage from lcov output" >&2
+            exit 1
+          fi
+          if awk "BEGIN { if ($COVERAGE + 0 < 70) { exit 1 } else { exit 0 } }"; then
+            echo "PASS: ${COVERAGE}% meets the 70% line coverage threshold"
+          else
+            echo "FAIL: ${COVERAGE}% is below the 70% line coverage threshold" >&2
+            echo ""
+            echo "=== Files with lowest coverage ==="
+            lcov --list coverage/lcov.info 2>&1 | tail -30
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: bimusic_app/coverage/
+
+  build-android:
+    name: Build Android APK
+    if: github.event_name == 'push'
+    needs: [lint-unit]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bimusic_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.27.x"
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: bimusic_app/build/app/outputs/flutter-apk/app-release.apk
+
+  build-windows:
+    name: Build Windows App
+    if: github.event_name == 'push'
+    needs: [lint-unit]
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: bimusic_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.27.x"
+          cache: true
+      - run: flutter config --enable-windows-desktop
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build windows --release
+      - name: Zip Windows build
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "build\windows\x64\runner\Release\*" `
+            -DestinationPath "bimusic_app-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: bimusic_app/bimusic_app-windows-x64.zip
+
+  release:
+    name: Publish GitHub Release
+    if: github.event_name == 'push'
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: artifacts/android
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-zip
+          path: artifacts/windows
+      - name: Compute release tag
+        id: tag
+        run: |
+          APP_VERSION=$(grep -E '^version:' bimusic_app/pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          TAG="app-v${APP_VERSION}+${{ github.run_number }}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "name=BiMusic App ${TAG}" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.name }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            artifacts/android/app-release.apk
+            artifacts/windows/bimusic_app-windows-x64.zip
