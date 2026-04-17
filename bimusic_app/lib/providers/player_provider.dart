@@ -18,6 +18,7 @@ class PlayerState {
     this.artistName,
     this.albumTitle,
     this.imageUrl,
+    this.volume = 1.0,
   });
 
   final Track? currentTrack;
@@ -28,6 +29,7 @@ class PlayerState {
   final String? artistName;
   final String? albumTitle;
   final String? imageUrl;
+  final double volume;
 
   bool get hasTrack => currentTrack != null;
 
@@ -40,6 +42,7 @@ class PlayerState {
     String? artistName,
     String? albumTitle,
     String? imageUrl,
+    double? volume,
   }) {
     return PlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
@@ -50,11 +53,13 @@ class PlayerState {
       artistName: artistName ?? this.artistName,
       albumTitle: albumTitle ?? this.albumTitle,
       imageUrl: imageUrl ?? this.imageUrl,
+      volume: volume ?? this.volume,
     );
   }
 }
 
 class PlayerNotifier extends Notifier<PlayerState> {
+  double _preMuteVolume = 1.0;
   @override
   PlayerState build() {
     final handler = ref.read(audioHandlerProvider);
@@ -151,6 +156,21 @@ class PlayerNotifier extends Notifier<PlayerState> {
         ? AudioServiceShuffleMode.none
         : AudioServiceShuffleMode.all;
     return ref.read(audioHandlerProvider).setShuffleMode(newMode);
+  }
+
+  Future<void> setVolume(double v) async {
+    final clamped = v.clamp(0.0, 1.0);
+    await ref.read(audioHandlerProvider).setVolume(clamped);
+    state = state.copyWith(volume: clamped);
+  }
+
+  Future<void> toggleMute() async {
+    if (state.volume > 0) {
+      _preMuteVolume = state.volume;
+      await setVolume(0);
+    } else {
+      await setVolume(_preMuteVolume == 0 ? 1.0 : _preMuteVolume);
+    }
   }
 }
 

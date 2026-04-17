@@ -87,6 +87,10 @@ class _StubPlayerNotifier extends Notifier<PlayerState>
 
   @override
   Future<void> toggleShuffle() async {}
+  @override
+  Future<void> setVolume(double v) async {}
+  @override
+  Future<void> toggleMute() async {}
 }
 
 class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {

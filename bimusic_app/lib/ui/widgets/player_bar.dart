@@ -1,10 +1,16 @@
+import 'dart:io' show Platform;
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/player_provider.dart';
 import '../../services/auth_service.dart';
 import '../layouts/breakpoints.dart';
 import 'full_player.dart';
+
+bool get _isDesktopOrWeb =>
+    kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS));
 
 class PlayerBar extends ConsumerWidget {
   const PlayerBar({super.key});
@@ -167,11 +173,46 @@ class PlayerBar extends ConsumerWidget {
                   onPressed: () =>
                       ref.read(playerNotifierProvider.notifier).skipNext(),
                 ),
+                if (_isDesktopOrWeb) const _VolumeControl(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VolumeControl extends ConsumerWidget {
+  const _VolumeControl();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final volume = ref.watch(playerNotifierProvider.select((s) => s.volume));
+    final notifier = ref.read(playerNotifierProvider.notifier);
+
+    final icon = switch (volume) {
+      0.0 => Icons.volume_off_rounded,
+      < 0.5 => Icons.volume_down_rounded,
+      _ => Icons.volume_up_rounded,
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: volume > 0 ? 'Mute' : 'Unmute',
+          icon: Icon(icon),
+          onPressed: () => notifier.toggleMute(),
+        ),
+        SizedBox(
+          width: 100,
+          child: Slider(
+            value: volume,
+            onChanged: (v) => notifier.setVolume(v),
+          ),
+        ),
+      ],
     );
   }
 }
