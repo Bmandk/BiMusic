@@ -344,7 +344,10 @@ export async function streamTranscoded(
       try {
         renameSync(partPath, tempPath);
       } catch (renameErr) {
-        logger.warn({ renameErr, partPath, tempPath }, "Failed to rename part file");
+        logger.warn(
+          { renameErr, partPath, tempPath },
+          "Failed to rename part file",
+        );
       }
       externalResolve();
     }
@@ -390,7 +393,10 @@ export async function streamTranscoded(
   });
 
   partStream.on("error", (err: Error) => {
-    logger.error({ err, partPath }, "Part file write error during stream transcode");
+    logger.error(
+      { err, partPath },
+      "Part file write error during stream transcode",
+    );
     settle(err);
   });
 
