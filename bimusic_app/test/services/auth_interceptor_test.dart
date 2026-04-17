@@ -247,6 +247,7 @@ void main() {
       final dio = container.read(apiClientProvider);
 
       expect(dio, isA<Dio>());
+      expect(dio.options.baseUrl, 'http://test');
       expect(
         dio.interceptors.whereType<AuthInterceptor>().length,
         1,
