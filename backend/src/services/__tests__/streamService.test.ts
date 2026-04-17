@@ -62,7 +62,7 @@ vi.mock("fluent-ffmpeg", () => ({
   default: vi.fn(() => mockFfmpegCmd),
 }));
 
-const mockReadStream = { pipe: vi.fn() };
+const mockReadStream = { pipe: vi.fn(), on: vi.fn() };
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();

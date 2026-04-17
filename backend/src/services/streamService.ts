@@ -10,6 +10,7 @@ import {
   unlinkSync,
 } from "fs";
 import { access, constants } from "fs/promises";
+import { PassThrough } from "stream";
 import path from "path";
 import { Request, Response } from "express";
 import ffmpeg, { FfmpegCommand } from "fluent-ffmpeg";
@@ -375,11 +376,17 @@ export async function streamTranscoded(
 
   registerFfmpegCommand(cmd);
 
-  const ffmpegOut = cmd.pipe();
+  const ffmpegOut = cmd.pipe() as PassThrough;
 
   ffmpegOut.on("data", (chunk: Buffer) => {
-    if (!res.destroyed && !res.writableEnded) res.write(chunk);
     if (!partStream.destroyed) partStream.write(chunk);
+    if (!res.destroyed && !res.writableEnded) {
+      const ok = res.write(chunk);
+      if (!ok) {
+        ffmpegOut.pause();
+        res.once("drain", () => ffmpegOut.resume());
+      }
+    }
   });
 
   ffmpegOut.on("end", () => {
@@ -445,10 +452,22 @@ export function serveFile(filePath: string, req: Request, res: Response): void {
     res.status(206);
     res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
     res.setHeader("Content-Length", chunkSize);
-    createReadStream(filePath, { start, end }).pipe(res);
+    const rangeStream = createReadStream(filePath, { start, end });
+    rangeStream.on("error", (err: Error) => {
+      logger.error({ err, filePath }, "File read error during range serve");
+      if (!res.headersSent) res.status(500).end();
+      else if (!res.destroyed) res.destroy();
+    });
+    rangeStream.pipe(res);
   } else {
     res.status(200);
     res.setHeader("Content-Length", fileSize);
-    createReadStream(filePath).pipe(res);
+    const fileStream = createReadStream(filePath);
+    fileStream.on("error", (err: Error) => {
+      logger.error({ err, filePath }, "File read error during serve");
+      if (!res.headersSent) res.status(500).end();
+      else if (!res.destroyed) res.destroy();
+    });
+    fileStream.pipe(res);
   }
 }
