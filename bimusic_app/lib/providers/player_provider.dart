@@ -5,6 +5,7 @@ import '../models/download_task.dart';
 import '../models/track.dart';
 import '../services/audio_service.dart';
 import '../services/auth_service.dart';
+import 'auth_provider.dart';
 import 'bitrate_provider.dart';
 import 'download_provider.dart';
 
@@ -63,6 +64,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
   @override
   PlayerState build() {
     final handler = ref.read(audioHandlerProvider);
+
+    // When the access token is silently refreshed, update the audio sources so
+    // libmpv never replays a request with an expired token.
+    ref.listen<AuthState>(authNotifierProvider, (prev, next) {
+      if (next is! AuthStateAuthenticated) return;
+      final prevToken = prev is AuthStateAuthenticated
+          ? prev.tokens.accessToken
+          : null;
+      if (prevToken == next.tokens.accessToken) return;
+      handler.updateToken(next.tokens.accessToken).catchError((_) {});
+    });
 
     // skip(1) avoids the synchronous BehaviorSubject emission during build
     final playbackSub = handler.playbackState.skip(1).listen((ps) {

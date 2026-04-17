@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -6,6 +8,16 @@ import 'package:bimusic_app/models/auth_tokens.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/providers/auth_provider.dart';
 import 'package:bimusic_app/services/auth_service.dart';
+
+/// Builds a minimal JWT-like string. Pass [exp] (seconds since epoch) to
+/// include an expiry claim; omit to produce a token with no exp field.
+String _makeJwt({int? exp}) {
+  final header = base64Url.encode(utf8.encode('{"alg":"HS256","typ":"JWT"}'));
+  final payloadJson =
+      exp != null ? '{"sub":"u1","exp":$exp}' : '{"sub":"u1"}';
+  final payload = base64Url.encode(utf8.encode(payloadJson));
+  return '$header.$payload.fakesig';
+}
 
 class MockAuthService extends Mock implements AuthService {}
 
@@ -126,6 +138,135 @@ void main() {
 
       expect(container.read(authNotifierProvider), isA<AuthStateUnauthenticated>());
       verify(() => mockAuthService.logout()).called(1);
+    });
+  });
+
+  group('proactive token refresh', () {
+    // Epoch second in the distant past → token is already expired.
+    final pastEpoch = DateTime(2000).millisecondsSinceEpoch ~/ 1000;
+
+    setUp(() {
+      when(() => mockAuthService.readStoredTokens())
+          .thenAnswer((_) async => null);
+    });
+
+    test('immediately calls refresh when access token is already expired',
+        () async {
+      final expiredTokens = AuthTokens(
+        accessToken: _makeJwt(exp: pastEpoch),
+        refreshToken: 'rtoken',
+        user: testUser,
+      );
+
+      when(() => mockAuthService.login(any(), any()))
+          .thenAnswer((_) async => expiredTokens);
+      when(() => mockAuthService.refresh())
+          .thenAnswer((_) async => testTokens);
+
+      await waitForInit();
+      await container.read(authNotifierProvider.notifier).login('admin', 'pass');
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockAuthService.refresh()).called(1);
+    });
+
+    test('updates state to new tokens after immediate background refresh',
+        () async {
+      final expiredTokens = AuthTokens(
+        accessToken: _makeJwt(exp: pastEpoch),
+        refreshToken: 'rtoken',
+        user: testUser,
+      );
+
+      when(() => mockAuthService.login(any(), any()))
+          .thenAnswer((_) async => expiredTokens);
+      when(() => mockAuthService.refresh())
+          .thenAnswer((_) async => testTokens);
+
+      await waitForInit();
+      await container.read(authNotifierProvider.notifier).login('admin', 'pass');
+      await Future<void>.delayed(Duration.zero);
+
+      final s = container.read(authNotifierProvider);
+      expect(s, isA<AuthStateAuthenticated>());
+      expect((s as AuthStateAuthenticated).tokens, testTokens);
+    });
+
+    test('goes unauthenticated when background refresh returns null', () async {
+      final expiredTokens = AuthTokens(
+        accessToken: _makeJwt(exp: pastEpoch),
+        refreshToken: 'rtoken',
+        user: testUser,
+      );
+
+      when(() => mockAuthService.login(any(), any()))
+          .thenAnswer((_) async => expiredTokens);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => null);
+      when(() => mockAuthService.clearTokens()).thenAnswer((_) async {});
+
+      await waitForInit();
+      await container.read(authNotifierProvider.notifier).login('admin', 'pass');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+          container.read(authNotifierProvider), isA<AuthStateUnauthenticated>());
+      verify(() => mockAuthService.clearTokens()).called(1);
+    });
+
+    test('stays authenticated when background refresh throws (network error)',
+        () async {
+      final expiredTokens = AuthTokens(
+        accessToken: _makeJwt(exp: pastEpoch),
+        refreshToken: 'rtoken',
+        user: testUser,
+      );
+
+      when(() => mockAuthService.login(any(), any()))
+          .thenAnswer((_) async => expiredTokens);
+      when(() => mockAuthService.refresh())
+          .thenThrow(Exception('network error'));
+
+      await waitForInit();
+      await container.read(authNotifierProvider.notifier).login('admin', 'pass');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+          container.read(authNotifierProvider), isA<AuthStateAuthenticated>());
+    });
+
+    test('does not schedule refresh when token has no exp field', () async {
+      final noExpTokens = AuthTokens(
+        accessToken: _makeJwt(),
+        refreshToken: 'rtoken',
+        user: testUser,
+      );
+
+      when(() => mockAuthService.login(any(), any()))
+          .thenAnswer((_) async => noExpTokens);
+
+      await waitForInit();
+      await container.read(authNotifierProvider.notifier).login('admin', 'pass');
+
+      verifyNever(() => mockAuthService.refresh());
+      expect(container.read(authNotifierProvider), isA<AuthStateAuthenticated>());
+    });
+
+    test('does not crash or schedule refresh for a malformed access token',
+        () async {
+      const badTokens = AuthTokens(
+        accessToken: 'not-a-jwt',
+        refreshToken: 'rtoken',
+        user: testUser,
+      );
+
+      when(() => mockAuthService.login(any(), any()))
+          .thenAnswer((_) async => badTokens);
+
+      await waitForInit();
+      await container.read(authNotifierProvider.notifier).login('admin', 'pass');
+
+      verifyNever(() => mockAuthService.refresh());
+      expect(container.read(authNotifierProvider), isA<AuthStateAuthenticated>());
     });
   });
 }
