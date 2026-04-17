@@ -31,6 +31,23 @@ class BiMusicAudioHandler extends BaseAudioHandler {
 
   Future<void> setVolume(double v) => _player.setVolume(v.clamp(0.0, 1.0));
 
+  /// Called when the access token is refreshed. Rebuilds the audio source
+  /// playlist with fresh stream URLs so libmpv never hits an expired token.
+  Future<void> updateToken(String newToken) async {
+    _accessToken = newToken;
+    if (_tracks.isEmpty) return;
+    final index = _player.currentIndex ?? 0;
+    final position = _player.position;
+    final playlist = ConcatenatingAudioSource(
+      children: _tracks.map(_sourceForTrack).toList(),
+    );
+    await _player.setAudioSource(
+      playlist,
+      initialIndex: index,
+      initialPosition: position,
+    );
+  }
+
   Future<void> _init() async {
     try {
       final session = await AudioSession.instance;
