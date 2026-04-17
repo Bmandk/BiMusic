@@ -73,7 +73,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
           ? prev.tokens.accessToken
           : null;
       if (prevToken == next.tokens.accessToken) return;
-      handler.updateToken(next.tokens.accessToken);
+      handler.updateToken(next.tokens.accessToken).catchError((_) {});
     });
 
     // skip(1) avoids the synchronous BehaviorSubject emission during build

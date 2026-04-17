@@ -124,6 +124,8 @@ class AuthNotifier extends Notifier<AuthState> {
     final svc = ref.read(authServiceProvider);
     try {
       final refreshed = await svc.refresh();
+      // Bail out if logout was called while the refresh was in-flight.
+      if (state is AuthStateUnauthenticated) return;
       if (refreshed != null) {
         state = AuthStateAuthenticated(refreshed);
         _scheduleTokenRefresh(refreshed);
@@ -133,6 +135,7 @@ class AuthNotifier extends Notifier<AuthState> {
       }
     } catch (_) {
       // Network error — retry in 30 s rather than logging the user out.
+      if (state is AuthStateUnauthenticated) return;
       _refreshTimer = Timer(const Duration(seconds: 30), _backgroundRefresh);
     }
   }
