@@ -181,6 +181,8 @@ void main() {
           imageUrl: any(named: 'imageUrl'),
           localFilePaths: any(named: 'localFilePaths'),
         )).thenAnswer((_) async {});
+    when(() => mockHandler.setVolume(any())).thenAnswer((_) async {});
+    when(() => mockHandler.updateToken(any())).thenAnswer((_) async {});
 
     container = ProviderContainer(
       overrides: [
@@ -556,6 +558,51 @@ void main() {
       // Simply reading the provider exercises lines 168-170.
       final value = c.read(playerDurationProvider);
       expect(value, isA<AsyncValue<Duration?>>());
+    });
+  });
+
+  group('PlayerNotifier.setVolume', () {
+    test('updates state.volume to given value', () async {
+      await notifier().setVolume(0.5);
+      expect(state().volume, 0.5);
+    });
+
+    test('clamps value below 0 to 0', () async {
+      await notifier().setVolume(-0.5);
+      expect(state().volume, 0.0);
+    });
+
+    test('clamps value above 1 to 1', () async {
+      await notifier().setVolume(1.5);
+      expect(state().volume, 1.0);
+    });
+
+    test('calls handler.setVolume with clamped value', () async {
+      await notifier().setVolume(0.7);
+      verify(() => mockHandler.setVolume(0.7)).called(1);
+    });
+  });
+
+  group('PlayerNotifier.toggleMute', () {
+    test('sets volume to 0 when currently unmuted', () async {
+      expect(state().volume, 1.0);
+      await notifier().toggleMute();
+      expect(state().volume, 0.0);
+    });
+
+    test('restores pre-mute volume when currently muted', () async {
+      await notifier().setVolume(0.6);
+      await notifier().toggleMute(); // mutes, saves 0.6
+      await notifier().toggleMute(); // unmutes, restores 0.6
+      expect(state().volume, 0.6);
+    });
+
+    test('restores to 1.0 when pre-mute volume is 0', () async {
+      // Force state.volume to 0 directly (bypasses preMuteVolume save)
+      await notifier().setVolume(0.0);
+      // preMuteVolume is still the initial 1.0 so toggle should restore to 1.0
+      await notifier().toggleMute();
+      expect(state().volume, 1.0);
     });
   });
 }
