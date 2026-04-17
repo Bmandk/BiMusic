@@ -80,7 +80,9 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     mediaItem.add(_trackToMediaItem(tracks[startIndex]));
 
     final playlist = ConcatenatingAudioSource(children: sources);
-    await _player.setAudioSource(playlist, initialIndex: startIndex);
+    // preload: false — returns immediately without waiting for duration probe;
+    // play() drives the actual load so first bytes reach the client sooner.
+    await _player.setAudioSource(playlist, initialIndex: startIndex, preload: false);
     await _player.play();
   }
 

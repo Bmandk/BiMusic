@@ -62,7 +62,7 @@ vi.mock("fluent-ffmpeg", () => ({
   default: vi.fn(() => mockFfmpegCmd),
 }));
 
-const mockReadStream = { pipe: vi.fn() };
+const mockReadStream = { pipe: vi.fn(), on: vi.fn() };
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
@@ -547,5 +547,50 @@ describe("serveFile", () => {
 
     expect(res.setHeader).toHaveBeenCalledWith("Accept-Ranges", "bytes");
     expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "audio/mpeg");
+  });
+
+  it("sends 500 on read stream error when headers not yet sent", () => {
+    const req = makeReq(undefined);
+    const res = { ...makeMockRes(), headersSent: false, destroyed: false };
+    let errorCb: ((err: Error) => void) | undefined;
+    const stream = {
+      pipe: vi.fn(),
+      on: vi.fn((event: string, cb: (err: Error) => void) => {
+        if (event === "error") errorCb = cb;
+        return stream;
+      }),
+    };
+    vi.mocked(fs.createReadStream).mockReturnValue(stream as never);
+
+    serveFile("/music/track.mp3", req, res as never);
+    errorCb?.(new Error("ENOENT"));
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it("destroys response on read stream error when headers already sent", () => {
+    const req = makeReq(undefined);
+    const res = {
+      ...makeMockRes(),
+      headersSent: true,
+      destroyed: false,
+      destroy: vi.fn(),
+    };
+    let errorCb: ((err: Error) => void) | undefined;
+    const stream = {
+      pipe: vi.fn(),
+      on: vi.fn((event: string, cb: (err: Error) => void) => {
+        if (event === "error") errorCb = cb;
+        return stream;
+      }),
+    };
+    vi.mocked(fs.createReadStream).mockReturnValue(stream as never);
+
+    serveFile("/music/track.mp3", req, res as never);
+    errorCb?.(new Error("EIO"));
+
+    expect(res.destroy).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalledWith(500);
   });
 });

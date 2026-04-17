@@ -1,13 +1,16 @@
 import { createHash } from "crypto";
 import {
   createReadStream,
+  createWriteStream,
   mkdirSync,
   readdirSync,
+  renameSync,
   statSync,
   existsSync,
   unlinkSync,
 } from "fs";
 import { access, constants } from "fs/promises";
+import { PassThrough } from "stream";
 import path from "path";
 import { Request, Response } from "express";
 import ffmpeg, { FfmpegCommand } from "fluent-ffmpeg";
@@ -252,6 +255,204 @@ export async function ensureTranscoded(
   return tempPath;
 }
 
+/**
+ * Stream a transcoded track to the response, tee-ing to disk for caching.
+ *
+ * First request with no Range header: pipes ffmpeg stdout directly to the
+ * response while simultaneously writing to a temp file. Bytes flow to the
+ * client immediately instead of waiting for the full transcode.
+ *
+ * Subsequent requests (cached file exists): served with full Range / 206
+ * support via serveFile.
+ *
+ * Range requests that are not an open bytes=0- probe: fall back to the
+ * blocking ensureTranscoded path so seek 206 semantics are preserved.
+ */
+export async function streamTranscoded(
+  sourcePath: string,
+  bitrate: number,
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const tempPath = getTempFilePath(sourcePath, bitrate);
+
+  // Cached: serve with full Range support.
+  if (existsSync(tempPath)) {
+    serveFile(tempPath, req, res);
+    return;
+  }
+
+  // Non-trivial range (seek) with no cached file: wait for full transcode.
+  const rangeHeader = req.headers.range;
+  if (rangeHeader && rangeHeader.trim() !== "bytes=0-") {
+    const filePath = await ensureTranscoded(sourcePath, bitrate);
+    serveFile(filePath, req, res);
+    return;
+  }
+
+  // Another request is already transcoding: wait for the file to be ready.
+  const existing = inProgressTranscodes.get(tempPath);
+  if (existing) {
+    try {
+      await existing;
+    } catch {
+      // The in-flight transcode failed; fall through to a fresh ensureTranscoded.
+      const filePath = await ensureTranscoded(sourcePath, bitrate);
+      serveFile(filePath, req, res);
+      return;
+    }
+    serveFile(tempPath, req, res);
+    return;
+  }
+
+  // First request: tee ffmpeg stdout → HTTP response + part file.
+  const partPath = `${tempPath}.part`;
+
+  const partStream = createWriteStream(partPath);
+
+  let headersFlushed = false;
+  const flushStreamingHeaders = () => {
+    if (headersFlushed) return;
+    headersFlushed = true;
+    res.status(200);
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Accept-Ranges", "none");
+    res.flushHeaders();
+  };
+
+  let externalResolve!: () => void;
+  let externalReject!: (err: Error) => void;
+  const streamDonePromise = new Promise<void>((resolve, reject) => {
+    externalResolve = resolve;
+    externalReject = reject;
+  });
+
+  inProgressTranscodes.set(tempPath, streamDonePromise);
+
+  let ffmpegEnded = false;
+  let partFinished = false;
+  let settled = false;
+
+  const settle = (err?: Error) => {
+    if (settled) return;
+    settled = true;
+    inProgressTranscodes.delete(tempPath);
+    if (err) {
+      try {
+        unlinkSync(partPath);
+      } catch {
+        /* ignore */
+      }
+      if (!headersFlushed && !res.headersSent) {
+        res.status(500).json({
+          error: {
+            code: "TRANSCODE_ERROR",
+            message: "Audio transcoding failed",
+          },
+        });
+      } else if (!res.destroyed) {
+        res.destroy();
+      }
+      partStream.destroy();
+      externalReject(err);
+    } else {
+      try {
+        renameSync(partPath, tempPath);
+        externalResolve();
+      } catch (renameErr) {
+        logger.warn(
+          { renameErr, partPath, tempPath },
+          "Failed to rename part file",
+        );
+        externalReject(
+          renameErr instanceof Error ? renameErr : new Error(String(renameErr)),
+        );
+      }
+    }
+  };
+
+  const tryFinalize = () => {
+    if (ffmpegEnded && partFinished) settle();
+  };
+
+  const cmd = ffmpeg(sourcePath)
+    .noVideo()
+    .audioCodec("libmp3lame")
+    .audioBitrate(bitrate)
+    .format("mp3")
+    .on("end", () => {
+      unregisterFfmpegCommand(cmd);
+      ffmpegEnded = true;
+      tryFinalize();
+    })
+    .on("error", (err: Error) => {
+      unregisterFfmpegCommand(cmd);
+      logger.error({ err, sourcePath, bitrate }, "Streaming transcode failed");
+      settle(err);
+    });
+
+  registerFfmpegCommand(cmd);
+
+  const ffmpegOut = cmd.pipe() as PassThrough;
+
+  ffmpegOut.on("error", (err: Error) => {
+    settle(err);
+  });
+
+  let pendingDrains = 0;
+  const waitForDrain = (stream: NodeJS.WritableStream) => {
+    pendingDrains += 1;
+    ffmpegOut.pause();
+    stream.once("drain", () => {
+      pendingDrains -= 1;
+      if (pendingDrains === 0) ffmpegOut.resume();
+    });
+  };
+
+  ffmpegOut.on("data", (chunk: Buffer) => {
+    flushStreamingHeaders();
+    if (!partStream.destroyed) {
+      const partOk = partStream.write(chunk);
+      if (!partOk) waitForDrain(partStream);
+    }
+    if (!res.destroyed && !res.writableEnded) {
+      const ok = res.write(chunk);
+      if (!ok) waitForDrain(res);
+    }
+  });
+
+  ffmpegOut.on("end", () => {
+    if (!res.destroyed && !res.writableEnded) res.end();
+    if (!partStream.destroyed) partStream.end();
+  });
+
+  partStream.on("finish", () => {
+    partFinished = true;
+    tryFinalize();
+  });
+
+  partStream.on("error", (err: Error) => {
+    logger.error(
+      { err, partPath },
+      "Part file write error during stream transcode",
+    );
+    settle(err);
+  });
+
+  res.on("close", () => {
+    if (!ffmpegEnded && !res.writableEnded) {
+      try {
+        cmd.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
+      settle(new Error("Client disconnected"));
+    }
+  });
+
+  return streamDonePromise;
+}
+
 /** Serve a file with Range support (206 Partial Content or 200 OK). */
 export function serveFile(filePath: string, req: Request, res: Response): void {
   const stat = statSync(filePath);
@@ -283,10 +484,22 @@ export function serveFile(filePath: string, req: Request, res: Response): void {
     res.status(206);
     res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
     res.setHeader("Content-Length", chunkSize);
-    createReadStream(filePath, { start, end }).pipe(res);
+    const rangeStream = createReadStream(filePath, { start, end });
+    rangeStream.on("error", (err: Error) => {
+      logger.error({ err, filePath }, "File read error during range serve");
+      if (!res.headersSent) res.status(500).end();
+      else if (!res.destroyed) res.destroy();
+    });
+    rangeStream.pipe(res);
   } else {
     res.status(200);
     res.setHeader("Content-Length", fileSize);
-    createReadStream(filePath).pipe(res);
+    const fileStream = createReadStream(filePath);
+    fileStream.on("error", (err: Error) => {
+      logger.error({ err, filePath }, "File read error during serve");
+      if (!res.headersSent) res.status(500).end();
+      else if (!res.destroyed) res.destroy();
+    });
+    fileStream.pipe(res);
   }
 }

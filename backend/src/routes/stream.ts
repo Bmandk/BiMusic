@@ -3,7 +3,7 @@ import { authenticate } from "../middleware/auth.js";
 import {
   resolveFilePath,
   isPassthrough,
-  ensureTranscoded,
+  streamTranscoded,
   serveFile,
 } from "../services/streamService.js";
 
@@ -44,14 +44,11 @@ router.get(
 
       const sourcePath = await resolveFilePath(trackId);
 
-      let filePath: string;
       if (isPassthrough(sourcePath)) {
-        filePath = sourcePath;
+        serveFile(sourcePath, req, res);
       } else {
-        filePath = await ensureTranscoded(sourcePath, bitrate);
+        await streamTranscoded(sourcePath, bitrate, req, res);
       }
-
-      serveFile(filePath, req, res);
     } catch (err) {
       next(err);
     }

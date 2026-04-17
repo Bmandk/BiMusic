@@ -19,6 +19,39 @@ export const lidarrApi: AxiosInstance = axios.create({
   timeout: 30000,
 });
 
+// --- In-memory TTL cache for track/trackfile metadata ---
+const METADATA_CACHE_TTL = 5 * 60 * 1000;
+const METADATA_CACHE_MAX = 500;
+
+interface MetadataCacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const metadataCache = new Map<string, MetadataCacheEntry<unknown>>();
+
+function metaCacheGet<T>(key: string): T | undefined {
+  const entry = metadataCache.get(key) as MetadataCacheEntry<T> | undefined;
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    metadataCache.delete(key);
+    return undefined;
+  }
+  return entry.data;
+}
+
+function metaCacheSet<T>(key: string, data: T): void {
+  if (metadataCache.size >= METADATA_CACHE_MAX) {
+    const firstKey = metadataCache.keys().next().value;
+    if (firstKey !== undefined) metadataCache.delete(firstKey);
+  }
+  metadataCache.set(key, { data, expiresAt: Date.now() + METADATA_CACHE_TTL });
+}
+
+export function resetLidarrMetadataCache(): void {
+  metadataCache.clear();
+}
+
 function mapError(err: unknown): never {
   if (axios.isAxiosError(err)) {
     if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") {
@@ -129,8 +162,12 @@ export async function getTracks(albumId?: number): Promise<LidarrTrack[]> {
 }
 
 export async function getTrack(id: number): Promise<LidarrTrack> {
+  const key = `track:${id}`;
+  const cached = metaCacheGet<LidarrTrack>(key);
+  if (cached) return cached;
   try {
     const res = await lidarrApi.get<LidarrTrack>(`/track/${id}`);
+    metaCacheSet(key, res.data);
     return res.data;
   } catch (err) {
     return mapError(err);
@@ -138,8 +175,12 @@ export async function getTrack(id: number): Promise<LidarrTrack> {
 }
 
 export async function getTrackFile(id: number): Promise<LidarrTrackFile> {
+  const key = `trackFile:${id}`;
+  const cached = metaCacheGet<LidarrTrackFile>(key);
+  if (cached) return cached;
   try {
     const res = await lidarrApi.get<LidarrTrackFile>(`/trackfile/${id}`);
+    metaCacheSet(key, res.data);
     return res.data;
   } catch (err) {
     return mapError(err);
