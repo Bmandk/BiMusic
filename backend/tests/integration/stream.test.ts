@@ -24,6 +24,8 @@ vi.mock('fluent-ffmpeg', () => ({
       noVideo: () => chain,
       audioCodec: (_codec: string) => chain,
       audioBitrate: (_bitrate: number) => chain,
+      format: (_fmt: string) => chain,
+      kill: (_signal: string) => {},
       output: (p: string) => {
         outputPath = p;
         return chain;
@@ -32,6 +34,23 @@ vi.mock('fluent-ffmpeg', () => ({
         callbacks[event] = cb;
         return chain;
       },
+      // New streaming path: pipe() without a destination returns a PassThrough.
+      pipe: () => {
+        const { PassThrough } = require('stream');
+        const pt = new PassThrough();
+        setTimeout(() => {
+          try {
+            pt.push(Buffer.alloc(10 * 1024)); // 10 KB fake MP3 data
+            pt.push(null);                    // signal EOF
+            callbacks['end']?.();
+          } catch (err) {
+            callbacks['error']?.(err as Error);
+            pt.destroy(err as Error);
+          }
+        }, mockState.delayMs);
+        return pt;
+      },
+      // Old blocking path: write file to disk then fire 'end'.
       run: () => {
         setTimeout(() => {
           try {
@@ -52,6 +71,7 @@ import { createApp } from '../../src/app.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { bootstrapAdminIfNeeded } from '../../src/services/userService.js';
 import { initTempDir, resetLidarrRootCache } from '../../src/services/streamService.js';
+import { resetLidarrMetadataCache } from '../../src/services/lidarrClient.js';
 
 const LIDARR = 'http://localhost:8686';
 
@@ -150,6 +170,7 @@ afterEach(() => {
   mockState.callCount = 0;
   mockState.delayMs = 0;
   resetLidarrRootCache();
+  resetLidarrMetadataCache();
 });
 
 describe('GET /api/stream/:trackId — auth & validation', () => {
@@ -276,6 +297,76 @@ describe('GET /api/stream/:trackId — concurrent deduplication', () => {
 
     expect(res1.status).toBe(200);
     expect(res2.status).toBe(200);
+    expect(mockState.callCount).toBe(1);
+  });
+});
+
+describe('GET /api/stream/:trackId — streamTranscoded fast-path', () => {
+  const TRACK_ID = 40;
+  const FILE_ID = 400;
+
+  it('streams transcoded output to the client immediately (200, no Content-Length)', async () => {
+    fs.writeFileSync(path.join(fixtureDir, 'stream-fast.flac'), Buffer.alloc(512));
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'stream-fast.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}?bitrate=128`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/audio\/mpeg/);
+    expect(res.headers['accept-ranges']).toBe('none');
+    // No Content-Length header for streaming response.
+    expect(res.headers['content-length']).toBeUndefined();
+    expect(mockState.callCount).toBe(1);
+  });
+
+  it('serves from disk cache on second request without re-running ffmpeg', async () => {
+    fs.writeFileSync(path.join(fixtureDir, 'stream-cached2.flac'), Buffer.alloc(512));
+    const flacPath = path.join(fixtureDir, 'stream-cached2.flac');
+
+    stubLidarr(TRACK_ID, FILE_ID, flacPath);
+    await request(app)
+      .get(`/api/stream/${TRACK_ID}?bitrate=128`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(mockState.callCount).toBe(1);
+
+    // Second request — temp file now exists on disk.
+    stubLidarr(TRACK_ID, FILE_ID, flacPath);
+    const res2 = await request(app)
+      .get(`/api/stream/${TRACK_ID}?bitrate=128`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res2.status).toBe(200);
+    expect(mockState.callCount).toBe(1); // no new ffmpeg invocation
+  });
+
+  it('falls back to blocking ensureTranscoded path for non-trivial Range header', async () => {
+    fs.writeFileSync(path.join(fixtureDir, 'stream-range.flac'), Buffer.alloc(512));
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'stream-range.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}?bitrate=128`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Range', 'bytes=100-511');
+
+    // Blocking path writes the file then serves with Range support.
+    expect(res.status).toBe(206);
+    expect(res.headers['content-range']).toMatch(/^bytes 100-511\//);
+    expect(mockState.callCount).toBe(1);
+  });
+
+  it('uses the streaming fast-path for open bytes=0- Range (libmpv probe)', async () => {
+    fs.writeFileSync(path.join(fixtureDir, 'stream-probe.flac'), Buffer.alloc(512));
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'stream-probe.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}?bitrate=128`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Range', 'bytes=0-');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['accept-ranges']).toBe('none');
     expect(mockState.callCount).toBe(1);
   });
 });
