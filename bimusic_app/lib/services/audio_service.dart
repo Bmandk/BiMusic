@@ -36,6 +36,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   Future<void> updateToken(String newToken) async {
     _accessToken = newToken;
     if (_tracks.isEmpty) return;
+    final wasPlaying = _player.playing;
     final index = _player.currentIndex ?? 0;
     final position = _player.position;
     final playlist = ConcatenatingAudioSource(
@@ -46,6 +47,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
       initialIndex: index,
       initialPosition: position,
     );
+    if (wasPlaying) await _player.play();
   }
 
   Future<void> _init() async {

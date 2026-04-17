@@ -198,12 +198,7 @@ void main() {
     expect(find.text('Test Song'), findsOneWidget);
   });
 
-  testWidgets('shows volume control on desktop-sized window', (tester) async {
-    tester.view.physicalSize = const Size(1400, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
+  testWidgets('shows volume control on desktop platform', (tester) async {
     const state = PlayerState(
       currentTrack: _testTrack,
       isPlaying: true,
@@ -211,7 +206,7 @@ void main() {
     );
     await tester.pumpWidget(buildSubject(state));
     await tester.pump();
-    // Volume icon and slider should be present (platform is Windows/Linux/macOS in CI)
+    // Volume control is shown on desktop/web (flutter test runs on desktop platform)
     expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
     expect(find.byType(Slider), findsOneWidget);
   });

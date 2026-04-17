@@ -122,13 +122,18 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> _backgroundRefresh() async {
     final svc = ref.read(authServiceProvider);
-    final refreshed = await svc.refresh();
-    if (refreshed != null) {
-      state = AuthStateAuthenticated(refreshed);
-      _scheduleTokenRefresh(refreshed);
-    } else {
-      await svc.clearTokens();
-      state = const AuthStateUnauthenticated();
+    try {
+      final refreshed = await svc.refresh();
+      if (refreshed != null) {
+        state = AuthStateAuthenticated(refreshed);
+        _scheduleTokenRefresh(refreshed);
+      } else {
+        await svc.clearTokens();
+        state = const AuthStateUnauthenticated();
+      }
+    } catch (_) {
+      // Network error — retry in 30 s rather than logging the user out.
+      _refreshTimer = Timer(const Duration(seconds: 30), _backgroundRefresh);
     }
   }
 }
