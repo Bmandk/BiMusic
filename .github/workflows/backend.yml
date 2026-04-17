@@ -70,7 +70,7 @@ jobs:
     name: Deploy Backend
     if: github.event_name == 'push'
     needs: [integration]
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64]
     env:
       PM2_HOME: /etc/.pm2
     defaults:
@@ -90,3 +90,6 @@ jobs:
           pm2 delete bimusic-backend 2>/dev/null || true
           pm2 start dist/index.js --name bimusic-backend
           pm2 save
+      - name: Cleanup env file
+        if: always()
+        run: rm -f .env
