@@ -29,6 +29,8 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   Stream<Duration?> get durationStream => _player.durationStream;
   List<Track> get currentTracks => List.unmodifiable(_tracks);
 
+  Future<void> setVolume(double v) => _player.setVolume(v.clamp(0.0, 1.0));
+
   Future<void> _init() async {
     try {
       final session = await AudioSession.instance;

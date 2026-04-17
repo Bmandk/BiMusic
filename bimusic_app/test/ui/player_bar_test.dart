@@ -42,6 +42,8 @@ class _FakePlayerNotifier extends Notifier<PlayerState>
   @override Future<void> skipPrev() async {}
   @override Future<void> setRepeat(AudioServiceRepeatMode m) async {}
   @override Future<void> toggleShuffle() async {}
+  @override Future<void> setVolume(double v) async {}
+  @override Future<void> toggleMute() async {}
 }
 
 void main() {
@@ -194,5 +196,45 @@ void main() {
     await tester.pump();
     // Track title still shows
     expect(find.text('Test Song'), findsOneWidget);
+  });
+
+  testWidgets('shows volume control on desktop-sized window', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      volume: 1.0,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    // Volume icon and slider should be present (platform is Windows/Linux/macOS in CI)
+    expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+  });
+
+  testWidgets('volume icon reflects muted state', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      volume: 0.0,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
+  });
+
+  testWidgets('volume icon reflects low volume state', (tester) async {
+    const state = PlayerState(
+      currentTrack: _testTrack,
+      isPlaying: true,
+      volume: 0.3,
+    );
+    await tester.pumpWidget(buildSubject(state));
+    await tester.pump();
+    expect(find.byIcon(Icons.volume_down_rounded), findsOneWidget);
   });
 }

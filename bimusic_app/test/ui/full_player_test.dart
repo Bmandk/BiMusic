@@ -42,6 +42,8 @@ class _FakePlayerNotifier extends Notifier<PlayerState>
   @override Future<void> skipPrev() async {}
   @override Future<void> setRepeat(AudioServiceRepeatMode m) async {}
   @override Future<void> toggleShuffle() async {}
+  @override Future<void> setVolume(double v) async {}
+  @override Future<void> toggleMute() async {}
 }
 
 void main() {
