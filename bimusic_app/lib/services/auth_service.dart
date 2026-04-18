@@ -7,20 +7,20 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/api_config.dart';
 import '../models/auth_tokens.dart';
 import '../models/user.dart';
+import '../providers/backend_url_provider.dart';
 
 class AuthService {
-  AuthService(this._storage);
+  AuthService(this._storage, String baseUrl)
+      : _dio = Dio(
+          BaseOptions(
+            baseUrl: baseUrl,
+            connectTimeout: ApiConfig.connectTimeout,
+            receiveTimeout: ApiConfig.receiveTimeout,
+          ),
+        );
 
   final FlutterSecureStorage _storage;
-
-  // Separate Dio instance for auth endpoints — never goes through AuthInterceptor.
-  late final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: ApiConfig.connectTimeout,
-      receiveTimeout: ApiConfig.receiveTimeout,
-    ),
-  );
+  final Dio _dio;
 
   String? _accessToken;
 
@@ -135,5 +135,6 @@ class AuthService {
 }
 
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService(const FlutterSecureStorage());
+  final url = ref.watch(backendUrlProvider).valueOrNull ?? '';
+  return AuthService(const FlutterSecureStorage(), url);
 });

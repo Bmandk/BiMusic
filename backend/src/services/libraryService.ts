@@ -1,7 +1,6 @@
 import type { AxiosResponse } from "axios";
 import type { Readable } from "stream";
 import * as lidarrClient from "./lidarrClient.js";
-import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import type {
   LidarrArtist,
@@ -27,7 +26,7 @@ function shapeArtist(a: LidarrArtist, albumCount: number): Artist {
     id: a.id,
     name: a.artistName ?? "Unknown Artist",
     overview: a.overview,
-    imageUrl: `${env.API_BASE_URL}/api/library/artists/${a.id}/image`,
+    imageUrl: `/api/library/artists/${a.id}/image`,
     albumCount,
   };
 }
@@ -38,7 +37,7 @@ function shapeAlbum(a: LidarrAlbum, trackCount: number): Album {
     title: a.title ?? "Unknown Album",
     artistId: a.artistId,
     artistName: a.artist?.artistName ?? "Unknown Artist",
-    imageUrl: `${env.API_BASE_URL}/api/library/albums/${a.id}/image`,
+    imageUrl: `/api/library/albums/${a.id}/image`,
     releaseDate: a.releaseDate,
     genres: a.genres ?? [],
     trackCount,
@@ -55,7 +54,7 @@ function shapeTrack(t: LidarrTrack): Track {
     albumId: t.albumId,
     artistId: t.artistId,
     hasFile: t.hasFile,
-    streamUrl: `${env.API_BASE_URL}/api/stream/${t.id}`,
+    streamUrl: `/api/stream/${t.id}`,
   };
 }
 

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/backend_url_provider.dart';
 import '../../providers/library_provider.dart';
 import '../../services/auth_service.dart';
+import '../../utils/url_resolver.dart';
 import '../layouts/breakpoints.dart';
 import '../widgets/album_card.dart';
 
@@ -19,6 +21,10 @@ class ArtistDetailScreen extends ConsumerWidget {
     final artistAsync = ref.watch(artistProvider(artistId));
     final albumsAsync = ref.watch(artistAlbumsProvider(artistId));
     final token = ref.watch(authServiceProvider).accessToken;
+    final base = ref.watch(backendUrlProvider).valueOrNull;
+    if (base == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -49,7 +55,7 @@ class ArtistDetailScreen extends ConsumerWidget {
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(artist.name),
                 background: CachedNetworkImage(
-                  imageUrl: artist.imageUrl,
+                  imageUrl: resolveBackendUrl(base, artist.imageUrl),
                   httpHeaders: headers,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => ColoredBox(

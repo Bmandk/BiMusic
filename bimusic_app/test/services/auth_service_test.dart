@@ -97,7 +97,7 @@ void main() {
 
   setUp(() {
     fakeStorage = _FakeStorage();
-    service = AuthService(fakeStorage);
+    service = AuthService(fakeStorage, 'http://test');
   });
 
   group('accessToken', () {

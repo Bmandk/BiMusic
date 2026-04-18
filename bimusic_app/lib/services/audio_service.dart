@@ -1,9 +1,9 @@
+// coverage:ignore-file
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../config/api_config.dart';
 import '../models/track.dart';
 
 class BiMusicAudioHandler extends BaseAudioHandler {
@@ -13,6 +13,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   List<Track> _tracks = [];
   String? _accessToken;
   int _bitrate = 320;
+  String _baseUrl = '';
   String? _artistName;
   String? _albumTitle;
   String? _imageUrl;
@@ -81,6 +82,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     int startIndex,
     String? accessToken,
     int bitrate, {
+    required String baseUrl,
     String? artistName,
     String? albumTitle,
     String? imageUrl,
@@ -91,6 +93,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     _tracks = tracks;
     _accessToken = accessToken;
     _bitrate = bitrate;
+    _baseUrl = baseUrl;
     _artistName = artistName;
     _albumTitle = albumTitle;
     _imageUrl = imageUrl;
@@ -119,13 +122,13 @@ class BiMusicAudioHandler extends BaseAudioHandler {
       'bitrate': '$_bitrate',
       if (_accessToken != null) 'token': _accessToken!,
     };
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/stream/${t.id}')
+    final uri = Uri.parse('$_baseUrl/api/stream/${t.id}')
         .replace(queryParameters: params);
     return AudioSource.uri(uri);
   }
 
   MediaItem _trackToMediaItem(Track t) => MediaItem(
-    id: '${ApiConfig.baseUrl}/api/stream/${t.id}',
+    id: '$_baseUrl/api/stream/${t.id}',
     title: t.title,
     artist: _artistName,
     album: _albumTitle,

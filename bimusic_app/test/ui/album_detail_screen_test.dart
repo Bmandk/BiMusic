@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:bimusic_app/models/album.dart';
 import 'package:bimusic_app/models/download_task.dart';
 import 'package:bimusic_app/models/track.dart';
+import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/download_provider.dart';
 import 'package:bimusic_app/providers/library_provider.dart';
 import 'package:bimusic_app/providers/player_provider.dart';
@@ -17,6 +18,15 @@ import 'package:mocktail/mocktail.dart';
 class _MockAuthService extends Mock implements AuthService {}
 
 class _MockAudioHandler extends Mock implements BiMusicAudioHandler {}
+
+class _StubBackendUrlNotifier extends BackendUrlNotifier {
+  @override
+  Future<String?> build() async => 'http://test';
+  @override
+  Future<void> setUrl(String raw) async {}
+  @override
+  Future<void> clearUrl() async {}
+}
 
 class _StubDownloadNotifier extends DownloadNotifier {
   _StubDownloadNotifier([this._tasks = const []]);
@@ -144,6 +154,7 @@ void main() {
   }) =>
       ProviderScope(
         overrides: [
+          backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
           authServiceProvider.overrideWith((_) => mockAuthService),
           albumProvider(album.id).overrideWith((_) async => album),
           albumTracksProvider(album.id)
@@ -185,6 +196,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
           authServiceProvider.overrideWith((_) => mockAuthService),
           albumProvider(1).overrideWith((_) async => throw Exception('fail')),
           albumTracksProvider(1)
@@ -206,6 +218,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
           authServiceProvider.overrideWith((_) => mockAuthService),
           albumProvider(1).overrideWith((_) async => _testAlbum),
           albumTracksProvider(1)
