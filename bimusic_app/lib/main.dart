@@ -1,3 +1,4 @@
+// coverage:ignore-file
 import 'dart:io' show Platform;
 
 import 'package:audio_service/audio_service.dart';
