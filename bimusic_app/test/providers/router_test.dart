@@ -157,23 +157,50 @@ void main() {
 
   group('routerProvider redirect — unauthenticated', () {
     testWidgets('redirects to /login when not authenticated', (tester) async {
+      late GoRouter capturedRouter;
       await tester.pumpWidget(
-        _buildRouter(const AuthStateUnauthenticated(), handler, authService),
+        ProviderScope(
+          overrides: _baseOverrides(
+            const AuthStateUnauthenticated(),
+            handler,
+            authService,
+          ),
+          child: Consumer(builder: (context, ref, _) {
+            capturedRouter = ref.watch(routerProvider);
+            return MaterialApp.router(routerConfig: capturedRouter);
+          }),
+        ),
       );
       await tester.pumpAndSettle();
 
-      // The router starts at /login; LoginScreen shows "BiMusic".
-      expect(find.text('BiMusic'), findsOneWidget);
+      expect(
+        capturedRouter.routeInformationProvider.value.uri.path,
+        '/login',
+      );
     });
 
     testWidgets('stays on /login when already on login route', (tester) async {
+      late GoRouter capturedRouter;
       await tester.pumpWidget(
-        _buildRouter(const AuthStateUnauthenticated(), handler, authService),
+        ProviderScope(
+          overrides: _baseOverrides(
+            const AuthStateUnauthenticated(),
+            handler,
+            authService,
+          ),
+          child: Consumer(builder: (context, ref, _) {
+            capturedRouter = ref.watch(routerProvider);
+            return MaterialApp.router(routerConfig: capturedRouter);
+          }),
+        ),
       );
       await tester.pumpAndSettle();
 
-      // No redirect loop — still showing login.
-      expect(find.text('BiMusic'), findsOneWidget);
+      // No redirect loop — still on /login.
+      expect(
+        capturedRouter.routeInformationProvider.value.uri.path,
+        '/login',
+      );
     });
   });
 
@@ -192,17 +219,27 @@ void main() {
   group('routerProvider redirect — authenticated', () {
     testWidgets('redirects away from /login when authenticated',
         (tester) async {
+      late GoRouter capturedRouter;
       await tester.pumpWidget(
-        _buildRouter(
-          const AuthStateAuthenticated(_testTokens),
-          handler,
-          authService,
+        ProviderScope(
+          overrides: _baseOverrides(
+            const AuthStateAuthenticated(_testTokens),
+            handler,
+            authService,
+          ),
+          child: Consumer(builder: (context, ref, _) {
+            capturedRouter = ref.watch(routerProvider);
+            return MaterialApp.router(routerConfig: capturedRouter);
+          }),
         ),
       );
       await tester.pumpAndSettle();
 
-      // Authenticated users at /login redirect to /home.
-      expect(find.text('Home'), findsAtLeastNWidgets(1));
+      // Authenticated users at /login are redirected to /home.
+      expect(
+        capturedRouter.routeInformationProvider.value.uri.path,
+        '/home',
+      );
     });
   });
 
