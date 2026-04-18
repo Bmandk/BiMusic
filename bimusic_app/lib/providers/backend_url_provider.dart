@@ -22,10 +22,20 @@ String normalizeBackendUrl(String raw) {
 class BackendUrlNotifier extends AsyncNotifier<String?> {
   static const _kStorageKey = 'bimusic_backend_url';
 
+  @visibleForTesting
+  FlutterSecureStorage buildStorage() => const FlutterSecureStorage();
+
+  @visibleForTesting
+  Dio Function() dioFactory = () => Dio(
+        BaseOptions(
+          connectTimeout: ApiConfig.connectTimeout,
+          receiveTimeout: ApiConfig.receiveTimeout,
+        ),
+      );
+
   @override
   Future<String?> build() async {
-    const storage = FlutterSecureStorage();
-    return storage.read(key: _kStorageKey);
+    return buildStorage().read(key: _kStorageKey);
   }
 
   /// Validates [raw] by pinging its /api/health endpoint, then persists it.
@@ -33,12 +43,7 @@ class BackendUrlNotifier extends AsyncNotifier<String?> {
   Future<void> setUrl(String raw) async {
     final normalized = normalizeBackendUrl(raw);
 
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: ApiConfig.connectTimeout,
-        receiveTimeout: ApiConfig.receiveTimeout,
-      ),
-    );
+    final dio = dioFactory();
     try {
       final response = await dio.get<dynamic>('$normalized/api/health');
       if (response.statusCode == null || response.statusCode! >= 400) {
@@ -55,17 +60,14 @@ class BackendUrlNotifier extends AsyncNotifier<String?> {
       dio.close();
     }
 
-    const storage = FlutterSecureStorage();
-    await storage.write(key: _kStorageKey, value: normalized);
+    await buildStorage().write(key: _kStorageKey, value: normalized);
     state = AsyncData(normalized);
   }
 
   Future<void> clearUrl() async {
-    const storage = FlutterSecureStorage();
-    await storage.delete(key: _kStorageKey);
+    await buildStorage().delete(key: _kStorageKey);
     state = const AsyncData(null);
   }
-
 }
 
 final backendUrlProvider =

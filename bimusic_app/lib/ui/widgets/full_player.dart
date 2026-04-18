@@ -30,7 +30,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final positionAsync = ref.watch(playerPositionProvider);
     final durationAsync = ref.watch(playerDurationProvider);
     final token = ref.watch(authServiceProvider).accessToken;
-    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
+    final base = ref.watch(backendUrlProvider).valueOrNull;
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -97,7 +97,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                       aspectRatio: 1,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: playerState.imageUrl != null
+                        child: playerState.imageUrl != null && base != null
                             ? CachedNetworkImage(
                                 imageUrl: resolveBackendUrl(base, playerState.imageUrl!),
                                 httpHeaders: headers,

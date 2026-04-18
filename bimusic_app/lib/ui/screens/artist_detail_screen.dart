@@ -21,7 +21,10 @@ class ArtistDetailScreen extends ConsumerWidget {
     final artistAsync = ref.watch(artistProvider(artistId));
     final albumsAsync = ref.watch(artistAlbumsProvider(artistId));
     final token = ref.watch(authServiceProvider).accessToken;
-    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
+    final base = ref.watch(backendUrlProvider).valueOrNull;
+    if (base == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};

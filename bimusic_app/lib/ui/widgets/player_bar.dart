@@ -60,7 +60,7 @@ class PlayerBar extends ConsumerWidget {
 
     final track = playerState.currentTrack!;
     final token = ref.watch(authServiceProvider).accessToken;
-    final base = ref.watch(backendUrlProvider).valueOrNull ?? '';
+    final base = ref.watch(backendUrlProvider).valueOrNull;
     final headers = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : <String, String>{};
@@ -85,7 +85,7 @@ class PlayerBar extends ConsumerWidget {
             child: Row(
               children: [
                 // Album art thumbnail
-                if (playerState.imageUrl != null)
+                if (playerState.imageUrl != null && base != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: CachedNetworkImage(

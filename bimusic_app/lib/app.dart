@@ -45,12 +45,14 @@ class BiMusicApp extends ConsumerWidget {
             ),
     );
 
+    // coverage:ignore-start
     // Work around a Flutter Windows accessibility bridge bug where
     // OverlayPortal semantics nodes get reparented on any tree change,
     // causing "Failed to update ui::AXTree" errors in the engine.
     if (!kIsWeb && Platform.isWindows) {
       app = ExcludeSemantics(child: app);
     }
+    // coverage:ignore-end
 
     return app;
   }

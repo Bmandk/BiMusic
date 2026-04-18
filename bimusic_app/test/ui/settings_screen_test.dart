@@ -8,6 +8,7 @@ import 'package:bimusic_app/models/auth_tokens.dart';
 import 'package:bimusic_app/models/track.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/providers/auth_provider.dart';
+import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/bitrate_preference_provider.dart';
 import 'package:bimusic_app/providers/download_provider.dart';
 import 'package:bimusic_app/providers/player_provider.dart';
@@ -93,6 +94,29 @@ class _StubPlayerNotifier extends Notifier<PlayerState>
   Future<void> toggleMute() async {}
 }
 
+class _StubBackendUrlNotifier extends BackendUrlNotifier {
+  _StubBackendUrlNotifier({this.throwOnSet, String? url}) : _url = url;
+
+  final Object? throwOnSet;
+  final String? _url;
+  String? lastSetUrl;
+
+  @override
+  Future<String?> build() async => _url;
+
+  @override
+  Future<void> setUrl(String raw) async {
+    lastSetUrl = raw;
+    if (throwOnSet != null) throw throwOnSet!;
+    state = AsyncData(raw);
+  }
+
+  @override
+  Future<void> clearUrl() async {
+    state = const AsyncData(null);
+  }
+}
+
 class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
   _StubBitratePreferenceNotifier([this._pref = BitratePreference.auto]);
   final BitratePreference _pref;
@@ -115,6 +139,7 @@ Widget _buildSubject({
   BitratePreference bitratePref = BitratePreference.auto,
   _MockAuthService? authService,
   _MockAudioHandler? handler,
+  _StubBackendUrlNotifier? backendUrlNotifier,
 }) {
   final mockAuth = authService ?? _MockAuthService();
   final mockHandler = handler ?? _MockAudioHandler();
@@ -130,6 +155,8 @@ Widget _buildSubject({
       playerNotifierProvider.overrideWith(() => _StubPlayerNotifier()),
       bitratePreferenceProvider
           .overrideWith(() => _StubBitratePreferenceNotifier(bitratePref)),
+      backendUrlProvider.overrideWith(
+          () => backendUrlNotifier ?? _StubBackendUrlNotifier()),
     ],
     child: const MaterialApp(home: SettingsScreen()),
   );
@@ -330,5 +357,68 @@ void main() {
     await tester.pump();
     expect(find.text('Crossfade'), findsOneWidget);
     expect(find.text('Coming soon'), findsOneWidget);
+  });
+
+  group('_EditBackendUrlDialog', () {
+    Future<void> openDialog(WidgetTester tester,
+        {_StubBackendUrlNotifier? stub}) async {
+      await tester.pumpWidget(
+          _buildSubject(backendUrlNotifier: stub ?? _StubBackendUrlNotifier()));
+      await tester.pump();
+      // Scroll to the About section where the Backend URL tile lives.
+      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      await tester.pump();
+      await tester.tap(find.text('Backend URL'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('tapping Backend URL tile opens edit dialog', (tester) async {
+      await openDialog(tester);
+      expect(find.text('Backend URL'), findsWidgets);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
+    });
+
+    testWidgets('Cancel closes the dialog', (tester) async {
+      await openDialog(tester);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Save'), findsNothing);
+    });
+
+    testWidgets('shows error when URL is empty and Save is tapped',
+        (tester) async {
+      await openDialog(tester);
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Please enter a URL.'), findsOneWidget);
+    });
+
+    testWidgets('shows error message returned by notifier on failure',
+        (tester) async {
+      final stub =
+          _StubBackendUrlNotifier(throwOnSet: 'Could not reach server');
+      await openDialog(tester, stub: stub);
+      await tester.enterText(find.byType(TextField), 'http://bad');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.text('Could not reach server'), findsOneWidget);
+    });
+
+    testWidgets('successful save dismisses dialog and triggers logout',
+        (tester) async {
+      final stub = _StubBackendUrlNotifier();
+      await openDialog(tester, stub: stub);
+      await tester.enterText(find.byType(TextField), 'http://newhost:3000');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(stub.lastSetUrl, 'http://newhost:3000');
+      // Dialog should be dismissed.
+      expect(find.text('Save'), findsNothing);
+    });
   });
 }

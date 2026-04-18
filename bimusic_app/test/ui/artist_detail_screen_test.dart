@@ -5,11 +5,21 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:bimusic_app/models/album.dart';
 import 'package:bimusic_app/models/artist.dart';
+import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/library_provider.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 import 'package:bimusic_app/ui/screens/artist_detail_screen.dart';
 
 class _MockAuthService extends Mock implements AuthService {}
+
+class _StubBackendUrlNotifier extends BackendUrlNotifier {
+  @override
+  Future<String?> build() async => 'http://test';
+  @override
+  Future<void> setUrl(String raw) async {}
+  @override
+  Future<void> clearUrl() async {}
+}
 
 const _testArtist = Artist(
   id: 1,
@@ -43,6 +53,7 @@ void main() {
 
   Widget buildSubject() => ProviderScope(
         overrides: [
+          backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
           authServiceProvider.overrideWith((_) => mockAuthService),
           artistProvider(1).overrideWith((_) async => _testArtist),
           artistAlbumsProvider(1).overrideWith((_) async => _testAlbums),

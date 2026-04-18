@@ -1,3 +1,4 @@
+// coverage:ignore-file
 class Breakpoints {
   const Breakpoints._();
 
