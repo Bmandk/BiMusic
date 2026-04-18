@@ -83,26 +83,87 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('normalizeBackendUrl', () {
-    test('accepts http URL', () {
-      expect(normalizeBackendUrl('http://example.com'), 'http://example.com');
+    test('accepts http with loopback 127.0.0.1', () {
+      expect(normalizeBackendUrl('http://127.0.0.1'), 'http://127.0.0.1');
     });
 
-    test('accepts https URL', () {
+    test('accepts http with localhost', () {
+      expect(normalizeBackendUrl('http://localhost'), 'http://localhost');
+    });
+
+    test('accepts http with 10.x.x.x', () {
+      expect(normalizeBackendUrl('http://10.0.0.1'), 'http://10.0.0.1');
+    });
+
+    test('accepts http with 172.16.x.x', () {
+      expect(normalizeBackendUrl('http://172.16.0.1'), 'http://172.16.0.1');
+    });
+
+    test('accepts http with 172.31.x.x', () {
+      expect(normalizeBackendUrl('http://172.31.255.1'), 'http://172.31.255.1');
+    });
+
+    test('accepts http with 192.168.x.x', () {
+      expect(
+        normalizeBackendUrl('http://192.168.1.1'),
+        'http://192.168.1.1',
+      );
+    });
+
+    test('accepts https URL with public host', () {
       expect(normalizeBackendUrl('https://example.com'), 'https://example.com');
     });
 
+    test('rejects http with public hostname', () {
+      expect(
+        () => normalizeBackendUrl('http://example.com'),
+        throwsA(isA<String>()),
+      );
+    });
+
+    test('rejects http with non-private public IP', () {
+      expect(
+        () => normalizeBackendUrl('http://203.0.113.1'),
+        throwsA(isA<String>()),
+      );
+    });
+
+    test('rejects http with hostnames that only start with private IP prefixes', () {
+      // Regression: prefix-only regex would allow these bypasses.
+      expect(() => normalizeBackendUrl('http://10.example.com'),
+          throwsA(isA<String>()));
+      expect(() => normalizeBackendUrl('http://172.16.attacker.tld'),
+          throwsA(isA<String>()));
+      expect(() => normalizeBackendUrl('http://192.168.bad.tld'),
+          throwsA(isA<String>()));
+    });
+
+    test('throws String for malformed URL with unclosed IPv6 bracket', () {
+      expect(
+        () => normalizeBackendUrl('http://[::1'),
+        throwsA(isA<String>()),
+      );
+    });
+
     test('strips trailing slash', () {
-      expect(normalizeBackendUrl('http://example.com/'), 'http://example.com');
+      expect(
+        normalizeBackendUrl('http://192.168.1.1/'),
+        'http://192.168.1.1',
+      );
     });
 
     test('strips multiple trailing slashes', () {
       expect(
-          normalizeBackendUrl('http://example.com///'), 'http://example.com');
+        normalizeBackendUrl('http://192.168.1.1///'),
+        'http://192.168.1.1',
+      );
     });
 
     test('trims leading/trailing whitespace', () {
       expect(
-          normalizeBackendUrl('  http://example.com  '), 'http://example.com');
+        normalizeBackendUrl('  http://192.168.1.1  '),
+        'http://192.168.1.1',
+      );
     });
 
     test('preserves path and port', () {
@@ -217,12 +278,12 @@ void main() {
       final notifier = container.read(backendUrlProvider.notifier)
           as _TestableBackendUrlNotifier;
 
-      await notifier.setUrl('http://host:3000/');
+      await notifier.setUrl('http://192.168.1.1:3000/');
 
       final state = container.read(backendUrlProvider);
-      expect(state.value, 'http://host:3000');
+      expect(state.value, 'http://192.168.1.1:3000');
       expect(notifier.buildStorage()._store['bimusic_backend_url'],
-          'http://host:3000');
+          'http://192.168.1.1:3000');
     });
 
     test('setUrl throws when server returns 500', () async {
@@ -238,7 +299,7 @@ void main() {
       final notifier = container.read(backendUrlProvider.notifier);
 
       await expectLater(
-        () => notifier.setUrl('http://bad-server'),
+        () => notifier.setUrl('http://192.168.1.1'),
         throwsA('Server returned 500'),
       );
     });
@@ -256,7 +317,7 @@ void main() {
       final notifier = container.read(backendUrlProvider.notifier);
 
       await expectLater(
-        () => notifier.setUrl('http://unreachable'),
+        () => notifier.setUrl('http://192.168.1.1'),
         throwsA('Connection timed out. Check the URL and try again.'),
       );
     });
@@ -275,7 +336,7 @@ void main() {
       final notifier = container.read(backendUrlProvider.notifier);
 
       await expectLater(
-        () => notifier.setUrl('http://unreachable'),
+        () => notifier.setUrl('http://192.168.1.1'),
         throwsA('Could not reach server: connection refused'),
       );
     });
