@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bimusic_app/models/update_info.dart';
 import 'package:bimusic_app/providers/update_provider.dart';
+import 'package:bimusic_app/services/update_installer.dart' show canSelfUpdateProvider;
 import 'package:bimusic_app/ui/dialogs/update_available_dialog.dart';
 
 // ---------------------------------------------------------------------------
@@ -62,9 +63,11 @@ const _testInfo = UpdateInfo(
   windowsAssetUrl: 'https://example.com/bimusic.zip',
 );
 
-Widget _buildDialog(_StubUpdateNotifier stub) => ProviderScope(
+Widget _buildDialog(_StubUpdateNotifier stub, {bool canSelfUpdate = false}) =>
+    ProviderScope(
       overrides: [
         updateProvider.overrideWith(() => stub),
+        canSelfUpdateProvider.overrideWithValue(canSelfUpdate),
       ],
       child: const MaterialApp(
         home: Scaffold(
@@ -142,7 +145,7 @@ void main() {
     testWidgets('tapping Install calls installNow on the notifier',
         (tester) async {
       final stub = _StubUpdateNotifier(const UpdateAvailable(_testInfo));
-      await tester.pumpWidget(_buildDialog(stub));
+      await tester.pumpWidget(_buildDialog(stub, canSelfUpdate: true));
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 

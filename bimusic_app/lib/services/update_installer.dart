@@ -238,3 +238,9 @@ final updateInstallerProvider = Provider<UpdateInstaller>((ref) {
   if (Platform.isWindows) return WindowsUpdateInstaller(dio);
   return const UnsupportedUpdateInstaller();
 });
+
+/// Whether this platform supports self-update (download + install in-app).
+/// Overridable in tests to exercise the Install code path on Linux CI.
+final canSelfUpdateProvider = Provider<bool>(
+  (_) => !kIsWeb && (Platform.isAndroid || Platform.isWindows),
+);

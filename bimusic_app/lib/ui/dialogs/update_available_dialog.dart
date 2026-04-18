@@ -1,12 +1,10 @@
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/update_info.dart';
 import '../../providers/update_provider.dart';
+import '../../services/update_installer.dart' show canSelfUpdateProvider;
 
 class UpdateAvailableDialog extends ConsumerStatefulWidget {
   const UpdateAvailableDialog({super.key, required this.info});
@@ -156,8 +154,7 @@ class _UpdateAvailableDialogState extends ConsumerState<UpdateAvailableDialog> {
       ];
     }
 
-    final canSelfUpdate =
-        !kIsWeb && (Platform.isAndroid || Platform.isWindows);
+    final canSelfUpdate = ref.watch(canSelfUpdateProvider);
 
     return [
       TextButton(
