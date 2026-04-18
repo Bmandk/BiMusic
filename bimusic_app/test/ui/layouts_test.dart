@@ -83,6 +83,8 @@ class _StubPlayerNotifier extends Notifier<PlayerState>
 List<Override> _overrides(_MockAudioHandler handler) => [
       audioHandlerProvider.overrideWithValue(handler),
       playerNotifierProvider.overrideWith(() => _StubPlayerNotifier()),
+      playerPositionProvider.overrideWith((_) => Stream.value(Duration.zero)),
+      playerDurationProvider.overrideWith((_) => Stream.value(null)),
     ];
 
 // ---------------------------------------------------------------------------
