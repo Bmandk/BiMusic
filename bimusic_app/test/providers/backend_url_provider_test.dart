@@ -128,6 +128,23 @@ void main() {
       );
     });
 
+    test('rejects http with hostnames that only start with private IP prefixes', () {
+      // Regression: prefix-only regex would allow these bypasses.
+      expect(() => normalizeBackendUrl('http://10.example.com'),
+          throwsA(isA<String>()));
+      expect(() => normalizeBackendUrl('http://172.16.attacker.tld'),
+          throwsA(isA<String>()));
+      expect(() => normalizeBackendUrl('http://192.168.bad.tld'),
+          throwsA(isA<String>()));
+    });
+
+    test('throws String for malformed URL with unclosed IPv6 bracket', () {
+      expect(
+        () => normalizeBackendUrl('http://[::1'),
+        throwsA(isA<String>()),
+      );
+    });
+
     test('strips trailing slash', () {
       expect(
         normalizeBackendUrl('http://192.168.1.1/'),

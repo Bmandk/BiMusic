@@ -5,11 +5,20 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../config/api_config.dart';
 
+// Strict IPv4 pattern — all four groups must be purely numeric digits so that
+// hostnames like "10.example.com" are never mistaken for private IPs.
+final _ipv4 = RegExp(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$');
+
 bool _isPrivateHost(String host) {
-  if (host == 'localhost' || host == '127.0.0.1' || host == '::1') return true;
-  if (RegExp(r'^10\.').hasMatch(host)) return true;
-  if (RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(host)) return true;
-  if (RegExp(r'^192\.168\.').hasMatch(host)) return true;
+  if (host == 'localhost' || host == '::1') return true;
+  final m = _ipv4.firstMatch(host);
+  if (m == null) return false;
+  final a = int.parse(m.group(1)!);
+  final b = int.parse(m.group(2)!);
+  if (a == 127) return true;                        // 127.0.0.0/8 loopback
+  if (a == 10) return true;                         // 10.0.0.0/8
+  if (a == 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
+  if (a == 192 && b == 168) return true;             // 192.168.0.0/16
   return false;
 }
 
@@ -26,8 +35,16 @@ String normalizeBackendUrl(String raw) {
   while (url.endsWith('/')) {
     url = url.substring(0, url.length - 1);
   }
-  if (url.startsWith('http://') && !_isPrivateHost(Uri.parse(url).host)) {
-    throw 'HTTP is only allowed for local/private addresses (e.g. 192.168.x.x). Use HTTPS for public hosts.';
+  if (url.startsWith('http://')) {
+    final String host;
+    try {
+      host = Uri.parse(url).host;
+    } on FormatException {
+      throw 'Invalid URL format.';
+    }
+    if (!_isPrivateHost(host)) {
+      throw 'HTTP is only allowed for local/private addresses (e.g. 192.168.x.x). Use HTTPS for public hosts.';
+    }
   }
   return url;
 }
