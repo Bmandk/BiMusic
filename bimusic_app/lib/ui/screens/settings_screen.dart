@@ -8,7 +8,9 @@ import '../../providers/backend_url_provider.dart';
 import '../../providers/bitrate_preference_provider.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/player_provider.dart';
+import '../../providers/update_provider.dart';
 import '../../services/api_client.dart';
+import '../dialogs/update_available_dialog.dart';
 
 // ---------------------------------------------------------------------------
 // Async providers
@@ -486,6 +488,52 @@ class _AboutSection extends ConsumerWidget {
           subtitle: Text(url.isEmpty ? '—' : url),
           trailing: const Icon(Icons.edit_outlined),
           onTap: () => _showEditUrlDialog(context, ref, url),
+        ),
+        Consumer(
+          builder: (context, ref, _) {
+            final updateState = ref.watch(updateProvider);
+            final busy = updateState is UpdateChecking ||
+                updateState is UpdateDownloading;
+            return ListTile(
+              leading: const Icon(Icons.system_update_outlined),
+              title: const Text('Check for Updates'),
+              trailing: busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              onTap: busy
+                  ? null
+                  : () async {
+                      await ref
+                          .read(updateProvider.notifier)
+                          .checkManual();
+                      final s = ref.read(updateProvider);
+                      if (!context.mounted) return;
+                      switch (s) {
+                        case UpdateUpToDate():
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('You are up to date.')),
+                          );
+                        case UpdateError(message: final m):
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Update check failed: $m')),
+                          );
+                        case UpdateAvailable(info: final i):
+                          showDialog<void>(
+                            context: context,
+                            builder: (_) => UpdateAvailableDialog(info: i),
+                          );
+                        default:
+                          break;
+                      }
+                    },
+            );
+          },
         ),
         ListTile(
           leading: const Icon(Icons.gavel_outlined),

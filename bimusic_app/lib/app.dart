@@ -8,6 +8,7 @@ import 'config/theme.dart';
 import 'providers/backend_url_provider.dart';
 import 'router.dart';
 import 'ui/screens/backend_setup_screen.dart';
+import 'ui/widgets/update_launch_listener.dart';
 
 class BiMusicApp extends ConsumerWidget {
   const BiMusicApp({super.key});
@@ -36,12 +37,14 @@ class BiMusicApp extends ConsumerWidget {
               themeMode: ThemeMode.system,
               home: const BackendSetupScreen(),
             )
-          : MaterialApp.router(
-              title: 'BiMusic',
-              theme: AppTheme.light,
-              darkTheme: AppTheme.dark,
-              themeMode: ThemeMode.system,
-              routerConfig: ref.watch(routerProvider),
+          : UpdateLaunchListener(
+              child: MaterialApp.router(
+                title: 'BiMusic',
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark,
+                themeMode: ThemeMode.system,
+                routerConfig: ref.watch(routerProvider),
+              ),
             ),
     );
 

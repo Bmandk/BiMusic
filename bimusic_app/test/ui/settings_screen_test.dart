@@ -12,6 +12,7 @@ import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/bitrate_preference_provider.dart';
 import 'package:bimusic_app/providers/download_provider.dart';
 import 'package:bimusic_app/providers/player_provider.dart';
+import 'package:bimusic_app/providers/update_provider.dart';
 import 'package:bimusic_app/services/audio_service.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 import 'package:bimusic_app/ui/screens/settings_screen.dart';
@@ -120,6 +121,33 @@ class _StubBackendUrlNotifier extends BackendUrlNotifier {
   }
 }
 
+class _StubUpdateNotifier extends Notifier<UpdateState>
+    implements UpdateNotifier {
+  _StubUpdateNotifier([this._initState = const UpdateIdle()]);
+  final UpdateState _initState;
+  int checkManualCalls = 0;
+
+  @override
+  UpdateState build() => _initState;
+
+  @override
+  Future<void> checkOnLaunch() async {}
+
+  @override
+  Future<void> checkManual() async {
+    checkManualCalls++;
+  }
+
+  @override
+  Future<void> installNow() async {}
+
+  @override
+  void cancelDownload() {}
+
+  @override
+  void dismiss() {}
+}
+
 class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
   _StubBitratePreferenceNotifier([this._pref = BitratePreference.auto]);
   final BitratePreference _pref;
@@ -144,6 +172,7 @@ Widget _buildSubject({
   _MockAudioHandler? handler,
   _StubBackendUrlNotifier? backendUrlNotifier,
   _StubAuthNotifier? authNotifier,
+  _StubUpdateNotifier? updateNotifier,
 }) {
   final mockAuth = authService ?? _MockAuthService();
   final mockHandler = handler ?? _MockAudioHandler();
@@ -161,6 +190,8 @@ Widget _buildSubject({
           .overrideWith(() => _StubBitratePreferenceNotifier(bitratePref)),
       backendUrlProvider.overrideWith(
           () => backendUrlNotifier ?? _StubBackendUrlNotifier()),
+      updateProvider.overrideWith(
+          () => updateNotifier ?? _StubUpdateNotifier()),
     ],
     child: const MaterialApp(home: SettingsScreen()),
   );
@@ -430,4 +461,65 @@ void main() {
       expect(authStub.didLogout, isTrue);
     });
   });
+
+  group('Check for Updates tile', () {
+    Future<void> scrollToAbout(WidgetTester tester) async {
+      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      await tester.pump();
+    }
+
+    testWidgets('renders Check for Updates tile in About section',
+        (tester) async {
+      await tester.pumpWidget(_buildSubject());
+      await tester.pump();
+      await scrollToAbout(tester);
+      expect(find.text('Check for Updates'), findsOneWidget);
+    });
+
+    testWidgets('calls checkManual on the notifier when tapped',
+        (tester) async {
+      final updateStub = _StubUpdateNotifier();
+      await tester.pumpWidget(_buildSubject(updateNotifier: updateStub));
+      await tester.pump();
+      await scrollToAbout(tester);
+
+      await tester.tap(find.text('Check for Updates'));
+      await tester.pump();
+
+      expect(updateStub.checkManualCalls, 1);
+    });
+
+    testWidgets('shows spinner and disables tile while checking', (tester) async {
+      final updateStub = _StubUpdateNotifier(const UpdateChecking());
+      await tester.pumpWidget(_buildSubject(updateNotifier: updateStub));
+      await tester.pump();
+      await scrollToAbout(tester);
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('shows You are up to date snackbar when update check returns upToDate',
+        (tester) async {
+      // Use a stub that transitions to UpdateUpToDate when checkManual is called.
+      final updateStub = _UpToDateUpdateNotifier();
+      await tester.pumpWidget(_buildSubject(updateNotifier: updateStub));
+      await tester.pump();
+      await scrollToAbout(tester);
+
+      await tester.tap(find.text('Check for Updates'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('up to date'), findsOneWidget);
+    });
+  });
+}
+
+class _UpToDateUpdateNotifier extends _StubUpdateNotifier {
+  _UpToDateUpdateNotifier() : super(const UpdateIdle());
+
+  @override
+  Future<void> checkManual() async {
+    checkManualCalls++;
+    state = const UpdateUpToDate();
+  }
 }
