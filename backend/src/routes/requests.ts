@@ -142,7 +142,7 @@ router.post(
         metadataProfileId,
         rootFolderPath,
         monitored,
-        addOptions: { searchForMissingAlbums: true, albumsToMonitor: "all" },
+        addOptions: { monitor: "all", searchForMissingAlbums: true },
       });
 
       await lidarrClient.runCommand("ArtistSearch", { artistId: artist.id });
