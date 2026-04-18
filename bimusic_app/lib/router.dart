@@ -1,4 +1,3 @@
-// coverage:ignore-file
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,19 +58,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const LoginScreen(), // coverage:ignore-line
       ),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) => AdaptiveScaffold(
-          navigationShell: navigationShell,
-          child: navigationShell,
-        ),
+        builder: (context, state, navigationShell) => AdaptiveScaffold( // coverage:ignore-line
+          navigationShell: navigationShell, // coverage:ignore-line
+          child: navigationShell, // coverage:ignore-line
+        ), // coverage:ignore-line
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/home',
-                builder: (context, state) => const HomeScreen(),
+                builder: (context, state) => const HomeScreen(), // coverage:ignore-line
               ),
             ],
           ),
@@ -79,19 +78,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/library',
-                builder: (context, state) => const LibraryScreen(),
+                builder: (context, state) => const LibraryScreen(), // coverage:ignore-line
                 routes: [
                   GoRoute(
                     path: 'artist/:id',
-                    builder: (context, state) => ArtistDetailScreen(
-                      id: state.pathParameters['id']!,
-                    ),
+                    builder: (context, state) => ArtistDetailScreen( // coverage:ignore-line
+                      id: state.pathParameters['id']!, // coverage:ignore-line
+                    ), // coverage:ignore-line
                   ),
                   GoRoute(
                     path: 'album/:id',
-                    builder: (context, state) => AlbumDetailScreen(
-                      id: state.pathParameters['id']!,
-                    ),
+                    builder: (context, state) => AlbumDetailScreen( // coverage:ignore-line
+                      id: state.pathParameters['id']!, // coverage:ignore-line
+                    ), // coverage:ignore-line
                   ),
                 ],
               ),
@@ -101,7 +100,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/search',
-                builder: (context, state) => const SearchScreen(),
+                builder: (context, state) => const SearchScreen(), // coverage:ignore-line
               ),
             ],
           ),
@@ -109,13 +108,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/playlists',
-                builder: (context, state) => const PlaylistsScreen(),
+                builder: (context, state) => const PlaylistsScreen(), // coverage:ignore-line
                 routes: [
                   GoRoute(
                     path: ':id',
-                    builder: (context, state) => PlaylistDetailScreen(
-                      id: state.pathParameters['id']!,
-                    ),
+                    builder: (context, state) => PlaylistDetailScreen( // coverage:ignore-line
+                      id: state.pathParameters['id']!, // coverage:ignore-line
+                    ), // coverage:ignore-line
                   ),
                 ],
               ),
@@ -125,7 +124,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/downloads',
-                builder: (context, state) => const DownloadsScreen(),
+                builder: (context, state) => const DownloadsScreen(), // coverage:ignore-line
               ),
             ],
           ),
@@ -133,7 +132,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/settings',
-                builder: (context, state) => const SettingsScreen(),
+                builder: (context, state) => const SettingsScreen(), // coverage:ignore-line
               ),
             ],
           ),

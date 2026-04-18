@@ -29,6 +29,14 @@ void main() {
     );
   });
 
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
+      null,
+    );
+  });
+
   group('BitratePreferenceNotifier.build() — real notifier', () {
     // Instantiate the real notifier (no override) so that build(), _load(),
     // and the early-return branch in _load() are all instrumented.

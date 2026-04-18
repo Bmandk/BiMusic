@@ -324,8 +324,8 @@ void _mutationTests() {
       final container = _makeContainer([], dio: _FakeDio());
       addTearDown(container.dispose);
 
-      expect(
-        () => container.read(downloadProvider.notifier).removeDownload('missing'),
+      await expectLater(
+        container.read(downloadProvider.notifier).removeDownload('missing'),
         throwsStateError,
       );
     });
