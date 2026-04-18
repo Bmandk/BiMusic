@@ -5,8 +5,18 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../config/api_config.dart';
 
+bool _isPrivateHost(String host) {
+  if (host == 'localhost' || host == '127.0.0.1' || host == '::1') return true;
+  if (RegExp(r'^10\.').hasMatch(host)) return true;
+  if (RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(host)) return true;
+  if (RegExp(r'^192\.168\.').hasMatch(host)) return true;
+  return false;
+}
+
 /// Normalises a raw URL string: trims whitespace, strips trailing slashes,
-/// and enforces http/https scheme. Throws a [String] error message on failure.
+/// and enforces http/https scheme. HTTP is only permitted for loopback and
+/// RFC-1918 private addresses to prevent JWT leakage over plain HTTP.
+/// Throws a [String] error message on failure.
 @visibleForTesting
 String normalizeBackendUrl(String raw) {
   var url = raw.trim();
@@ -15,6 +25,9 @@ String normalizeBackendUrl(String raw) {
   }
   while (url.endsWith('/')) {
     url = url.substring(0, url.length - 1);
+  }
+  if (url.startsWith('http://') && !_isPrivateHost(Uri.parse(url).host)) {
+    throw 'HTTP is only allowed for local/private addresses (e.g. 192.168.x.x). Use HTTPS for public hosts.';
   }
   return url;
 }

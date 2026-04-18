@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Allow cleartext HTTP for self-hosted backends on LAN (user-configured IP, not predictable) -->
+<!-- Cleartext (HTTP) is permitted globally because Android network-security-config
+     cannot match IP subnets, making it impossible to statically restrict to
+     RFC-1918 ranges. The Flutter URL validator (normalizeBackendUrl) is the
+     primary guard: it rejects HTTP unless the host is loopback or a private IP
+     (10/8, 172.16/12, 192.168/16), so JWTs are never sent to public hosts over
+     plain HTTP. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>
