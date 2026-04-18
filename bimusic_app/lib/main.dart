@@ -33,11 +33,13 @@ Future<void> _initBackgroundService() async {
     androidConfiguration: AndroidConfiguration(
       onStart: _backgroundServiceMain,
       autoStart: false,
+      autoStartOnBoot: false,
       isForegroundMode: true,
       notificationChannelId: 'bimusic_downloads',
       initialNotificationTitle: 'BiMusic Downloads',
       initialNotificationContent: 'Processing downloads…',
       foregroundServiceNotificationId: 888,
+      foregroundServiceTypes: [AndroidForegroundType.dataSync],
     ),
     iosConfiguration: IosConfiguration(
       autoStart: false,
