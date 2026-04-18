@@ -11,6 +11,7 @@ import 'package:bimusic_app/services/audio_service.dart';
 import 'package:bimusic_app/ui/layouts/desktop_layout.dart';
 import 'package:bimusic_app/ui/layouts/mobile_layout.dart';
 import 'package:bimusic_app/ui/widgets/adaptive_scaffold.dart';
+import 'package:bimusic_app/ui/widgets/player_bar.dart';
 
 // ---------------------------------------------------------------------------
 // Fakes / mocks
@@ -162,6 +163,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(PlayerBar), findsNothing);
     });
   });
 
@@ -241,6 +243,16 @@ void main() {
     testWidgets('shows DesktopLayout on wide screen', (tester) async {
       await tester.pumpWidget(
           buildWithSize(const Size(1400, 900), shell, handler));
+      await tester.pump();
+
+      expect(find.byType(DesktopLayout), findsOneWidget);
+      expect(find.byType(MobileLayout), findsNothing);
+    });
+
+    testWidgets('shows DesktopLayout at exactly 1024px breakpoint',
+        (tester) async {
+      await tester.pumpWidget(
+          buildWithSize(const Size(1024, 768), shell, handler));
       await tester.pump();
 
       expect(find.byType(DesktopLayout), findsOneWidget);

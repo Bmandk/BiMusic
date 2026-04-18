@@ -27,6 +27,7 @@ class _MockAudioHandler extends Mock implements BiMusicAudioHandler {}
 class _StubAuthNotifier extends Notifier<AuthState> implements AuthNotifier {
   _StubAuthNotifier({this.isAdmin = false});
   final bool isAdmin;
+  bool didLogout = false;
 
   @override
   Future<void> get initialized async {}
@@ -48,7 +49,9 @@ class _StubAuthNotifier extends Notifier<AuthState> implements AuthNotifier {
   Future<void> login(String username, String password) async {}
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout() async {
+    didLogout = true;
+  }
 }
 
 class _StubDownloadNotifier extends DownloadNotifier {
@@ -140,16 +143,17 @@ Widget _buildSubject({
   _MockAuthService? authService,
   _MockAudioHandler? handler,
   _StubBackendUrlNotifier? backendUrlNotifier,
+  _StubAuthNotifier? authNotifier,
 }) {
   final mockAuth = authService ?? _MockAuthService();
   final mockHandler = handler ?? _MockAudioHandler();
   when(() => mockAuth.accessToken).thenReturn('test_token');
+  final stubAuth = authNotifier ?? _StubAuthNotifier(isAdmin: isAdmin);
 
   return ProviderScope(
     overrides: [
       authServiceProvider.overrideWith((_) => mockAuth),
-      authNotifierProvider
-          .overrideWith(() => _StubAuthNotifier(isAdmin: isAdmin)),
+      authNotifierProvider.overrideWith(() => stubAuth),
       downloadProvider.overrideWith(() => _StubDownloadNotifier()),
       audioHandlerProvider.overrideWithValue(mockHandler),
       playerNotifierProvider.overrideWith(() => _StubPlayerNotifier()),
@@ -361,9 +365,11 @@ void main() {
 
   group('_EditBackendUrlDialog', () {
     Future<void> openDialog(WidgetTester tester,
-        {_StubBackendUrlNotifier? stub}) async {
-      await tester.pumpWidget(
-          _buildSubject(backendUrlNotifier: stub ?? _StubBackendUrlNotifier()));
+        {_StubBackendUrlNotifier? stub,
+        _StubAuthNotifier? authNotifier}) async {
+      await tester.pumpWidget(_buildSubject(
+          backendUrlNotifier: stub ?? _StubBackendUrlNotifier(),
+          authNotifier: authNotifier));
       await tester.pump();
       // Scroll to the About section where the Backend URL tile lives.
       await tester.drag(find.byType(ListView), const Offset(0, -600));
@@ -411,7 +417,8 @@ void main() {
     testWidgets('successful save dismisses dialog and triggers logout',
         (tester) async {
       final stub = _StubBackendUrlNotifier();
-      await openDialog(tester, stub: stub);
+      final authStub = _StubAuthNotifier();
+      await openDialog(tester, stub: stub, authNotifier: authStub);
       await tester.enterText(find.byType(TextField), 'http://newhost:3000');
       await tester.pump();
       await tester.tap(find.text('Save'));
@@ -419,6 +426,8 @@ void main() {
       expect(stub.lastSetUrl, 'http://newhost:3000');
       // Dialog should be dismissed.
       expect(find.text('Save'), findsNothing);
+      // Logout should have been triggered after saving.
+      expect(authStub.didLogout, isTrue);
     });
   });
 }
