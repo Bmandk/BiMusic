@@ -64,16 +64,18 @@ class AuthService {
   Future<RefreshResult> refresh() async {
     if (_inflight != null) return _inflight!;
 
-    final storedRefresh = await _storage.read(key: _kRefreshToken);
-    if (storedRefresh == null) {
-      return const RefreshResult(RefreshOutcome.rejected);
-    }
-
-    if (_inflight != null) return _inflight!;
-
+    // Set _inflight before any await so concurrent callers immediately join
+    // this in-flight future rather than starting a second refresh request.
     final completer = Completer<RefreshResult>();
     _inflight = completer.future;
     try {
+      final storedRefresh = await _storage.read(key: _kRefreshToken);
+      if (storedRefresh == null) {
+        const result = RefreshResult(RefreshOutcome.rejected);
+        completer.complete(result);
+        return result;
+      }
+
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/refresh',
         data: {'refreshToken': storedRefresh},
