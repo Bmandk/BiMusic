@@ -1,6 +1,6 @@
 {
-    "name": "bimusic_app",
-    "short_name": "bimusic_app",
+    "name": "BiMusic",
+    "short_name": "BiMusic",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
