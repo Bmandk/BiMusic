@@ -9,7 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 
 import 'app.dart';
+import 'providers/launch_at_startup_provider.dart';
 import 'services/audio_service.dart';
+import 'services/desktop_service.dart';
+import 'utils/platform.dart';
 
 // ---------------------------------------------------------------------------
 // Background service (mobile only)
@@ -53,7 +56,7 @@ Future<void> _initBackgroundService() async {
 // main
 // ---------------------------------------------------------------------------
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   // Reduce libmpv demuxer buffer from the default 32 MB to 2 MB to cut
   // initial prebuffer time on Windows/Linux without risking glitches on LAN.
@@ -74,11 +77,19 @@ void main() async {
     ),
   );
 
+  final container = ProviderContainer(
+    overrides: [audioHandlerProvider.overrideWithValue(audioHandler)],
+  );
+
+  if (isDesktop) {
+    final startHidden = args.contains('--hidden');
+    await DesktopService.instance.init(container, startHidden: startHidden);
+    await container.read(launchAtStartupProvider.notifier).syncWithOs();
+  }
+
   runApp(
-    ProviderScope(
-      overrides: [
-        audioHandlerProvider.overrideWithValue(audioHandler),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const BiMusicApp(),
     ),
   );
