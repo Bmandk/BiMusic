@@ -72,7 +72,7 @@ class DesktopService with WindowListener, TrayListener {
     // React to future preference changes.
     _minimizeToTraySub = container.listen<bool>(
       minimizeToTrayProvider,
-      (_, next) async => onMinimizeToTrayChanged(next),
+      (_, next) => unawaited(onMinimizeToTrayChanged(next)),
     );
   }
 
