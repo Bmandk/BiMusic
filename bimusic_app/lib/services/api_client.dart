@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,9 +12,9 @@ import 'auth_service.dart';
 
 /// Dio interceptor that:
 /// 1. Attaches `Authorization: Bearer <jwt>` to every outgoing request.
-/// 2. On 401: attempts token refresh once, retries the original request.
-/// 3. On refresh failure: calls [onLogout] to force the user back to login.
-/// 4. Uses a [Completer] to serialise concurrent refresh attempts.
+/// 2. On 401: attempts token refresh (single-flight lives in [AuthService]).
+/// 3. On server rejection: calls [onLogout] to force the user back to login.
+/// 4. On transient network failure: forwards the 401 without logging out.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required this.authService,
@@ -27,26 +25,6 @@ class AuthInterceptor extends Interceptor {
   final AuthService authService;
   final Dio dio;
   final void Function() onLogout;
-
-  Completer<bool>? _refreshCompleter;
-
-  Future<bool> _ensureRefreshed() async {
-    if (_refreshCompleter != null) {
-      return _refreshCompleter!.future;
-    }
-    _refreshCompleter = Completer<bool>();
-    try {
-      final tokens = await authService.refresh();
-      final success = tokens != null;
-      _refreshCompleter!.complete(success);
-      return success;
-    } catch (_) {
-      _refreshCompleter!.complete(false);
-      return false;
-    } finally {
-      _refreshCompleter = null;
-    }
-  }
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -67,23 +45,28 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    final bool refreshed = await _ensureRefreshed();
+    final result = await authService.refresh();
 
-    if (refreshed) {
-      final options = err.requestOptions;
-      options.headers['Authorization'] = 'Bearer ${authService.accessToken}';
-      try {
-        final response = await dio.fetch<dynamic>(options);
-        handler.resolve(response);
-        return;
-      } on DioException catch (retryErr) {
-        handler.next(retryErr);
-        return;
-      }
+    switch (result.outcome) {
+      case RefreshOutcome.success:
+        final options = err.requestOptions;
+        options.headers['Authorization'] = 'Bearer ${authService.accessToken}';
+        try {
+          final response = await dio.fetch<dynamic>(options);
+          handler.resolve(response);
+          return;
+        } on DioException catch (retryErr) {
+          handler.next(retryErr);
+          return;
+        }
+      case RefreshOutcome.rejected:
+        onLogout();
+        handler.next(err);
+      case RefreshOutcome.transient:
+        // Network failure — don't log out. The user keeps their session;
+        // they'll see a failed request but remain authenticated.
+        handler.next(err);
     }
-
-    onLogout();
-    handler.next(err);
   }
 }
 

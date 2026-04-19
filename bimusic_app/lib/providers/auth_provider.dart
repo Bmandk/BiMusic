@@ -52,14 +52,20 @@ class AuthNotifier extends Notifier<AuthState> {
       state = const AuthStateUnauthenticated();
       return;
     }
-    final refreshed = await svc.refresh();
-    if (refreshed == null) {
-      await svc.clearTokens();
-      state = const AuthStateUnauthenticated();
-      return;
+    final result = await svc.refresh();
+    switch (result.outcome) {
+      case RefreshOutcome.success:
+        state = AuthStateAuthenticated(result.tokens!);
+        _scheduleTokenRefresh(result.tokens!);
+      case RefreshOutcome.rejected:
+        await svc.clearTokens();
+        state = const AuthStateUnauthenticated();
+      case RefreshOutcome.transient:
+        // Network/transport failure on launch — keep stored session alive.
+        // The interceptor will refresh when the next request goes out.
+        state = AuthStateAuthenticated(stored);
+        _scheduleTokenRefresh(stored);
     }
-    state = AuthStateAuthenticated(refreshed);
-    _scheduleTokenRefresh(refreshed);
   }
 
   /// Log in. Sets state to [AuthStateAuthenticated] on success.
@@ -122,21 +128,19 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> _backgroundRefresh() async {
     final svc = ref.read(authServiceProvider);
-    try {
-      final refreshed = await svc.refresh();
-      // Bail out if logout was called while the refresh was in-flight.
-      if (state is AuthStateUnauthenticated) return;
-      if (refreshed != null) {
-        state = AuthStateAuthenticated(refreshed);
-        _scheduleTokenRefresh(refreshed);
-      } else {
+    final result = await svc.refresh();
+    // Bail out if logout was called while the refresh was in-flight.
+    if (state is AuthStateUnauthenticated) return;
+    switch (result.outcome) {
+      case RefreshOutcome.success:
+        state = AuthStateAuthenticated(result.tokens!);
+        _scheduleTokenRefresh(result.tokens!);
+      case RefreshOutcome.rejected:
         await svc.clearTokens();
         state = const AuthStateUnauthenticated();
-      }
-    } catch (_) {
-      // Network error — retry in 30 s rather than logging the user out.
-      if (state is AuthStateUnauthenticated) return;
-      _refreshTimer = Timer(const Duration(seconds: 30), _backgroundRefresh);
+      case RefreshOutcome.transient:
+        // Network error — retry in 30 s rather than logging the user out.
+        _refreshTimer = Timer(const Duration(seconds: 30), _backgroundRefresh);
     }
   }
 }
