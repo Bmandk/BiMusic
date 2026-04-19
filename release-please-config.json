@@ -1,0 +1,14 @@
+{
+  "packages": {
+    "bimusic_app": {
+      "release-type": "dart",
+      "package-name": "bimusic_app",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "changelog-path": "CHANGELOG.md"
+    }
+  },
+  "separate-pull-requests": false,
+  "plugins": [{ "type": "sentence-case" }]
+}
