@@ -143,27 +143,30 @@ class DesktopService with WindowListener, TrayListener {
 
   @override
   void onTrayIconMouseDown() {
-    showWindow();
+    unawaited(showWindow());
   }
 
   @override
   void onTrayIconRightMouseDown() {
-    trayManager.popUpContextMenu();
+    unawaited(trayManager.popUpContextMenu());
   }
 
   @override
   void onTrayMenuItemClick(MenuItem menuItem) {
     switch (menuItem.key) {
       case 'show_hide':
-        windowManager.isVisible().then((visible) {
-          if (visible) {
-            hideWindow();
-          } else {
-            showWindow();
-          }
-        });
+        unawaited(_handleShowHideToggle());
       case 'quit':
-        quit();
+        unawaited(quit());
+    }
+  }
+
+  Future<void> _handleShowHideToggle() async {
+    final visible = await windowManager.isVisible();
+    if (visible) {
+      await hideWindow();
+    } else {
+      await showWindow();
     }
   }
 }
