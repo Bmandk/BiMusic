@@ -166,11 +166,21 @@ class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
 class _StubLaunchAtStartupNotifier extends LaunchAtStartupNotifier {
   @override
   bool build() => false;
+
+  @override
+  Future<void> setEnabled(bool value) async {
+    state = value;
+  }
 }
 
 class _StubMinimizeToTrayNotifier extends MinimizeToTrayNotifier {
   @override
   bool build() => true;
+
+  @override
+  Future<void> setEnabled(bool value) async {
+    state = value;
+  }
 }
 
 // ---------------------------------------------------------------------------

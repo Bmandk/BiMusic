@@ -32,9 +32,7 @@ class LaunchAtStartupNotifier extends Notifier<bool> {
   }
 
   Future<void> setEnabled(bool value) async {
-    state = value;
-    const storage = FlutterSecureStorage();
-    await storage.write(key: _kStorageKey, value: value.toString());
+    // Attempt OS call first so state/storage only update on success.
     try {
       if (value) {
         await LaunchAtStartup.instance.enable();
@@ -42,8 +40,14 @@ class LaunchAtStartupNotifier extends Notifier<bool> {
         await LaunchAtStartup.instance.disable();
       }
     } on UnsupportedError {
-      // Platform does not support launch at startup (e.g. Flatpak, test env).
+      // Platform does not support launch at startup — persist preference anyway.
+    } catch (_) {
+      // OS call failed — leave state and storage unchanged.
+      return;
     }
+    state = value;
+    const storage = FlutterSecureStorage();
+    await storage.write(key: _kStorageKey, value: value.toString());
   }
 }
 

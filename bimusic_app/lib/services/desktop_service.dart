@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart' show Size;
@@ -108,7 +109,11 @@ class DesktopService with WindowListener, TrayListener {
   // ---------------------------------------------------------------------------
 
   @override
-  void onWindowClose() async {
+  void onWindowClose() {
+    unawaited(_handleClose());
+  }
+
+  Future<void> _handleClose() async {
     // Fires only when setPreventClose(true) is active.
     final pref = _container?.read(minimizeToTrayProvider) ?? true;
     if (pref) {
@@ -120,7 +125,11 @@ class DesktopService with WindowListener, TrayListener {
   }
 
   @override
-  void onWindowMinimize() async {
+  void onWindowMinimize() {
+    unawaited(_handleMinimize());
+  }
+
+  Future<void> _handleMinimize() async {
     final pref = _container?.read(minimizeToTrayProvider) ?? true;
     if (pref) {
       await windowManager.hide();

@@ -40,6 +40,29 @@ void main() {
       // Storage returned null → state stays at default true.
       expect(container.read(minimizeToTrayProvider), true);
     });
+
+    test('returns false when stored preference is false', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
+        (MethodCall call) async => call.method == 'read' ? 'false' : null,
+      );
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+          const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
+          (MethodCall call) async => null,
+        );
+      });
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(minimizeToTrayProvider), true);
+      await Future<void>.delayed(Duration.zero);
+      // Storage returned 'false' → state updated to false.
+      expect(container.read(minimizeToTrayProvider), false);
+    });
   });
 
   group('MinimizeToTrayNotifier.setEnabled() — via stub', () {
