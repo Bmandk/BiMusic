@@ -11,6 +11,8 @@ import 'package:bimusic_app/providers/auth_provider.dart';
 import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/bitrate_preference_provider.dart';
 import 'package:bimusic_app/providers/download_provider.dart';
+import 'package:bimusic_app/providers/launch_at_startup_provider.dart';
+import 'package:bimusic_app/providers/minimize_to_tray_provider.dart';
 import 'package:bimusic_app/providers/player_provider.dart';
 import 'package:bimusic_app/providers/update_provider.dart';
 import 'package:bimusic_app/services/audio_service.dart';
@@ -161,6 +163,16 @@ class _StubBitratePreferenceNotifier extends BitratePreferenceNotifier {
   }
 }
 
+class _StubLaunchAtStartupNotifier extends LaunchAtStartupNotifier {
+  @override
+  bool build() => false;
+}
+
+class _StubMinimizeToTrayNotifier extends MinimizeToTrayNotifier {
+  @override
+  bool build() => true;
+}
+
 // ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
@@ -188,6 +200,10 @@ Widget _buildSubject({
       playerNotifierProvider.overrideWith(() => _StubPlayerNotifier()),
       bitratePreferenceProvider
           .overrideWith(() => _StubBitratePreferenceNotifier(bitratePref)),
+      launchAtStartupProvider
+          .overrideWith(() => _StubLaunchAtStartupNotifier()),
+      minimizeToTrayProvider
+          .overrideWith(() => _StubMinimizeToTrayNotifier()),
       backendUrlProvider.overrideWith(
           () => backendUrlNotifier ?? _StubBackendUrlNotifier()),
       updateProvider.overrideWith(
@@ -279,19 +295,19 @@ void main() {
   testWidgets('renders Offline Downloads section on non-web', (tester) async {
     await tester.pumpWidget(_buildSubject());
     await tester.pump();
-    expect(find.text('Offline Downloads'), findsOneWidget);
+    expect(find.text('Offline Downloads', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('renders Offline Music storage tile', (tester) async {
     await tester.pumpWidget(_buildSubject());
     await tester.pump();
-    expect(find.text('Offline Music'), findsOneWidget);
+    expect(find.text('Offline Music', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('renders Clear All Downloads tile', (tester) async {
     await tester.pumpWidget(_buildSubject());
     await tester.pump();
-    expect(find.text('Clear All Downloads'), findsOneWidget);
+    expect(find.text('Clear All Downloads', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('does NOT render Debug section for non-admin user', (tester) async {
@@ -379,6 +395,8 @@ void main() {
     await tester.pumpWidget(_buildSubject());
     await tester.pump();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pump();
     await tester.tap(find.text('Clear All Downloads'));
     await tester.pumpAndSettle();
 

@@ -7,9 +7,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/backend_url_provider.dart';
 import '../../providers/bitrate_preference_provider.dart';
 import '../../providers/download_provider.dart';
+import '../../providers/launch_at_startup_provider.dart';
+import '../../providers/minimize_to_tray_provider.dart';
 import '../../providers/player_provider.dart';
 import '../../providers/update_provider.dart';
 import '../../services/api_client.dart';
+import '../../utils/platform.dart';
 import '../dialogs/update_available_dialog.dart';
 
 // ---------------------------------------------------------------------------
@@ -99,6 +102,15 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const Divider(),
+
+          // ----------------------------------------------------------------
+          // Desktop (Windows / Linux only)
+          // ----------------------------------------------------------------
+          if (isDesktop) ...[
+            const _SectionHeader(title: 'Desktop'),
+            _DesktopSection(),
+            const Divider(),
+          ],
 
           // ----------------------------------------------------------------
           // Storage (not shown on web)
@@ -355,6 +367,39 @@ class _BitratePreferenceTile extends ConsumerWidget {
           .read(bitratePreferenceProvider.notifier)
           .setPreference(selected);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Desktop section
+// ---------------------------------------------------------------------------
+
+class _DesktopSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final launchAtStartup = ref.watch(launchAtStartupProvider);
+    final minimizeToTray = ref.watch(minimizeToTrayProvider);
+
+    return Column(
+      children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.rocket_launch_outlined),
+          title: const Text('Launch at Startup'),
+          subtitle: const Text('Start BiMusic when you log in'),
+          value: launchAtStartup,
+          onChanged: (value) =>
+              ref.read(launchAtStartupProvider.notifier).setEnabled(value),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.minimize),
+          title: const Text('Minimize to Tray'),
+          subtitle: const Text('Hide to system tray instead of closing'),
+          value: minimizeToTray,
+          onChanged: (value) =>
+              ref.read(minimizeToTrayProvider.notifier).setEnabled(value),
+        ),
+      ],
+    );
   }
 }
 
