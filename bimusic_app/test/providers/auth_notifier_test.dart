@@ -32,6 +32,10 @@ void main() {
     user: testUser,
   );
 
+  const successResult = RefreshResult(RefreshOutcome.success, testTokens);
+  const rejectedResult = RefreshResult(RefreshOutcome.rejected);
+  const transientResult = RefreshResult(RefreshOutcome.transient);
+
   setUp(() {
     mockAuthService = MockAuthService();
     container = ProviderContainer(
@@ -53,7 +57,6 @@ void main() {
     test('starts in loading state', () {
       when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
 
-      // Read the provider before init completes.
       final state = container.read(authNotifierProvider);
       expect(state, isA<AuthStateLoading>());
     });
@@ -70,7 +73,7 @@ void main() {
       when(() => mockAuthService.readStoredTokens())
           .thenAnswer((_) async => testTokens);
       when(() => mockAuthService.refresh())
-          .thenAnswer((_) async => testTokens);
+          .thenAnswer((_) async => successResult);
 
       await waitForInit();
 
@@ -79,16 +82,29 @@ void main() {
       expect((state as AuthStateAuthenticated).tokens, testTokens);
     });
 
-    test('goes unauthenticated and clears tokens when refresh fails', () async {
+    test('goes unauthenticated and clears tokens when refresh is rejected', () async {
       when(() => mockAuthService.readStoredTokens())
           .thenAnswer((_) async => testTokens);
-      when(() => mockAuthService.refresh()).thenAnswer((_) async => null);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => rejectedResult);
       when(() => mockAuthService.clearTokens()).thenAnswer((_) async {});
 
       await waitForInit();
 
       expect(container.read(authNotifierProvider), isA<AuthStateUnauthenticated>());
       verify(() => mockAuthService.clearTokens()).called(1);
+    });
+
+    test('stays authenticated with stored tokens when refresh is transient', () async {
+      when(() => mockAuthService.readStoredTokens())
+          .thenAnswer((_) async => testTokens);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => transientResult);
+
+      await waitForInit();
+
+      final state = container.read(authNotifierProvider);
+      expect(state, isA<AuthStateAuthenticated>());
+      expect((state as AuthStateAuthenticated).tokens, testTokens);
+      verifyNever(() => mockAuthService.clearTokens());
     });
   });
 
@@ -128,7 +144,7 @@ void main() {
       when(() => mockAuthService.readStoredTokens())
           .thenAnswer((_) async => testTokens);
       when(() => mockAuthService.refresh())
-          .thenAnswer((_) async => testTokens);
+          .thenAnswer((_) async => successResult);
       when(() => mockAuthService.logout()).thenAnswer((_) async {});
 
       await waitForInit();
@@ -161,7 +177,7 @@ void main() {
       when(() => mockAuthService.login(any(), any()))
           .thenAnswer((_) async => expiredTokens);
       when(() => mockAuthService.refresh())
-          .thenAnswer((_) async => testTokens);
+          .thenAnswer((_) async => successResult);
 
       await waitForInit();
       await container.read(authNotifierProvider.notifier).login('admin', 'pass');
@@ -181,7 +197,7 @@ void main() {
       when(() => mockAuthService.login(any(), any()))
           .thenAnswer((_) async => expiredTokens);
       when(() => mockAuthService.refresh())
-          .thenAnswer((_) async => testTokens);
+          .thenAnswer((_) async => successResult);
 
       await waitForInit();
       await container.read(authNotifierProvider.notifier).login('admin', 'pass');
@@ -192,7 +208,7 @@ void main() {
       expect((s as AuthStateAuthenticated).tokens, testTokens);
     });
 
-    test('goes unauthenticated when background refresh returns null', () async {
+    test('goes unauthenticated when background refresh is rejected', () async {
       final expiredTokens = AuthTokens(
         accessToken: _makeJwt(exp: pastEpoch),
         refreshToken: 'rtoken',
@@ -201,7 +217,7 @@ void main() {
 
       when(() => mockAuthService.login(any(), any()))
           .thenAnswer((_) async => expiredTokens);
-      when(() => mockAuthService.refresh()).thenAnswer((_) async => null);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => rejectedResult);
       when(() => mockAuthService.clearTokens()).thenAnswer((_) async {});
 
       await waitForInit();
@@ -213,7 +229,7 @@ void main() {
       verify(() => mockAuthService.clearTokens()).called(1);
     });
 
-    test('stays authenticated when background refresh throws (network error)',
+    test('stays authenticated when background refresh has transient failure',
         () async {
       final expiredTokens = AuthTokens(
         accessToken: _makeJwt(exp: pastEpoch),
@@ -224,7 +240,7 @@ void main() {
       when(() => mockAuthService.login(any(), any()))
           .thenAnswer((_) async => expiredTokens);
       when(() => mockAuthService.refresh())
-          .thenThrow(Exception('network error'));
+          .thenAnswer((_) async => transientResult);
 
       await waitForInit();
       await container.read(authNotifierProvider.notifier).login('admin', 'pass');

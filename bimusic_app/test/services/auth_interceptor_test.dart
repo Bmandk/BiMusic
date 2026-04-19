@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +69,10 @@ void main() {
     user: testUser,
   );
 
+  const successResult = RefreshResult(RefreshOutcome.success, testTokens);
+  const rejectedResult = RefreshResult(RefreshOutcome.rejected);
+  const transientResult = RefreshResult(RefreshOutcome.transient);
+
   setUp(() {
     logoutCalled = false;
     mockAuthService = MockAuthService();
@@ -132,7 +134,7 @@ void main() {
     });
 
     test('401 triggers refresh and retries on success', () async {
-      when(() => mockAuthService.refresh()).thenAnswer((_) async => testTokens);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => successResult);
       when(() => mockAuthService.accessToken).thenReturn('new_access');
       when(() => mockDio.fetch<dynamic>(any())).thenAnswer(
         (_) async => Response<dynamic>(
@@ -151,8 +153,8 @@ void main() {
       expect(handler.forwarded, isNull);
     });
 
-    test('401 calls onLogout and forwards error when refresh fails', () async {
-      when(() => mockAuthService.refresh()).thenAnswer((_) async => null);
+    test('401 calls onLogout and forwards error when refresh is rejected', () async {
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => rejectedResult);
 
       final err = make401();
       final handler = _FakeErrorHandler();
@@ -163,20 +165,21 @@ void main() {
       expect(handler.forwarded, err);
     });
 
-    test('401 calls onLogout and forwards error when refresh throws', () async {
-      when(() => mockAuthService.refresh()).thenThrow(Exception('network'));
+    test('401 forwards error without logging out when refresh is transient', () async {
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => transientResult);
 
       final err = make401();
       final handler = _FakeErrorHandler();
 
       await interceptor.onError(err, handler);
 
-      expect(logoutCalled, isTrue);
+      expect(logoutCalled, isFalse);
       expect(handler.forwarded, err);
+      expect(handler.resolved, isNull);
     });
 
     test('401 forwards retry DioException when retry fetch fails', () async {
-      when(() => mockAuthService.refresh()).thenAnswer((_) async => testTokens);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => successResult);
       when(() => mockAuthService.accessToken).thenReturn('new_access');
       final retryErr = DioException(
         requestOptions: RequestOptions(path: '/api/test'),
@@ -193,16 +196,8 @@ void main() {
       expect(handler.resolved, isNull);
     });
 
-    test('concurrent 401s only trigger one refresh', () async {
-      int refreshCount = 0;
-      final firstStarted = Completer<void>();
-      final refreshGate = Completer<AuthTokens?>();
-
-      when(() => mockAuthService.refresh()).thenAnswer((_) async {
-        refreshCount++;
-        firstStarted.complete();
-        return refreshGate.future;
-      });
+    test('concurrent 401s both resolve correctly', () async {
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => successResult);
       when(() => mockAuthService.accessToken).thenReturn('new_access');
       when(() => mockDio.fetch<dynamic>(any())).thenAnswer(
         (_) async => Response<dynamic>(
@@ -216,16 +211,11 @@ void main() {
       final handler1 = _FakeErrorHandler();
       final handler2 = _FakeErrorHandler();
 
-      // Start both error handlers concurrently.
-      final future1 = interceptor.onError(err1, handler1);
-      await firstStarted.future; // ensure first refresh is in-flight
-      final future2 = interceptor.onError(err2, handler2);
+      await Future.wait([
+        interceptor.onError(err1, handler1),
+        interceptor.onError(err2, handler2),
+      ]);
 
-      // Unblock the refresh.
-      refreshGate.complete(testTokens);
-      await Future.wait([future1, future2]);
-
-      expect(refreshCount, 1, reason: 'only one refresh should be attempted');
       expect(handler1.resolved?.statusCode, 200);
       expect(handler2.resolved?.statusCode, 200);
     });
@@ -241,8 +231,6 @@ void main() {
       ]);
       addTearDown(container.dispose);
 
-      // Wait for the async backendUrlProvider to resolve before reading
-      // apiClientProvider, which throws if the URL is not yet configured.
       await container.read(backendUrlProvider.future);
       final dio = container.read(apiClientProvider);
 

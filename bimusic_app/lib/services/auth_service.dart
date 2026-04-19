@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -9,19 +10,29 @@ import '../models/auth_tokens.dart';
 import '../models/user.dart';
 import '../providers/backend_url_provider.dart';
 
+enum RefreshOutcome { success, rejected, transient }
+
+class RefreshResult {
+  const RefreshResult(this.outcome, [this.tokens]);
+  final RefreshOutcome outcome;
+  final AuthTokens? tokens;
+}
+
 class AuthService {
-  AuthService(this._storage, String baseUrl)
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: baseUrl,
-            connectTimeout: ApiConfig.connectTimeout,
-            receiveTimeout: ApiConfig.receiveTimeout,
-          ),
-        );
+  AuthService(this._storage, String baseUrl, {Dio? httpClient})
+      : _dio = httpClient ??
+            Dio(
+              BaseOptions(
+                baseUrl: baseUrl,
+                connectTimeout: ApiConfig.connectTimeout,
+                receiveTimeout: ApiConfig.receiveTimeout,
+              ),
+            );
 
   final FlutterSecureStorage _storage;
   final Dio _dio;
 
+  Future<RefreshResult>? _inflight;
   String? _accessToken;
 
   /// The current in-memory access token, used by [AuthInterceptor].
@@ -43,10 +54,25 @@ class AuthService {
   }
 
   /// Attempt to refresh tokens using the stored refresh token.
-  /// Returns [AuthTokens] on success, or null if the token is missing/expired.
-  Future<AuthTokens?> refresh() async {
+  ///
+  /// Returns [RefreshResult] with outcome:
+  /// - [RefreshOutcome.success]: new tokens were issued and stored.
+  /// - [RefreshOutcome.rejected]: server rejected the token (HTTP 4xx) — session is dead.
+  /// - [RefreshOutcome.transient]: network/transport error — session may still be valid.
+  ///
+  /// Concurrent calls share a single in-flight request (single-flight).
+  Future<RefreshResult> refresh() async {
+    if (_inflight != null) return _inflight!;
+
     final storedRefresh = await _storage.read(key: _kRefreshToken);
-    if (storedRefresh == null) return null;
+    if (storedRefresh == null) {
+      return const RefreshResult(RefreshOutcome.rejected);
+    }
+
+    if (_inflight != null) return _inflight!;
+
+    final completer = Completer<RefreshResult>();
+    _inflight = completer.future;
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/refresh',
@@ -54,9 +80,23 @@ class AuthService {
       );
       final tokens = _buildTokens(response.data!);
       await storeTokens(tokens);
-      return tokens;
-    } on DioException {
-      return null;
+      final result = RefreshResult(RefreshOutcome.success, tokens);
+      completer.complete(result);
+      return result;
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final result =
+          (statusCode != null && statusCode >= 400 && statusCode < 500)
+              ? const RefreshResult(RefreshOutcome.rejected)
+              : const RefreshResult(RefreshOutcome.transient);
+      completer.complete(result);
+      return result;
+    } catch (_) {
+      const result = RefreshResult(RefreshOutcome.transient);
+      completer.complete(result);
+      return result;
+    } finally {
+      _inflight = null;
     }
   }
 

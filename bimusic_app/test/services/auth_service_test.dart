@@ -1,14 +1,16 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:bimusic_app/models/auth_tokens.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/services/auth_service.dart';
 
 // ---------------------------------------------------------------------------
-// Fake FlutterSecureStorage (avoids platform channels)
+// Fakes / mocks
 // ---------------------------------------------------------------------------
 
 class _FakeStorage extends Fake implements FlutterSecureStorage {
@@ -56,6 +58,10 @@ class _FakeStorage extends Fake implements FlutterSecureStorage {
   }
 }
 
+class MockDio extends Mock implements Dio {}
+
+class _FakeRequestOptions extends Fake implements RequestOptions {}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -87,17 +93,44 @@ String _makeJwtRaw({
   return 'eyJhbGciOiJIUzI1NiJ9.$payload.fakesig';
 }
 
+Response<Map<String, dynamic>> _makeRefreshResponse(String access, String refresh) =>
+    Response<Map<String, dynamic>>(
+      data: {'accessToken': access, 'refreshToken': refresh},
+      requestOptions: RequestOptions(path: '/api/auth/refresh'),
+      statusCode: 200,
+    );
+
+DioException _makeDioException(int statusCode) => DioException(
+      requestOptions: RequestOptions(path: '/api/auth/refresh'),
+      response: Response<dynamic>(
+        statusCode: statusCode,
+        requestOptions: RequestOptions(path: '/api/auth/refresh'),
+      ),
+      type: DioExceptionType.badResponse,
+    );
+
+DioException _makeConnectionError() => DioException(
+      requestOptions: RequestOptions(path: '/api/auth/refresh'),
+      type: DioExceptionType.connectionError,
+    );
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(_FakeRequestOptions());
+  });
+
   late _FakeStorage fakeStorage;
+  late MockDio mockDio;
   late AuthService service;
 
   setUp(() {
     fakeStorage = _FakeStorage();
-    service = AuthService(fakeStorage, 'http://test');
+    mockDio = MockDio();
+    service = AuthService(fakeStorage, 'http://test', httpClient: mockDio);
   });
 
   group('accessToken', () {
@@ -174,7 +207,6 @@ void main() {
       expect(result.user.userId, 'u2');
       expect(result.user.username, 'bob');
       expect(result.user.isAdmin, isFalse);
-      // In-memory token is updated too.
       expect(service.accessToken, access);
     });
 
@@ -190,16 +222,12 @@ void main() {
     });
 
     test('decodes integer 1 isAdmin as true without throwing', () async {
-      // Backend encodes isAdmin as a boolean, but hand-crafted or legacy JWTs
-      // might contain integer 1. The safe cast (== true) must handle this.
       final access = _makeJwtRaw(userId: 'u4', username: 'admin2', isAdminRaw: '1');
       fakeStorage._store['bimusic_access_token'] = access;
       fakeStorage._store['bimusic_refresh_token'] = 'r';
 
       final result = await service.readStoredTokens();
 
-      // Integer 1 is not equal to true in Dart, so isAdmin should be false
-      // (not throw). The important thing is no TypeError is raised.
       expect(result!.user.isAdmin, isFalse);
     });
 
@@ -215,19 +243,110 @@ void main() {
   });
 
   group('refresh', () {
-    test('returns null immediately when no refresh token is stored', () async {
-      // Storage is empty — no HTTP call should be made.
+    test('returns rejected when no refresh token is stored', () async {
       final result = await service.refresh();
-      expect(result, isNull);
+      expect(result.outcome, RefreshOutcome.rejected);
+      verifyNever(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
+    });
+
+    test('returns success with new tokens on HTTP 200', () async {
+      final access = _makeJwt(userId: 'u1', username: 'admin', isAdmin: false);
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((_) async => _makeRefreshResponse(access, 'new-refresh'));
+
+      final result = await service.refresh();
+
+      expect(result.outcome, RefreshOutcome.success);
+      expect(result.tokens?.accessToken, access);
+      expect(result.tokens?.refreshToken, 'new-refresh');
+      expect(fakeStorage._store['bimusic_access_token'], access);
+      expect(fakeStorage._store['bimusic_refresh_token'], 'new-refresh');
+    });
+
+    test('returns rejected on HTTP 401', () async {
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenThrow(_makeDioException(401));
+
+      final result = await service.refresh();
+
+      expect(result.outcome, RefreshOutcome.rejected);
+      expect(result.tokens, isNull);
+    });
+
+    test('returns rejected on HTTP 403', () async {
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenThrow(_makeDioException(403));
+
+      final result = await service.refresh();
+
+      expect(result.outcome, RefreshOutcome.rejected);
+    });
+
+    test('returns transient on connection error', () async {
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenThrow(_makeConnectionError());
+
+      final result = await service.refresh();
+
+      expect(result.outcome, RefreshOutcome.transient);
+    });
+
+    test('returns transient on HTTP 500', () async {
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenThrow(_makeDioException(500));
+
+      final result = await service.refresh();
+
+      expect(result.outcome, RefreshOutcome.transient);
+    });
+
+    test('does not clear storage on transient failure', () async {
+      final access = _makeJwt(userId: 'u1', username: 'admin', isAdmin: false);
+      fakeStorage._store['bimusic_access_token'] = access;
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenThrow(_makeConnectionError());
+
+      await service.refresh();
+
+      expect(fakeStorage._store.containsKey('bimusic_access_token'), isTrue);
+      expect(fakeStorage._store.containsKey('bimusic_refresh_token'), isTrue);
+    });
+
+    test('concurrent calls share one network request (single-flight)', () async {
+      final access = _makeJwt(userId: 'u1', username: 'admin', isAdmin: false);
+      fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
+
+      int callCount = 0;
+      when(() => mockDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')))
+          .thenAnswer((_) async {
+        callCount++;
+        return _makeRefreshResponse(access, 'new-refresh');
+      });
+
+      final results = await Future.wait([service.refresh(), service.refresh()]);
+
+      expect(callCount, 1, reason: 'only one HTTP request should be made');
+      expect(results[0].outcome, RefreshOutcome.success);
+      expect(results[1].outcome, RefreshOutcome.success);
     });
   });
 
   group('logout', () {
     test('clears tokens even when no tokens are stored', () async {
-      // Neither storage entry nor in-memory token exists — no HTTP call.
       await service.logout();
 
-      // Storage should still be clean.
       expect(fakeStorage._store.containsKey('bimusic_access_token'), isFalse);
       expect(fakeStorage._store.containsKey('bimusic_refresh_token'), isFalse);
       expect(service.accessToken, isNull);
@@ -235,7 +354,6 @@ void main() {
 
     test('clears tokens when refresh is stored but in-memory token is null',
         () async {
-      // Store a refresh token but leave _accessToken null — HTTP call is skipped.
       fakeStorage._store['bimusic_refresh_token'] = 'stored-refresh';
 
       await service.logout();
