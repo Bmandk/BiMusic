@@ -193,8 +193,13 @@ try {
   }
   $staging = Join-Path $env:TEMP ("bimusic_stage_" + [guid]::NewGuid())
   Expand-Archive -Path $ZipPath -DestinationPath $staging -Force
-  $srcRoot = Get-ChildItem $staging -Directory | Select-Object -First 1 -ExpandProperty FullName
-  if (-not $srcRoot) { $srcRoot = $staging }
+  $filesAtRoot = @(Get-ChildItem $staging -File)
+  $dirsAtRoot  = @(Get-ChildItem $staging -Directory)
+  if ($filesAtRoot.Count -eq 0 -and $dirsAtRoot.Count -eq 1) {
+    $srcRoot = $dirsAtRoot[0].FullName
+  } else {
+    $srcRoot = $staging
+  }
   Copy-Item -Path (Join-Path $srcRoot '*') -Destination $InstallDir -Recurse -Force
   Start-Process -FilePath (Join-Path $InstallDir $ExeName)
 } catch {
