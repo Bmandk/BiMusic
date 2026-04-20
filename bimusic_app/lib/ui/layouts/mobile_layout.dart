@@ -4,10 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../providers/player_provider.dart';
 import '../widgets/player_bar.dart';
 
-/// Maps the 6 visible mobile tab indices to shell branch indices.
+/// Maps the 5 visible mobile tab indices to shell branch indices.
 /// Shell branches: 0=Home, 1=Library, 2=Search, 3=Playlists, 4=Downloads, 5=Settings
-/// Mobile tabs:    0=Home, 1=Library, 2=Search, 3=Playlists, 4=Downloads, 5=Settings
-const List<int> _mobileToBranchIndex = [0, 1, 2, 3, 4, 5];
+/// Mobile tabs:    0=Home, 1=Library, 2=Search, 3=Playlists, 4=Settings
+/// Downloads is accessed via the Library AppBar icon on mobile.
+const List<int> _mobileToBranchIndex = [0, 1, 2, 3, 5];
 
 class MobileLayout extends ConsumerWidget {
   const MobileLayout({
@@ -22,7 +23,9 @@ class MobileLayout extends ConsumerWidget {
   int get _selectedTabIndex {
     final branchIndex = navigationShell.currentIndex;
     final tabIndex = _mobileToBranchIndex.indexOf(branchIndex);
-    return tabIndex < 0 ? 0 : tabIndex;
+    // Downloads branch (4) is not in the mobile bar; keep Library (tab 1) highlighted
+    // since that's where the Downloads AppBar icon lives.
+    return tabIndex < 0 ? 1 : tabIndex;
   }
 
   @override
@@ -66,11 +69,6 @@ class MobileLayout extends ConsumerWidget {
             icon: Icon(Icons.queue_music_outlined),
             selectedIcon: Icon(Icons.queue_music),
             label: 'Playlists',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.download_outlined),
-            selectedIcon: Icon(Icons.download),
-            label: 'Downloads',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

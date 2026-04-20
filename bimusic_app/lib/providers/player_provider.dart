@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/download_task.dart';
 import '../models/track.dart';
 import '../services/audio_service.dart';
@@ -61,7 +62,10 @@ class PlayerState {
 }
 
 class PlayerNotifier extends Notifier<PlayerState> {
+  static const _kVolumeStorageKey = 'bimusic_player_volume';
+
   double _preMuteVolume = 1.0;
+
   @override
   PlayerState build() {
     final handler = ref.read(audioHandlerProvider);
@@ -103,7 +107,22 @@ class PlayerNotifier extends Notifier<PlayerState> {
       indexSub.cancel();
     });
 
+    _loadPersistedVolume();
     return const PlayerState();
+  }
+
+  Future<void> _loadPersistedVolume() async {
+    try {
+      const storage = FlutterSecureStorage();
+      final value = await storage.read(key: _kVolumeStorageKey);
+      if (value == null) return;
+      final v = double.tryParse(value);
+      if (v == null) return;
+      final clamped = v.clamp(0.0, 1.0);
+      state = state.copyWith(volume: clamped);
+      if (clamped > 0) _preMuteVolume = clamped;
+      await ref.read(audioHandlerProvider).setVolume(clamped);
+    } catch (_) {}
   }
 
   Future<void> play(
@@ -177,6 +196,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
     final clamped = v.clamp(0.0, 1.0);
     await ref.read(audioHandlerProvider).setVolume(clamped);
     state = state.copyWith(volume: clamped);
+    try {
+      await const FlutterSecureStorage().write(key: _kVolumeStorageKey, value: clamped.toString());
+    } catch (_) {}
   }
 
   Future<void> toggleMute() async {
