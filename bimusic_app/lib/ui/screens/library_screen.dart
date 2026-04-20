@@ -6,6 +6,7 @@ import '../../providers/library_provider.dart';
 import '../layouts/breakpoints.dart';
 import '../widgets/artist_card.dart';
 
+
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
@@ -14,7 +15,17 @@ class LibraryScreen extends ConsumerWidget {
     final artistsAsync = ref.watch(libraryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Library')),
+      appBar: AppBar(
+        title: const Text('Library'),
+        actions: [
+          if (MediaQuery.sizeOf(context).width < Breakpoints.desktop)
+            IconButton(
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Downloads',
+              onPressed: () => context.go('/downloads'),
+            ),
+        ],
+      ),
       body: artistsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(

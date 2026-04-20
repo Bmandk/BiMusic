@@ -105,7 +105,8 @@ void main() {
   });
 
   group('MobileLayout', () {
-    testWidgets('renders NavigationBar with 6 destinations', (tester) async {
+    testWidgets('renders NavigationBar with 5 destinations (no Downloads tab)',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: _overrides(handler),
@@ -124,7 +125,7 @@ void main() {
       expect(find.text('Library'), findsOneWidget);
       expect(find.text('Search'), findsOneWidget);
       expect(find.text('Playlists'), findsOneWidget);
-      expect(find.text('Downloads'), findsOneWidget);
+      expect(find.text('Downloads'), findsNothing);
       expect(find.text('Settings'), findsOneWidget);
     });
 

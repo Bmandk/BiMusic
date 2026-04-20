@@ -78,6 +78,7 @@ void main() {
     PlayerState playerState, {
     Duration position = const Duration(seconds: 60),
     Duration? duration = const Duration(seconds: 240),
+    bool embedded = false,
   }) =>
       ProviderScope(
         overrides: [
@@ -93,7 +94,9 @@ void main() {
             (_) => Stream.value(duration),
           ),
         ],
-        child: const MaterialApp(home: Scaffold(body: FullPlayer())),
+        child: MaterialApp(
+          home: Scaffold(body: FullPlayer(embedded: embedded)),
+        ),
       );
 
   testWidgets('shows track title and artist', (tester) async {
@@ -206,5 +209,21 @@ void main() {
     await tester.pump();
     // Icon is rendered with primary color when shuffled — just verify widget renders
     expect(find.byIcon(Icons.shuffle_rounded), findsOneWidget);
+  });
+
+  testWidgets('default mode wraps content in DraggableScrollableSheet',
+      (tester) async {
+    await tester.pumpWidget(buildSubject(playingState));
+    await tester.pump();
+    expect(find.byType(DraggableScrollableSheet), findsOneWidget);
+  });
+
+  testWidgets('embedded mode skips DraggableScrollableSheet', (tester) async {
+    await tester.pumpWidget(buildSubject(playingState, embedded: true));
+    await tester.pump();
+    expect(find.byType(DraggableScrollableSheet), findsNothing);
+    // Controls still render without the sheet wrapper
+    expect(find.text('Now Playing Song'), findsOneWidget);
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
   });
 }
