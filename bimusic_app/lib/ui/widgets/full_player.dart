@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +23,18 @@ class FullPlayer extends ConsumerStatefulWidget {
 
 class _FullPlayerState extends ConsumerState<FullPlayer> {
   double? _dragValue;
+  Duration? _pendingSeekTarget;
+  Timer? _seekTimeoutTimer;
   bool _showQueue = false;
+
+  static const _seekCatchUpTolerance = Duration(milliseconds: 1500);
+  static const _seekSafetyTimeout = Duration(seconds: 5);
+
+  @override
+  void dispose() {
+    _seekTimeoutTimer?.cancel();
+    super.dispose();
+  }
 
   String _formatDuration(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -36,6 +49,21 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final durationAsync = ref.watch(playerDurationProvider);
     final token = ref.watch(authServiceProvider).accessToken;
     final base = ref.watch(backendUrlProvider).valueOrNull;
+
+    ref.listen<AsyncValue<Duration>>(playerPositionProvider, (_, next) {
+      final target = _pendingSeekTarget;
+      if (target == null) return;
+      final pos = next.valueOrNull;
+      if (pos == null) return;
+      if (pos >= target - _seekCatchUpTolerance) {
+        _seekTimeoutTimer?.cancel();
+        setState(() {
+          _dragValue = null;
+          _pendingSeekTarget = null;
+        });
+      }
+    });
+
     final colorScheme = Theme.of(context).colorScheme;
 
     final position = positionAsync.valueOrNull ?? Duration.zero;
@@ -169,12 +197,28 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   // Progress bar
                   Slider(
                     value: sliderValue.clamp(0.0, 1.0),
-                    onChanged: (v) => setState(() => _dragValue = v),
+                    onChanged: (v) {
+                      _seekTimeoutTimer?.cancel();
+                      setState(() {
+                        _dragValue = v;
+                        _pendingSeekTarget = null;
+                      });
+                    },
                     onChangeEnd: (v) {
-                      ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: (v * maxMs).round()),
-                      );
-                      setState(() => _dragValue = null);
+                      final target =
+                          Duration(milliseconds: (v * maxMs).round());
+                      ref
+                          .read(playerNotifierProvider.notifier)
+                          .seekTo(target);
+                      _seekTimeoutTimer?.cancel();
+                      _seekTimeoutTimer = Timer(_seekSafetyTimeout, () {
+                        if (!mounted) return;
+                        setState(() {
+                          _dragValue = null;
+                          _pendingSeekTarget = null;
+                        });
+                      });
+                      setState(() => _pendingSeekTarget = target);
                     },
                   ),
                   Padding(
@@ -184,9 +228,13 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                       children: [
                         Text(
                           _formatDuration(
-                            _dragValue != null
-                                ? Duration(milliseconds: (_dragValue! * maxMs).round())
-                                : position,
+                            _pendingSeekTarget ??
+                                (_dragValue != null
+                                    ? Duration(
+                                        milliseconds:
+                                            (_dragValue! * maxMs).round(),
+                                      )
+                                    : position),
                           ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
