@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,6 +67,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   static const _kVolumeStorageKey = 'bimusic_player_volume';
 
   double _preMuteVolume = 1.0;
+  Timer? _volumePersistDebounce;
 
   @override
   PlayerState build() {
@@ -105,6 +108,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     ref.onDispose(() {
       playbackSub.cancel();
       indexSub.cancel();
+      _volumePersistDebounce?.cancel();
     });
 
     _loadPersistedVolume();
@@ -113,12 +117,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   Future<void> _loadPersistedVolume() async {
     try {
+      // Capture the default volume before the async read so we can detect
+      // whether the user already changed it while we were waiting.
+      final volumeBeforeLoad = state.volume;
       const storage = FlutterSecureStorage();
       final value = await storage.read(key: _kVolumeStorageKey);
       if (value == null) return;
       final v = double.tryParse(value);
       if (v == null) return;
       final clamped = v.clamp(0.0, 1.0);
+      // Only apply if the user hasn't already changed the volume.
+      if (state.volume != volumeBeforeLoad) return;
       state = state.copyWith(volume: clamped);
       if (clamped > 0) _preMuteVolume = clamped;
       await ref.read(audioHandlerProvider).setVolume(clamped);
@@ -196,9 +205,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
     final clamped = v.clamp(0.0, 1.0);
     await ref.read(audioHandlerProvider).setVolume(clamped);
     state = state.copyWith(volume: clamped);
-    try {
-      await const FlutterSecureStorage().write(key: _kVolumeStorageKey, value: clamped.toString());
-    } catch (_) {}
+    _volumePersistDebounce?.cancel();
+    _volumePersistDebounce = Timer(const Duration(milliseconds: 250), () {
+      const FlutterSecureStorage()
+          .write(key: _kVolumeStorageKey, value: clamped.toString())
+          .catchError((_) {});
+    });
   }
 
   Future<void> toggleMute() async {

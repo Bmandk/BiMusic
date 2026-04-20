@@ -35,7 +35,8 @@ class PlayerBar extends ConsumerWidget {
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 480,
-              maxHeight: MediaQuery.sizeOf(dialogContext).height - 48,
+              maxHeight: (MediaQuery.sizeOf(dialogContext).height - 48)
+                  .clamp(0.0, double.infinity),
             ),
             child: const FullPlayer(embedded: true),
           ),
