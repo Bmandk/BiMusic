@@ -375,6 +375,47 @@ void main() {
       expect(find.text('03:30'), findsNothing);
     });
 
+    testWidgets('backward seek stays sticky until player catches up',
+        (tester) async {
+      final notifier = _FakePlayerNotifier(playingState);
+      final controller = StreamController<Duration>.broadcast();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(buildSubjectWithStreams(
+        playingState,
+        notifier,
+        positionStream: controller.stream,
+        duration: trackDuration,
+      ));
+      await tester.pump();
+
+      // Seek backward from ~3:30 to 0:10 (0.0417 * 240 = 10 s).
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChangeEnd!(0.0417);
+      await tester.pump();
+
+      // Label shows backward seek target.
+      expect(find.text('00:10'), findsOneWidget);
+
+      // Pre-seek position (3:30 = 210 s) must NOT trigger release —
+      // 210 s is well outside the ±1.5 s tolerance around 10 s.
+      controller.add(const Duration(seconds: 210));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('00:10'), findsOneWidget);
+
+      // Position near target — releases sticky.
+      controller.add(const Duration(seconds: 10));
+      await tester.pump();
+      await tester.pump();
+
+      // Subsequent advance flows through normally.
+      controller.add(const Duration(seconds: 11));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('00:11'), findsOneWidget);
+    });
+
     testWidgets('no timer leak on dispose', (tester) async {
       final notifier = _FakePlayerNotifier(playingState);
       final controller = StreamController<Duration>.broadcast();

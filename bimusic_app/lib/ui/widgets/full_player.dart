@@ -55,7 +55,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
       if (target == null) return;
       final pos = next.valueOrNull;
       if (pos == null) return;
-      if (pos >= target - _seekCatchUpTolerance) {
+      if ((pos - target).abs() <= _seekCatchUpTolerance) {
         _seekTimeoutTimer?.cancel();
         setState(() {
           _dragValue = null;
