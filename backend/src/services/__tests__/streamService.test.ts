@@ -192,6 +192,7 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
+      duration: 240000,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -203,9 +204,10 @@ describe("resolveFilePath", () => {
 
     const result = await resolveFilePath(1);
     // /music stripped, /c/test-music prepended
-    expect(result).toContain("Artist");
-    expect(result).toContain("Album");
-    expect(result).toContain("track.flac");
+    expect(result.path).toContain("Artist");
+    expect(result.path).toContain("Album");
+    expect(result.path).toContain("track.flac");
+    expect(result.durationMs).toBe(240000);
   });
 
   it("throws 404 when track has no file", async () => {
@@ -289,6 +291,7 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
+      duration: 180000,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -309,6 +312,7 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
+      duration: 300000,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -319,7 +323,8 @@ describe("resolveFilePath", () => {
     ] as never);
 
     const result = await resolveFilePath(1);
-    expect(result).toBe("/c/test-music/Artist/track.flac");
+    expect(result.path).toBe("/c/test-music/Artist/track.flac");
+    expect(result.durationMs).toBe(300000);
   });
 });
 

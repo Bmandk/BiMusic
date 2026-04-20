@@ -305,7 +305,7 @@ describe('GET /api/stream/:trackId — streamTranscoded fast-path', () => {
   const TRACK_ID = 40;
   const FILE_ID = 400;
 
-  it('streams transcoded output to the client immediately (200, no Content-Length)', async () => {
+  it('streams transcoded output to the client immediately (200, Accept-Ranges: bytes)', async () => {
     fs.writeFileSync(path.join(fixtureDir, 'stream-fast.flac'), Buffer.alloc(512));
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'stream-fast.flac'));
 
@@ -315,9 +315,8 @@ describe('GET /api/stream/:trackId — streamTranscoded fast-path', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/audio\/mpeg/);
-    expect(res.headers['accept-ranges']).toBe('none');
-    // No Content-Length header for streaming response.
-    expect(res.headers['content-length']).toBeUndefined();
+    // Accept-Ranges: bytes so libmpv can make Range requests when seeking.
+    expect(res.headers['accept-ranges']).toBe('bytes');
     expect(mockState.callCount).toBe(1);
   });
 
@@ -366,7 +365,7 @@ describe('GET /api/stream/:trackId — streamTranscoded fast-path', () => {
       .set('Range', 'bytes=0-');
 
     expect(res.status).toBe(200);
-    expect(res.headers['accept-ranges']).toBe('none');
+    expect(res.headers['accept-ranges']).toBe('bytes');
     expect(mockState.callCount).toBe(1);
   });
 });

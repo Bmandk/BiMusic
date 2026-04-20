@@ -145,7 +145,9 @@ export function startTempFileCleanup(): void {
 }
 
 /** Resolve the on-disk path for a Lidarr track, verifying it is readable. */
-export async function resolveFilePath(trackId: number): Promise<string> {
+export async function resolveFilePath(
+  trackId: number,
+): Promise<{ path: string; durationMs: number }> {
   const track = await getTrack(trackId);
   if (!track.hasFile || !track.trackFileId) {
     logger.warn(
@@ -177,7 +179,7 @@ export async function resolveFilePath(trackId: number): Promise<string> {
     throw createError(404, "NOT_FOUND", "Track file is not readable");
   }
 
-  return localPath;
+  return { path: localPath, durationMs: track.duration };
 }
 
 /** Returns the deterministic temp file path for a given source + bitrate. */
@@ -255,6 +257,169 @@ export async function ensureTranscoded(
   return tempPath;
 }
 
+/** Parse a Range header value, returning start and end (-1 = open-ended). */
+function parseRange(rangeHeader: string): { start: number; end: number } {
+  const parts = rangeHeader.split("=");
+  const range = parts[1] ?? "";
+  const [startStr, endStr] = range.split("-");
+  return {
+    start: parseInt(startStr ?? "0", 10),
+    end: endStr ? parseInt(endStr, 10) : -1,
+  };
+}
+
+/**
+ * Serve a Range request from a temp file that is still being written by an
+ * active tee transcode. Polls the .part file as ffmpeg writes it, streaming
+ * chunks to the client until the transcode completes. This avoids blocking
+ * the full transcode before a seek can be served.
+ */
+async function serveFromGrowingFile(
+  partPath: string,
+  finalPath: string,
+  start: number,
+  requestedEnd: number,
+  estimatedTotal: number,
+  transcodeDone: Promise<void>,
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const POLL_MS = 100;
+  const WAIT_TIMEOUT_MS = 60_000;
+
+  let transcodeFinished = false;
+  let transcodeFailed = false;
+  transcodeDone
+    .then(() => {
+      transcodeFinished = true;
+    })
+    .catch(() => {
+      transcodeFinished = true;
+      transcodeFailed = true;
+    });
+
+  let clientGone = false;
+  req.on("close", () => {
+    clientGone = true;
+  });
+
+  // Wait until the part file has at least start+1 bytes.
+  const deadline = Date.now() + WAIT_TIMEOUT_MS;
+  while (Date.now() < deadline && !clientGone) {
+    let fileSize = 0;
+    try {
+      fileSize = statSync(partPath).size;
+    } catch {
+      /* not yet created */
+    }
+    if (fileSize > start) break;
+
+    if (transcodeFinished) {
+      // Transcode already done — check the renamed final file.
+      let finalSize = 0;
+      try {
+        finalSize = statSync(finalPath).size;
+      } catch {
+        /* doesn't exist */
+      }
+      if (finalSize > start) break;
+      if (!res.headersSent) {
+        res
+          .status(416)
+          .setHeader("Content-Range", `bytes */${estimatedTotal}`)
+          .end();
+      }
+      return;
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, POLL_MS));
+  }
+
+  if (clientGone) return;
+
+  if (Date.now() >= deadline && !res.headersSent) {
+    res
+      .status(503)
+      .json({ error: { code: "SEEK_TIMEOUT", message: "Seek timed out" } });
+    return;
+  }
+
+  if (transcodeFailed && !res.headersSent) {
+    res.status(500).json({
+      error: { code: "TRANSCODE_ERROR", message: "Transcoding failed" },
+    });
+    return;
+  }
+
+  const effectiveEnd = requestedEnd >= 0 ? requestedEnd : estimatedTotal - 1;
+
+  res.status(206);
+  res.setHeader("Content-Type", "audio/mpeg");
+  res.setHeader("Accept-Ranges", "bytes");
+  res.setHeader(
+    "Content-Range",
+    `bytes ${start}-${effectiveEnd}/${estimatedTotal}`,
+  );
+
+  let position = start;
+  const targetEnd = effectiveEnd;
+
+  while (position <= targetEnd && !clientGone) {
+    let filePath = partPath;
+    let fileSize = 0;
+    try {
+      fileSize = statSync(partPath).size;
+    } catch {
+      /* part file renamed to final */
+    }
+
+    if (fileSize === 0 && transcodeFinished) {
+      try {
+        fileSize = statSync(finalPath).size;
+        filePath = finalPath;
+      } catch {
+        break;
+      }
+    }
+
+    if (fileSize > position) {
+      const chunkEnd = Math.min(fileSize - 1, targetEnd);
+      let bytesRead = 0;
+      await new Promise<void>((resolve, reject) => {
+        const rs = createReadStream(filePath, {
+          start: position,
+          end: chunkEnd,
+        });
+        rs.on("error", reject);
+        rs.on("end", () => {
+          position += bytesRead;
+          resolve();
+        });
+        rs.on("data", (chunk: string | Buffer) => {
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bytesRead += buf.length;
+          if (clientGone) {
+            rs.destroy();
+            return;
+          }
+          const ok = res.write(buf);
+          if (!ok) {
+            rs.pause();
+            res.once("drain", () => {
+              if (!clientGone) rs.resume();
+            });
+          }
+        });
+      });
+    } else if (transcodeFinished) {
+      break;
+    } else {
+      await new Promise<void>((resolve) => setTimeout(resolve, POLL_MS));
+    }
+  }
+
+  if (!res.destroyed && !res.writableEnded) res.end();
+}
+
 /**
  * Stream a transcoded track to the response, tee-ing to disk for caching.
  *
@@ -265,16 +430,25 @@ export async function ensureTranscoded(
  * Subsequent requests (cached file exists): served with full Range / 206
  * support via serveFile.
  *
- * Range requests that are not an open bytes=0- probe: fall back to the
- * blocking ensureTranscoded path so seek 206 semantics are preserved.
+ * Range requests during an active tee transcode: served from the growing
+ * .part file via serveFromGrowingFile so seeks don't block the full transcode.
+ *
+ * Range requests with no cached file and no active transcode: fall back to
+ * the blocking ensureTranscoded path.
  */
 export async function streamTranscoded(
   sourcePath: string,
   bitrate: number,
   req: Request,
   res: Response,
+  durationMs?: number,
 ): Promise<void> {
   const tempPath = getTempFilePath(sourcePath, bitrate);
+  // Estimated CBR MP3 size — used for Content-Range headers in seek responses.
+  const estimatedBytes =
+    durationMs != null && durationMs > 0
+      ? Math.ceil((bitrate * 1000) / 8 / 1000) * durationMs
+      : 0;
 
   // Cached: serve with full Range support.
   if (existsSync(tempPath)) {
@@ -282,9 +456,31 @@ export async function streamTranscoded(
     return;
   }
 
-  // Non-trivial range (seek) with no cached file: wait for full transcode.
   const rangeHeader = req.headers.range;
-  if (rangeHeader && rangeHeader.trim() !== "bytes=0-") {
+  const isNonTrivialRange =
+    rangeHeader != null && rangeHeader.trim() !== "bytes=0-";
+
+  // Non-trivial range (seek) with no cached file.
+  if (isNonTrivialRange) {
+    // If a tee transcode is already in progress, serve from the growing part
+    // file rather than blocking until the full transcode completes.
+    const existing = inProgressTranscodes.get(tempPath);
+    if (existing != null && estimatedBytes > 0) {
+      const { start, end } = parseRange(rangeHeader);
+      const partPath = `${tempPath}.part`;
+      await serveFromGrowingFile(
+        partPath,
+        tempPath,
+        start,
+        end,
+        estimatedBytes,
+        existing,
+        req,
+        res,
+      );
+      return;
+    }
+    // No active transcode: block until the full transcode finishes.
     const filePath = await ensureTranscoded(sourcePath, bitrate);
     serveFile(filePath, req, res);
     return;
@@ -316,7 +512,8 @@ export async function streamTranscoded(
     headersFlushed = true;
     res.status(200);
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Accept-Ranges", "none");
+    // bytes (not none) so libmpv knows it can make Range requests for seeks.
+    res.setHeader("Accept-Ranges", "bytes");
     res.flushHeaders();
   };
 

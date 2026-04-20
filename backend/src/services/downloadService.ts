@@ -221,7 +221,7 @@ export async function processOnePendingDownload(): Promise<void> {
     .run();
 
   try {
-    const sourcePath = await resolveFilePath(pending.lidarrTrackId);
+    const { path: sourcePath } = await resolveFilePath(pending.lidarrTrackId);
     const outputDir = path.join(env.OFFLINE_STORAGE_PATH, pending.userId);
     mkdirSync(outputDir, { recursive: true });
     const outputPath = getOfflineFilePath(

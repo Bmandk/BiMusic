@@ -42,12 +42,12 @@ router.get(
         bitrate = parsed;
       }
 
-      const sourcePath = await resolveFilePath(trackId);
+      const { path: sourcePath, durationMs } = await resolveFilePath(trackId);
 
       if (isPassthrough(sourcePath)) {
         serveFile(sourcePath, req, res);
       } else {
-        await streamTranscoded(sourcePath, bitrate, req, res);
+        await streamTranscoded(sourcePath, bitrate, req, res, durationMs);
       }
     } catch (err) {
       next(err);

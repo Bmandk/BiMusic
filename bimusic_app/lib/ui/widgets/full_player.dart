@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +23,17 @@ class FullPlayer extends ConsumerStatefulWidget {
 
 class _FullPlayerState extends ConsumerState<FullPlayer> {
   double? _dragValue;
+  // Holds the seek target after onChangeEnd so the slider doesn't snap back
+  // to the old position before the position stream catches up.
+  Duration? _seekTarget;
+  Timer? _seekReleaseTimer;
   bool _showQueue = false;
+
+  @override
+  void dispose() {
+    _seekReleaseTimer?.cancel();
+    super.dispose();
+  }
 
   String _formatDuration(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -41,8 +53,29 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final position = positionAsync.valueOrNull ?? Duration.zero;
     final duration = durationAsync.valueOrNull ?? Duration.zero;
     final maxMs = duration.inMilliseconds.toDouble();
-    final posMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs);
-    final sliderValue = maxMs > 0 ? (_dragValue ?? posMs / maxMs) : 0.0;
+    // While dragging, use _dragValue. After releasing, hold _seekTarget until
+    // the position stream catches up (prevents the slider from snapping back).
+    final effectivePositionMs = _dragValue != null
+        ? _dragValue! * maxMs
+        : (_seekTarget != null
+            ? _seekTarget!.inMilliseconds.toDouble()
+            : position.inMilliseconds.toDouble()).clamp(0.0, maxMs);
+    final sliderValue = maxMs > 0 ? effectivePositionMs / maxMs : 0.0;
+
+    // Release the seek target once the position stream reaches within 2 s of it.
+    if (_seekTarget != null &&
+        (position.inMilliseconds - _seekTarget!.inMilliseconds).abs() < 2000) {
+      // Use addPostFrameCallback to avoid calling setState during build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _seekTarget != null) {
+          setState(() {
+            _seekTarget = null;
+            _seekReleaseTimer?.cancel();
+            _seekReleaseTimer = null;
+          });
+        }
+      });
+    }
 
     if (!playerState.hasTrack) {
       return const SizedBox(height: 200, child: Center(child: Text('Nothing playing')));
@@ -171,10 +204,20 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                     value: sliderValue.clamp(0.0, 1.0),
                     onChanged: (v) => setState(() => _dragValue = v),
                     onChangeEnd: (v) {
-                      ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: (v * maxMs).round()),
+                      final target = Duration(
+                        milliseconds: (v * maxMs).round(),
                       );
-                      setState(() => _dragValue = null);
+                      ref.read(playerNotifierProvider.notifier).seekTo(target);
+                      _seekReleaseTimer?.cancel();
+                      // Hold the seek target so the slider stays put while
+                      // libmpv completes the seek and the stream catches up.
+                      _seekReleaseTimer = Timer(const Duration(seconds: 3), () {
+                        if (mounted) setState(() => _seekTarget = null);
+                      });
+                      setState(() {
+                        _dragValue = null;
+                        _seekTarget = target;
+                      });
                     },
                   ),
                   Padding(
@@ -186,7 +229,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                           _formatDuration(
                             _dragValue != null
                                 ? Duration(milliseconds: (_dragValue! * maxMs).round())
-                                : position,
+                                : (_seekTarget ?? position),
                           ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
