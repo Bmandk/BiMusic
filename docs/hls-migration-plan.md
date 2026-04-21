@@ -69,7 +69,7 @@ streamer, so we stop fighting idiosyncrasies of one playback stack.
 Replace the single `GET /api/stream/:trackId` endpoint with two HLS
 endpoints under `/api/stream`:
 
-```
+```text
 GET /api/stream/:trackId/playlist.m3u8?bitrate=128&token=<jwt>
 GET /api/stream/:trackId/segment/:index?bitrate=128&token=<jwt>
 ```
@@ -115,7 +115,7 @@ Why these choices:
 
 ### 2.3 On-disk cache layout
 
-```
+```text
 $HLS_CACHE_DIR/<trackKey>/
     segment000.ts
     segment001.ts
@@ -195,7 +195,7 @@ the wire protocol doesn't change.
 
 Rebuilt on every request (not cached — see § 2.3):
 
-```
+```m3u8
 #EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-TARGETDURATION:6
@@ -233,7 +233,7 @@ Three details worth calling out:
 
 ### 2.6 ffmpeg invocation for a single segment
 
-```
+```bash
 ffmpeg -nostdin -hide_banner -loglevel warning \
        -ss <N*6> -i <sourcePath> \
        -t 6 \
@@ -367,7 +367,7 @@ Test file moves:
 
 New env variables in `backend/.env.example` and `backend/src/config/env.ts`:
 
-- `HLS_CACHE_DIR` — absolute path. Default `./data/hls`.
+- `HLS_CACHE_DIR` — path to the segment cache directory (absolute or relative; relative paths are resolved against the application working directory). Default `./data/hls`.
 - `HLS_SEGMENT_SECONDS` — default `6`. Exposed for experimentation; the
   default is what ships.
 
@@ -460,7 +460,7 @@ the AudioSource boundary.
 - `backend/tests/integration/hls.test.ts` (new):
   - `GET /api/stream/:id/playlist.m3u8` — 200, correct `Content-Type`,
     correct segment count for a stubbed Lidarr track duration.
-  - `GET /api/stream/:id/segment/000.ts` — 200, `Content-Type: video/mp2t`,
+  - `GET /api/stream/:id/segment/000` — 200, `Content-Type: video/mp2t`,
     non-empty body (mock ffmpeg writes a fake TS payload).
   - Out-of-range index → 416 or 400.
   - Missing auth → 401 on both endpoints.
