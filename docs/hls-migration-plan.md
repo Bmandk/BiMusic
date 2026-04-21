@@ -167,13 +167,28 @@ spawn is ~50 ms CPU — but it's more process churn than Option B.
 Cons (format-specific): OGG Vorbis sources without an embedded seek index
 require a linear scan from file start on every `-ss` invocation. Under
 Option A this multiplies: 170 segments × full-file scan ≈ quadratic cost.
-**Mitigation:** detect OGG-without-index in `generateSegment` (via
-`ffprobe` at resolve time — check `format_name === "ogg"` and the absence
-of an index) and fall back to Option B for that one track: spawn a single
-continuous `ffmpeg ... -f segment -segment_time 6 ...` that fills the
-cache dir sequentially, with on-demand spawns only used to catch up on
-seeks ahead of the transcoder. All other formats (MP3, FLAC, AAC, ALAC,
-Opus) stay on Option A.
+
+**Mitigation (preferred — pre-transcode to seekable MP3):** on first
+playlist request, detect `format_name === "ogg"` via
+`ffprobe -v quiet -of json -show_entries format=format_name`. If the
+source is OGG, kick off a background full-transcode to
+`<cacheDir>/<trackKey>/source.mp3` (a single `ffmpeg -i <source>
+-c:a libmp3lame -b:a <bitrate>k source.mp3`). While that runs, serve
+any requested segments using Option B catch-up from the growing MP3
+intermediate — or simply queue segments until the MP3 is ready if no
+user seek has been issued. Once `source.mp3` exists, all subsequent
+segment requests run Option A against the seekable MP3. This avoids
+the Option B bookkeeping entirely after the first access and requires
+no ffprobe seek-index introspection beyond the format name check.
+
+**Alternative (Option B fallback):** if the pre-transcode approach
+proves hard to integrate, fall back to spawning a single continuous
+`ffmpeg ... -f segment -segment_time 6 ...` that fills the cache dir
+sequentially, with on-demand spawns only used for seeks ahead of the
+transcoder. More bookkeeping; prefer the pre-transcode path.
+
+All other formats (MP3, FLAC, AAC, ALAC, Opus) have reliable seek
+tables and stay on Option A with no pre-processing.
 
 **Option B — eager background transcode + lazy catch-up.** Same as A, but
 on first playlist request also kick off a single background ffmpeg that
