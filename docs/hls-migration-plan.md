@@ -123,8 +123,10 @@ $HLS_CACHE_DIR/<trackKey>/
     segment169.ts            # for a 17-min track at 6 s segments
 ```
 
-`<trackKey>` is `sha256(sourcePath + ":" + bitrate)` (hex). Same keying
-scheme as the current MP3 cache — different bitrate ⇒ different cache dir.
+`<trackKey>` is `sha256(sourcePath + ":" + sourceMtimeMs + ":" + sourceSize + ":" + bitrate)` (hex).
+Including the source file's mtime and byte-size in the key means the cache
+automatically invalidates when the source file is replaced (e.g. Lidarr
+re-downloads at higher quality). Different bitrate ⇒ different cache dir.
 
 **Only segments are cached on disk. The playlist is rebuilt fresh on every
 request** because it embeds the caller's JWT into each segment URI (see
@@ -243,6 +245,15 @@ Three details worth calling out:
   source with a fresh playlist URL, which now embeds the new token into
   every segment URI transparently. Within one access-token lifetime
   (15 min today) the token is stable and segments just work.
+- **Token redaction in logs.** Segment and playlist URLs contain
+  `?token=<jwt>` as a query parameter. This value must be stripped before
+  any URL is emitted to HTTP access logs, reverse-proxy logs, application
+  request/response logs, or error telemetry. Implement this in Pino's
+  `serializers` or in Express middleware (redact `req.url` and
+  `req.query.token` before logging) so the rule applies uniformly to both
+  the playlist and segment routes. Failure to redact leaks valid JWTs into
+  log files, which are often stored with weaker access controls than the
+  secrets they contain.
 - **Last segment's `EXTINF`** reflects the *actual* remaining duration, not
   6 s, so the computed duration matches Lidarr's metadata.
 
@@ -259,9 +270,10 @@ ffmpeg -nostdin -hide_banner -loglevel warning \
 ```
 
 Then `rename()` `.part` → final. Input-side `-ss` is fast for both FLAC
-(seek table) and MP3 (CBR or Xing header). For OGG Vorbis that lacks a
-seek index we fall back to Option B (see § 2.4) instead of paying the
-linear-scan cost 170 times.
+(seek table) and MP3 (CBR or Xing header). For OGG Vorbis sources,
+use the pre-transcode-to-MP3 path described in § 2.4 (preferred) rather
+than paying the linear-scan cost per segment; Option B is the fallback
+only when pre-transcoding is not feasible.
 
 **Timestamp strategy.** Each segment is an independent ffmpeg run. Without
 `-output_ts_offset <N*6>` every segment's PTS would restart near zero;
