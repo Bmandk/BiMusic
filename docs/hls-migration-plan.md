@@ -294,8 +294,10 @@ Exactly one segment is produced per ffmpeg invocation, which avoids the
 
 - `backend/src/services/hlsService.ts` — the whole HLS story:
   - `getHlsCacheDir(trackKey)` — resolves cache dir path.
-  - `computeTrackKey(sourcePath, bitrate)` — sha256 hash (mirrors the
-    current `getTempFilePath` helper).
+  - `computeTrackKey(sourcePath, sourceMtimeMs, sourceSize, bitrate)` —
+    sha256 hash that includes file metadata so the key changes when the
+    source file is replaced at the same path (mirrors the current
+    `getTempFilePath` helper but with mtime/size fingerprinting).
   - `buildPlaylist(durationMs, segmentCount, bitrate, token)` — pure
     function that returns playlist text.
   - `generateSegment({ sourcePath, bitrate, segmentIndex })` — spawns
@@ -303,8 +305,9 @@ Exactly one segment is produced per ffmpeg invocation, which avoids the
     Deduplicates concurrent callers via a `Map<segmentKey, Promise<string>>`.
     Registers the ffmpeg command with `registerFfmpegCommand` for graceful
     shutdown (same mechanism as today).
-  - `ensureSegment(...)` — returns the path to a ready segment, generating
-    on demand if missing.
+  - `ensureSegment({ sourcePath, bitrate, segmentIndex, trackKey })` —
+    returns the absolute path to a ready segment file, generating it on
+    demand via `generateSegment` if missing from cache.
   - `initHlsCacheDir()` — called at boot; clears stale `.part` files.
   - `startHlsCacheCleanup()` — hourly prune of cache dirs not touched in
     24 h. (Mirrors the current `startTempFileCleanup`.)
@@ -336,8 +339,8 @@ Two small handlers replace the one existing `GET /api/stream/:trackId`:
 //  - serve the .ts file with Content-Type: video/mp2t; add an optional
 //    contentType parameter to serveFile() in trackFileResolver.ts so
 //    both the download route (audio/mpeg) and the HLS segment route
-//    (video/mp2t) can share the same Range-capable helper without
-//    hardcoding the MIME type
+//    (video/mp2t) can share the same Range-capable helper:
+//    serveFile(segmentPath, req, res, { contentType: 'video/mp2t' })
 ```
 
 Remove from the current route file:
@@ -365,7 +368,7 @@ the two consumers to import from the new path:
   downloads via Range), so **keep `serveFile`** in `trackFileResolver.ts`
   and update the import path. Add an optional `contentType` parameter
   (default `'audio/mpeg'`) so the HLS segment route can call
-  `serveFile(res, segmentPath, { contentType: 'video/mp2t' })` without
+  `serveFile(segmentPath, req, res, { contentType: 'video/mp2t' })` without
   a dedicated wrapper — no need for a separate `serveStaticFile`.
 
 Helpers retained in `trackFileResolver.ts`:
@@ -493,7 +496,7 @@ the AudioSource boundary.
     correct segment count for a stubbed Lidarr track duration.
   - `GET /api/stream/:id/segment/000` — 200, `Content-Type: video/mp2t`,
     non-empty body (mock ffmpeg writes a fake TS payload).
-  - Out-of-range index → 416 or 400.
+  - Out-of-range index (< 0 or >= segmentCount) → 400 Bad Request.
   - Missing auth → 401 on both endpoints.
 
 - Delete `streamService.test.ts` and the old `stream.test.ts` integration
