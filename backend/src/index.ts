@@ -4,11 +4,11 @@ import { logger } from "./utils/logger.js";
 import { createApp } from "./app.js";
 import { runMigrations } from "./db/migrate.js";
 import { bootstrapAdminIfNeeded } from "./services/userService.js";
+import { killAllActiveTranscodes } from "./services/trackFileResolver.js";
 import {
-  initTempDir,
-  startTempFileCleanup,
-  killAllActiveTranscodes,
-} from "./services/streamService.js";
+  initHlsCacheDir,
+  startHlsCacheCleanup,
+} from "./services/hlsService.js";
 import {
   startDownloadWorker,
   resetStuckDownloads,
@@ -59,8 +59,8 @@ function startServer(): Promise<void> {
 async function main() {
   runMigrations();
   await bootstrapAdminIfNeeded();
-  initTempDir();
-  startTempFileCleanup();
+  initHlsCacheDir();
+  startHlsCacheCleanup();
   resetStuckDownloads();
   startDownloadWorker();
   await startServer();

@@ -14,4 +14,5 @@ process.env['MUSIC_LIBRARY_PATH'] = '/music';
 process.env['OFFLINE_STORAGE_PATH'] = './data/offline';
 process.env['ADMIN_USERNAME'] = 'admin';
 process.env['ADMIN_PASSWORD'] = 'adminpassword123';
-process.env['TEMP_DIR'] = '/tmp/bimusic';
+process.env['HLS_CACHE_DIR'] = '/tmp/bimusic-hls-test';
+process.env['HLS_SEGMENT_SECONDS'] = '6';

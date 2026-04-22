@@ -122,7 +122,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
       'bitrate': '$_bitrate',
       if (_accessToken != null) 'token': _accessToken!,
     };
-    final uri = Uri.parse('$_baseUrl/api/stream/${t.id}')
+    final uri = Uri.parse('$_baseUrl/api/stream/${t.id}/playlist.m3u8')
         .replace(queryParameters: params);
     return AudioSource.uri(uri);
   }
