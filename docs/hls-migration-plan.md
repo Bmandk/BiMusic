@@ -329,12 +329,15 @@ Two small handlers replace the one existing `GET /api/stream/:trackId`:
 // GET /api/stream/:trackId/segment/:index
 //  - auth
 //  - parse :index as int (parseInt tolerates leading zeros like "000"),
-//    reject > segmentCount or < 0
+//    reject >= segmentCount or < 0 (indices are zero-based; last valid
+//    index is segmentCount - 1)
 //  - resolveFilePath + bitrate parsing (same as playlist)
 //  - ensureSegment() → absolute file path
-//  - serveFile() the .ts file with Content-Type: video/mp2t (reuse the
-//    helper kept in trackFileResolver.ts — standard Range-capable file
-//    serve, though segments are small enough Range rarely matters)
+//  - serve the .ts file with Content-Type: video/mp2t; add an optional
+//    contentType parameter to serveFile() in trackFileResolver.ts so
+//    both the download route (audio/mpeg) and the HLS segment route
+//    (video/mp2t) can share the same Range-capable helper without
+//    hardcoding the MIME type
 ```
 
 Remove from the current route file:
@@ -360,9 +363,10 @@ the two consumers to import from the new path:
   `./streamService.js` for serving the finished offline MP3. The download
   route needs full HTTP Range semantics (clients may resume interrupted
   downloads via Range), so **keep `serveFile`** in `trackFileResolver.ts`
-  and update the import path. The HLS segment route does *not* need the
-  full Range story (segments are small, typically served 200 OK), but it
-  can reuse the same helper — no need for a separate `serveStaticFile`.
+  and update the import path. Add an optional `contentType` parameter
+  (default `'audio/mpeg'`) so the HLS segment route can call
+  `serveFile(res, segmentPath, { contentType: 'video/mp2t' })` without
+  a dedicated wrapper — no need for a separate `serveStaticFile`.
 
 Helpers retained in `trackFileResolver.ts`:
 
