@@ -1,0 +1,19 @@
+# Enforce LF line endings in the working tree for files that Prettier
+# (and other LF-default tooling) formats. Prettier 3's default
+# `endOfLine: "lf"` otherwise flags Windows checkouts as mis-formatted
+# while CI (Linux) sees the files as fine — a difference that silently
+# blocks local pre-commit hooks.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.dart text eol=lf
+
+# Windows-native scripts should keep CRLF regardless of platform.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
