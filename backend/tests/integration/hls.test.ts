@@ -248,9 +248,9 @@ describe("GET /api/stream/:id/playlist — happy path", () => {
   it("returns 200 with correct Content-Type", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`,
+    );
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(
@@ -261,9 +261,9 @@ describe("GET /api/stream/:id/playlist — happy path", () => {
   it("returns a valid HLS playlist with #EXTM3U and #EXT-X-ENDLIST", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`,
+    );
 
     const body = res.text;
     expect(body).toMatch(/^#EXTM3U/);
@@ -273,9 +273,9 @@ describe("GET /api/stream/:id/playlist — happy path", () => {
   it(`emits ${SEGMENT_COUNT} segments for a ${TRACK_DURATION_MS / 1000}s track`, async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`,
+    );
 
     const extinf = (res.text.match(/#EXTINF:/g) ?? []).length;
     expect(extinf).toBe(SEGMENT_COUNT);
@@ -284,19 +284,19 @@ describe("GET /api/stream/:id/playlist — happy path", () => {
   it("embeds the query token into segment URIs", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=secretjwt`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`,
+    );
 
-    expect(res.text).toContain("token=secretjwt");
+    expect(res.text).toContain(`token=${token}`);
   });
 
   it("sets Cache-Control: no-store", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`,
+    );
 
     expect(res.headers["cache-control"]).toBe("no-store");
   });

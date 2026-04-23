@@ -639,27 +639,34 @@ class BiMusicAudioHandler extends BaseAudioHandler {
       await session.configure(const AudioSessionConfiguration.music());
     } catch (_) {}
 
-    await _backend.init();
+    try {
+      await _backend.init();
 
-    _backend.processingStateStream.listen(
-      (_) {
-        dev.log(
-          '[BiMusicAudio] processingState: ${_backend.processingState} playing=${_backend.playing}',
-        );
-        _broadcastState();
-      },
-      onError: (Object e, StackTrace st) =>
-          dev.log('[BiMusicAudio] processingStateStream error: $e\n$st'),
-    );
-    _backend.playingStream.listen(
-      (_) => _broadcastState(),
-      onError: (Object e, StackTrace st) =>
-          dev.log('[BiMusicAudio] playingStream error: $e\n$st'),
-    );
-    _backend.indexStream.listen(_onCurrentIndexChanged);
-    _backend.durationStream.listen(_onDurationChanged);
+      _backend.processingStateStream.listen(
+        (_) {
+          dev.log(
+            '[BiMusicAudio] processingState: ${_backend.processingState} playing=${_backend.playing}',
+          );
+          _broadcastState();
+        },
+        onError: (Object e, StackTrace st) =>
+            dev.log('[BiMusicAudio] processingStateStream error: $e\n$st'),
+      );
+      _backend.playingStream.listen(
+        (_) => _broadcastState(),
+        onError: (Object e, StackTrace st) =>
+            dev.log('[BiMusicAudio] playingStream error: $e\n$st'),
+      );
+      _backend.indexStream.listen(_onCurrentIndexChanged);
+      _backend.durationStream.listen(_onDurationChanged);
 
-    _initCompleter.complete();
+      _initCompleter.complete();
+    } catch (e, st) {
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.completeError(e, st);
+      }
+      rethrow;
+    }
   }
 
   void _onCurrentIndexChanged(int? index) {
