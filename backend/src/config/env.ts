@@ -41,7 +41,7 @@ const envSchema = z.object({
   PM2_LOG_PATH: z.string().optional(),
   ADMIN_USERNAME: z.string().default("admin"),
   ADMIN_PASSWORD: z.string().min(8),
-  HLS_CACHE_DIR: z.string().default("./data/hls"),
+  HLS_CACHE_DIR: z.string().min(1).default("./data/hls"),
   HLS_SEGMENT_SECONDS: z.coerce.number().int().positive().default(6),
 });
 

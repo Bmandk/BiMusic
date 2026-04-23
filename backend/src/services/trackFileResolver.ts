@@ -162,11 +162,10 @@ export function serveFile(
   filePath: string,
   req: Request,
   res: Response,
-  options?: { contentType?: string },
+  options?: { contentType?: string; fileSize?: number },
 ): void {
   const contentType = options?.contentType ?? "audio/mpeg";
-  const stat = statSync(filePath);
-  const fileSize = stat.size;
+  const fileSize = options?.fileSize ?? statSync(filePath).size;
   const rangeHeader = req.headers.range;
 
   res.setHeader("Accept-Ranges", "bytes");

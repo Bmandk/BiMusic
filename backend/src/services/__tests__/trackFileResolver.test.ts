@@ -142,6 +142,26 @@ describe("resolveFilePath", () => {
     expect(result.durationMs).toBe(240000);
   });
 
+  it("returns durationMs: 0 when track duration is 0", async () => {
+    vi.mocked(lidarrClient.getTrack).mockResolvedValue({
+      id: 1,
+      hasFile: true,
+      trackFileId: 10,
+      duration: 0,
+    } as never);
+    vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
+      id: 10,
+      path: "/music/Artist/Album/track.flac",
+    } as never);
+    vi.mocked(lidarrClient.getRootFolders).mockResolvedValue([
+      { path: "/music/" },
+    ] as never);
+
+    const result = await resolveFilePath(1);
+    expect(result.durationMs).toBe(0);
+    expect(result.sourcePath).toContain("Artist");
+  });
+
   it("throws 404 when track has no file", async () => {
     vi.mocked(lidarrClient.getTrack).mockResolvedValue({
       id: 1,

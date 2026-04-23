@@ -152,17 +152,15 @@ export async function generateSegment(opts: {
       .output(partPath);
 
     let done = false;
+    let timedOut = false;
 
     const timeout = setTimeout(() => {
-      if (done) return;
-      done = true;
+      timedOut = true;
       try {
         cmd.kill("SIGTERM");
       } catch {
         /* ignore */
       }
-      unregisterFfmpegCommand(cmd);
-      releaseTranscodeSlot();
       try {
         unlinkSync(partPath);
       } catch {
@@ -182,6 +180,7 @@ export async function generateSegment(opts: {
         clearTimeout(timeout);
         unregisterFfmpegCommand(cmd);
         releaseTranscodeSlot();
+        if (timedOut) return;
         try {
           renameSync(partPath, segPath);
           resolve(segPath);
@@ -200,6 +199,7 @@ export async function generateSegment(opts: {
         } catch {
           /* ignore */
         }
+        if (timedOut) return;
         reject(err);
       });
 

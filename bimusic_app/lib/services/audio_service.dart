@@ -277,6 +277,8 @@ class _MediaKitBackend implements _PlayerBackend {
   // Updated before every playQueue call via updateSegmentDuration().
   Duration _segmentDuration = const Duration(seconds: 6);
 
+  bool _isShuffled = false;
+
   static final _segmentIndexPattern = RegExp(r'/segment/(\d+)');
 
   void _emit(AudioProcessingState s) {
@@ -303,7 +305,16 @@ class _MediaKitBackend implements _PlayerBackend {
 
     if (trackChanged) {
       _queue = _queue.withCurrentIndex(matched).withSegmentOffset(Duration.zero);
-      dev.log('[BiMusicAudio] track change: index=$matched path=$path');
+      final logUri = Uri.tryParse(path);
+      final safePath = logUri != null
+          ? logUri.replace(
+              queryParameters: {
+                for (final e in logUri.queryParameters.entries)
+                  e.key: e.key == 'token' ? '[REDACTED]' : e.value,
+              },
+            ).toString()
+          : path;
+      dev.log('[BiMusicAudio] track change: index=$matched path=$safePath');
       _indexCtrl.add(matched);
       if (matched < _queue.durations.length &&
           _queue.durations[matched] > Duration.zero) {
@@ -515,11 +526,19 @@ class _MediaKitBackend implements _PlayerBackend {
 
   @override
   Future<void> seekToNext() async {
+    if (_isShuffled) {
+      await _p.next();
+      return;
+    }
     if (hasNext) await jumpTo(_queue.currentIndex! + 1);
   }
 
   @override
   Future<void> seekToPrevious() async {
+    if (_isShuffled) {
+      await _p.previous();
+      return;
+    }
     if (hasPrevious) await jumpTo(_queue.currentIndex! - 1);
   }
 
@@ -544,7 +563,10 @@ class _MediaKitBackend implements _PlayerBackend {
       }[mode]!);
 
   @override
-  Future<void> setShuffle(bool enabled) => _p.setShuffle(enabled);
+  Future<void> setShuffle(bool enabled) {
+    _isShuffled = enabled;
+    return _p.setShuffle(enabled);
+  }
 
   @override
   void updateSegmentDuration(Duration d) => _segmentDuration = d;
@@ -713,7 +735,13 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     };
     final uri = Uri.parse('$_baseUrl/api/stream/${t.id}/playlist.m3u8')
         .replace(queryParameters: params);
-    dev.log('[BiMusicAudio] Track ${t.id}: stream URL = $uri');
+    final logUri = uri.replace(
+      queryParameters: {
+        for (final e in uri.queryParameters.entries)
+          e.key: e.key == 'token' ? '[REDACTED]' : e.value,
+      },
+    );
+    dev.log('[BiMusicAudio] Track ${t.id}: stream URL = $logUri');
     return uri;
   }
 

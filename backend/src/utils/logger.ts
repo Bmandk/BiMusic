@@ -4,7 +4,7 @@ import pino from "pino";
 // Covers req.query.token (if a full req object is ever logged) and the
 // common manual pattern { url: req.url }.
 const redact: pino.redactOptions = {
-  paths: ["req.query.token", "*.query.token", "url", "req.url"],
+  paths: ["req.query.token", "*.query.token"],
   censor: "[REDACTED]",
 };
 

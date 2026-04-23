@@ -75,6 +75,16 @@ void main() {
       expect(t.withinSegment, const Duration(seconds: 1));
       expect(t.sameSegment, isFalse);
     });
+
+    test('returns segment 0 when segmentDuration is zero', () {
+      final result = computeHlsSeekTarget(
+        seekTo: const Duration(seconds: 30),
+        currentSegmentOffset: Duration.zero,
+        segmentDuration: Duration.zero,
+      );
+      expect(result.targetSegment, 0);
+      expect(result.sameSegment, isTrue);
+    });
   });
 
   // ──────────────────────────────────────────────

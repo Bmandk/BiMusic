@@ -385,7 +385,7 @@ void main() {
             albumTitle: 'Test Album',
             imageUrl: 'http://img.jpg',
             localFilePaths: any(named: 'localFilePaths'),
-            segmentSeconds: any(named: 'segmentSeconds'),
+            segmentSeconds: 6,
           )).called(1);
     });
 

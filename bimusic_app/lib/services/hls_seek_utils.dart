@@ -30,6 +30,13 @@ HlsSeekTarget computeHlsSeekTarget({
   required Duration currentSegmentOffset,
   required Duration segmentDuration,
 }) {
+  if (segmentDuration.inMilliseconds <= 0) {
+    return HlsSeekTarget(
+      targetSegment: 0,
+      withinSegment: Duration(milliseconds: max(0, seekTo.inMilliseconds)),
+      sameSegment: true,
+    );
+  }
   final segmentMs = segmentDuration.inMilliseconds;
   final clampedMs = max(0, seekTo.inMilliseconds);
   final targetSegment = clampedMs ~/ segmentMs;
