@@ -62,6 +62,7 @@ abstract class _PlayerBackend {
   Future<void> setLoopMode(_LoopMode mode);
   Future<void> setShuffle(bool enabled);
   void updateSegmentDuration(Duration d);
+  Future<void> dispose();
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +183,9 @@ class _JustAudioBackend implements _PlayerBackend {
 
   @override
   void updateSegmentDuration(Duration d) {}
+
+  @override
+  Future<void> dispose() => _p.dispose();
 }
 
 // ---------------------------------------------------------------------------
@@ -578,6 +582,14 @@ class _MediaKitBackend implements _PlayerBackend {
 
   @override
   void updateSegmentDuration(Duration d) => _segmentDuration = d;
+
+  @override
+  Future<void> dispose() async {
+    await _psCtrl.close();
+    await _indexCtrl.close();
+    await _durationCtrl.close();
+    await _p.dispose();
+  }
 }
 
 // ---------------------------------------------------------------------------

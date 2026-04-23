@@ -73,11 +73,10 @@ import { env } from "../../src/config/env.js";
 
 const LIDARR = "http://localhost:8686";
 
-// Track duration: 240 seconds = 240000 ms
-// Segment length: 6 s
-// Expected segments: ceil(240000 / 6000) = 40
 const TRACK_DURATION_MS = 240000;
-const SEGMENT_COUNT = 40;
+const SEGMENT_COUNT = Math.ceil(
+  TRACK_DURATION_MS / (env.HLS_SEGMENT_SECONDS * 1000),
+);
 
 let app: Express;
 let token: string;
@@ -162,6 +161,8 @@ beforeAll(async () => {
   const res = await request(app)
     .post("/api/auth/login")
     .send({ username: "admin", password: "adminpassword123" });
+  expect(res.status).toBe(200);
+  expect(typeof res.body.accessToken).toBe("string");
   token = res.body.accessToken as string;
 });
 
@@ -317,9 +318,9 @@ describe("GET /api/stream/:id/playlist.m3u8 — happy path", () => {
   it("returns 200 with correct Content-Type", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=mytoken`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=${token}`,
+    );
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(
@@ -330,9 +331,9 @@ describe("GET /api/stream/:id/playlist.m3u8 — happy path", () => {
   it("returns a valid HLS playlist", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=mytoken`)
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=${token}`,
+    );
 
     expect(res.text).toMatch(/^#EXTM3U/);
     expect(res.text).toContain("#EXT-X-ENDLIST");
@@ -424,7 +425,7 @@ describe("GET /api/stream/:id/segment/:index — index validation", () => {
   it("returns 400 when segment index >= segmentCount", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    // segmentCount = ceil(240000 / 6000) = 40; index 40 is out-of-range
+    // SEGMENT_COUNT = 40; index 40 is out-of-range
     const res = await request(app)
       .get(`/api/stream/${TRACK_ID}/segment/040?bitrate=128`)
       .set("Authorization", `Bearer ${token}`);
@@ -455,11 +456,9 @@ describe("GET /api/stream/:id/playlist — startSegment", () => {
   it("returns a playlist starting at the requested segment", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(
-        `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=10`,
-      )
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}&startSegment=10`,
+    );
 
     expect(res.status).toBe(200);
     const lines = res.text.split("\n");
@@ -471,11 +470,9 @@ describe("GET /api/stream/:id/playlist — startSegment", () => {
   it("EXT-X-MEDIA-SEQUENCE equals startSegment", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(
-        `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=5`,
-      )
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}&startSegment=5`,
+    );
 
     expect(res.text).toContain("#EXT-X-MEDIA-SEQUENCE:5");
   });
@@ -483,13 +480,10 @@ describe("GET /api/stream/:id/playlist — startSegment", () => {
   it("emits only the remaining segments when startSegment > 0", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(
-        `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=10`,
-      )
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}&startSegment=10`,
+    );
 
-    // Total segments = 40; startSegment=10 → 30 remaining
     const extinf = (res.text.match(/#EXTINF:/g) ?? []).length;
     expect(extinf).toBe(SEGMENT_COUNT - 10);
   });
@@ -497,11 +491,9 @@ describe("GET /api/stream/:id/playlist — startSegment", () => {
   it("returns 400 when startSegment >= segmentCount", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(
-        `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=40`,
-      )
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}&startSegment=${SEGMENT_COUNT}`,
+    );
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("BAD_REQUEST");
@@ -510,11 +502,9 @@ describe("GET /api/stream/:id/playlist — startSegment", () => {
   it("returns 400 for negative startSegment", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    const res = await request(app)
-      .get(
-        `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=-1`,
-      )
-      .set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(
+      `/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}&startSegment=-1`,
+    );
 
     expect(res.status).toBe(400);
   });
