@@ -524,6 +524,7 @@ class _MediaKitBackend implements _PlayerBackend {
     }
 
     _queue = _queue
+        .resetNavigation()
         .withStartSegment(targetIndex, target.targetSegment)
         .withSegmentOffset(_segmentDuration * target.targetSegment);
     await _reopenQueueAt(targetIndex, target.withinSegment);
@@ -532,6 +533,7 @@ class _MediaKitBackend implements _PlayerBackend {
   @override
   Future<void> seekToNext() async {
     if (_isShuffled) {
+      _queue = _queue.resetNavigation();
       await _p.next();
       return;
     }
@@ -541,6 +543,7 @@ class _MediaKitBackend implements _PlayerBackend {
   @override
   Future<void> seekToPrevious() async {
     if (_isShuffled) {
+      _queue = _queue.resetNavigation();
       await _p.previous();
       return;
     }

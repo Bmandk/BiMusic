@@ -69,6 +69,7 @@ import { bootstrapAdminIfNeeded } from "../../src/services/userService.js";
 import { initHlsCacheDir } from "../../src/services/hlsService.js";
 import { resetLidarrRootCache } from "../../src/services/trackFileResolver.js";
 import { resetLidarrMetadataCache } from "../../src/services/lidarrClient.js";
+import { env } from "../../src/config/env.js";
 
 const LIDARR = "http://localhost:8686";
 
@@ -178,6 +179,9 @@ afterEach(() => {
   mockState.delayMs = 0;
   resetLidarrRootCache();
   resetLidarrMetadataCache();
+  // Clear cached HLS segments so tests don't inherit artifacts from prior cases.
+  fs.rmSync(env.HLS_CACHE_DIR, { recursive: true, force: true });
+  initHlsCacheDir();
 });
 
 // ────────────────────────────────────────────────────
