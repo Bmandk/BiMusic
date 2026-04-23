@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/Bmandk/BiMusic/compare/bimusic_app-v1.1.0...bimusic_app-v1.2.0) (2026-04-23)
+
+
+### Features
+
+* **flutter:** Add desktop tray and launch-at-startup support ([#18](https://github.com/Bmandk/BiMusic/issues/18)) ([50820c1](https://github.com/Bmandk/BiMusic/commit/50820c1cc21c9188dea20e1ec0316dc9e005e967))
+* **hls:** Replace progressive HTTP streaming with HLS VOD ([#26](https://github.com/Bmandk/BiMusic/issues/26)) ([7d958e1](https://github.com/Bmandk/BiMusic/commit/7d958e14fb1f9fe378a7469846e84de4f822aba0))
+
+
+### Bug Fixes
+
+* **flutter:** Fix mobile nav wrapping, desktop player modal height, and volume persistence ([#20](https://github.com/Bmandk/BiMusic/issues/20)) ([b9db4ac](https://github.com/Bmandk/BiMusic/commit/b9db4acc2fb748dfb53717c9e0b78ac18036a0cf))
+* **flutter:** Fix Windows auto-updater copying data/ instead of app files ([#21](https://github.com/Bmandk/BiMusic/issues/21)) ([d482eb5](https://github.com/Bmandk/BiMusic/commit/d482eb5c0baf15d5b9dc04cc08744ed5941fdfac))
+
 ## [1.1.0](https://github.com/Bmandk/BiMusic/compare/bimusic_app-v1.0.0...bimusic_app-v1.1.0) (2026-04-19)
 
 
