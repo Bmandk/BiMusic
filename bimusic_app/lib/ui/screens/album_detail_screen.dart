@@ -158,7 +158,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                                 tracks,
                                 artistName: album.artistName,
                                 albumTitle: album.title,
-                                imageUrl: album.imageUrl,
+                                imageUrl: resolveBackendUrl(base, album.imageUrl),
                               );
                             },
                           ),

@@ -21,6 +21,7 @@ class FullPlayer extends ConsumerStatefulWidget {
 
 class _FullPlayerState extends ConsumerState<FullPlayer> {
   double? _dragValue;
+  double? _seekTargetMs;
   bool _showQueue = false;
 
   String _formatDuration(Duration d) {
@@ -37,6 +38,15 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final token = ref.watch(authServiceProvider).accessToken;
     final base = ref.watch(backendUrlProvider).valueOrNull;
     final colorScheme = Theme.of(context).colorScheme;
+
+    ref.listen<AsyncValue<Duration>>(playerPositionProvider, (_, next) {
+      if (_seekTargetMs == null || !mounted) return;
+      final ms = next.valueOrNull?.inMilliseconds.toDouble();
+      if (ms != null && (ms - _seekTargetMs!).abs() < 500) {
+        _seekTargetMs = null;
+        setState(() => _dragValue = null);
+      }
+    });
 
     final position = positionAsync.valueOrNull ?? Duration.zero;
     final duration = durationAsync.valueOrNull ?? Duration.zero;
@@ -171,10 +181,14 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                     value: sliderValue.clamp(0.0, 1.0),
                     onChanged: (v) => setState(() => _dragValue = v),
                     onChangeEnd: (v) {
+                      final targetMs = (v * maxMs).roundToDouble();
                       ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: (v * maxMs).round()),
+                        Duration(milliseconds: targetMs.round()),
                       );
-                      setState(() => _dragValue = null);
+                      setState(() {
+                        _dragValue = v;
+                        _seekTargetMs = targetMs;
+                      });
                     },
                   ),
                   Padding(

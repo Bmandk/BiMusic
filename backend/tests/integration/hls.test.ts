@@ -174,6 +174,28 @@ afterEach(() => {
 // Auth & validation
 // ────────────────────────────────────────────────────
 
+describe('GET /api/stream/:id/playlist — auth & validation', () => {
+  it('returns 401 without Authorization header', async () => {
+    const res = await request(app).get('/api/stream/1/playlist');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 400 for invalid bitrate', async () => {
+    const res = await request(app)
+      .get('/api/stream/1/playlist?bitrate=256')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('BAD_REQUEST');
+  });
+
+  it('returns 400 for non-numeric bitrate', async () => {
+    const res = await request(app)
+      .get('/api/stream/1/playlist?bitrate=high')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('GET /api/stream/:id/playlist.m3u8 — auth & validation', () => {
   it('returns 401 without Authorization header', async () => {
     const res = await request(app).get('/api/stream/1/playlist.m3u8');
@@ -186,13 +208,6 @@ describe('GET /api/stream/:id/playlist.m3u8 — auth & validation', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('BAD_REQUEST');
-  });
-
-  it('returns 400 for non-numeric bitrate', async () => {
-    const res = await request(app)
-      .get('/api/stream/1/playlist.m3u8?bitrate=high')
-      .set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(400);
   });
 });
 
@@ -216,9 +231,72 @@ describe('GET /api/stream/:id/segment/:index — auth & validation', () => {
 // Playlist happy path
 // ────────────────────────────────────────────────────
 
-describe('GET /api/stream/:id/playlist.m3u8 — happy path', () => {
+describe('GET /api/stream/:id/playlist — happy path', () => {
   const TRACK_ID = 10;
   const FILE_ID = 100;
+
+  it('returns 200 with correct Content-Type', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/vnd\.apple\.mpegurl/);
+  });
+
+  it('returns a valid HLS playlist with #EXTM3U and #EXT-X-ENDLIST', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
+      .set('Authorization', `Bearer ${token}`);
+
+    const body = res.text;
+    expect(body).toMatch(/^#EXTM3U/);
+    expect(body).toContain('#EXT-X-ENDLIST');
+  });
+
+  it(`emits ${SEGMENT_COUNT} segments for a ${TRACK_DURATION_MS / 1000}s track`, async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
+      .set('Authorization', `Bearer ${token}`);
+
+    const extinf = (res.text.match(/#EXTINF:/g) ?? []).length;
+    expect(extinf).toBe(SEGMENT_COUNT);
+  });
+
+  it('embeds the query token into segment URIs', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=secretjwt`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.text).toContain('token=secretjwt');
+  });
+
+  it('sets Cache-Control: no-store', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=mytoken`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+});
+
+// ────────────────────────────────────────────────────
+// playlist.m3u8 alias (ExoPlayer / Android HLS detection)
+// ────────────────────────────────────────────────────
+
+describe('GET /api/stream/:id/playlist.m3u8 — happy path', () => {
+  const TRACK_ID = 11;
+  const FILE_ID = 111;
 
   it('returns 200 with correct Content-Type', async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
@@ -231,47 +309,15 @@ describe('GET /api/stream/:id/playlist.m3u8 — happy path', () => {
     expect(res.headers['content-type']).toMatch(/application\/vnd\.apple\.mpegurl/);
   });
 
-  it('returns a valid HLS playlist with #EXTM3U and #EXT-X-ENDLIST', async () => {
+  it('returns a valid HLS playlist', async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
 
     const res = await request(app)
       .get(`/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=mytoken`)
       .set('Authorization', `Bearer ${token}`);
 
-    const body = res.text;
-    expect(body).toMatch(/^#EXTM3U/);
-    expect(body).toContain('#EXT-X-ENDLIST');
-  });
-
-  it(`emits ${SEGMENT_COUNT} segments for a ${TRACK_DURATION_MS / 1000}s track`, async () => {
-    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
-
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=mytoken`)
-      .set('Authorization', `Bearer ${token}`);
-
-    const extinf = (res.text.match(/#EXTINF:/g) ?? []).length;
-    expect(extinf).toBe(SEGMENT_COUNT);
-  });
-
-  it('embeds the query token into segment URIs', async () => {
-    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
-
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=secretjwt`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.text).toContain('token=secretjwt');
-  });
-
-  it('sets Cache-Control: no-store', async () => {
-    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
-
-    const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist.m3u8?bitrate=128&token=mytoken`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.text).toMatch(/^#EXTM3U/);
+    expect(res.text).toContain('#EXT-X-ENDLIST');
   });
 });
 
@@ -283,7 +329,7 @@ describe('GET /api/stream/:id/segment/:index — happy path', () => {
   const TRACK_ID = 20;
   const FILE_ID = 200;
 
-  it('returns 200 with Content-Type: video/mp2t', async () => {
+  it('returns 200 with Content-Type: audio/mpeg', async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track2.flac'));
 
     const res = await request(app)
@@ -291,10 +337,10 @@ describe('GET /api/stream/:id/segment/:index — happy path', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toMatch(/video\/mp2t/);
+    expect(res.headers['content-type']).toMatch(/audio\/mpeg/);
   });
 
-  it('returns non-empty body (fake TS payload from mock ffmpeg)', async () => {
+  it('returns non-empty body (fake MP3 payload from mock ffmpeg)', async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track2.flac'));
 
     const res = await request(app)

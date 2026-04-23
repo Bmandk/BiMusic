@@ -40,6 +40,14 @@ export function computeTrackKey(
  * Build a HLS VOD playlist for the given track.
  * Rebuilt on every request — never cached — because the token is embedded in
  * every segment URI and must not be shared across users.
+ *
+ * `startSegment` skips the first N segments from the output. Used by the
+ * Windows client to implement cross-segment seeking: mpv's native playlist
+ * demuxer flattens HLS into per-segment playlist entries and can only seek
+ * within the currently-loaded segment, so the client asks for a new playlist
+ * starting at the desired segment and seeks within that. Segment URIs still
+ * carry their original track-relative index (`segment/020`, not `segment/000`)
+ * so the client's URL-based offset tracking keeps working.
  */
 export function buildPlaylist(
   durationMs: number,
@@ -47,16 +55,17 @@ export function buildPlaylist(
   segmentSeconds: number,
   bitrate: number,
   token: string,
+  startSegment: number = 0,
 ): string {
   const durationSec = durationMs / 1000;
   const lines: string[] = [
     "#EXTM3U",
     "#EXT-X-VERSION:3",
     `#EXT-X-TARGETDURATION:${segmentSeconds}`,
-    "#EXT-X-MEDIA-SEQUENCE:0",
+    `#EXT-X-MEDIA-SEQUENCE:${startSegment}`,
     "#EXT-X-PLAYLIST-TYPE:VOD",
   ];
-  for (let i = 0; i < segmentCount; i++) {
+  for (let i = startSegment; i < segmentCount; i++) {
     const isLast = i === segmentCount - 1;
     const segDuration = isLast
       ? (durationSec - i * segmentSeconds).toFixed(3)
@@ -69,17 +78,25 @@ export function buildPlaylist(
   return lines.join("\n") + "\n";
 }
 
-/** Absolute path to the cached .ts file for a given track key + segment index. */
+/** Absolute path to the cached .mp3 file for a given track key + segment index. */
 export function getSegmentCachePath(
   trackKey: string,
   segmentIndex: number,
 ): string {
   const idx = String(segmentIndex).padStart(3, "0");
-  return path.join(env.HLS_CACHE_DIR, trackKey, `segment${idx}.ts`);
+  return path.join(env.HLS_CACHE_DIR, trackKey, `segment${idx}.mp3`);
 }
 
 /**
- * Transcode exactly one 6-second HLS segment using ffmpeg.
+ * Transcode exactly one HLS segment using ffmpeg.
+ *
+ * Segments are plain MP3 (not MPEG-TS): each segment is a self-contained MP3
+ * frame sequence with no container. This is the simplest HLS audio variant —
+ * required because mpv on Windows treats HLS as a flat playlist and plays each
+ * segment as an independent media item. An MPEG-TS wrapper made format probe
+ * fail (lavf's TS probe returns 0, MP3 inside scored only 1) while a bare MP3
+ * segment is immediately recognized by lavf's mp3 demuxer.
+ *
  * Writes to a .part file then atomically renames to the final path.
  * Registers the ffmpeg command for graceful shutdown.
  */
@@ -106,12 +123,7 @@ export async function generateSegment(opts: {
       .audioCodec("libmp3lame")
       .audioBitrate(bitrate)
       .duration(segmentSeconds)
-      .outputOptions([
-        `-output_ts_offset ${segmentStart}`,
-        "-muxdelay 0",
-        "-muxpreload 0",
-      ])
-      .format("mpegts")
+      .format("mp3")
       .output(partPath)
       .on("end", () => {
         unregisterFfmpegCommand(cmd);

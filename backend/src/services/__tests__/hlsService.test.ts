@@ -201,7 +201,7 @@ describe("ensureSegment cache-hit", () => {
       segmentSeconds: 6,
     });
 
-    expect(result).toContain("segment000.ts");
+    expect(result).toContain("segment000.mp3");
     expect(mockFfmpegCmd.run).not.toHaveBeenCalled();
   });
 });
@@ -238,7 +238,7 @@ describe("generateSegment ffmpeg invocation", () => {
 
     expect(mockFfmpegCmd.audioCodec).toHaveBeenCalledWith("libmp3lame");
     expect(mockFfmpegCmd.audioBitrate).toHaveBeenCalledWith(320);
-    expect(mockFfmpegCmd.format).toHaveBeenCalledWith("mpegts");
+    expect(mockFfmpegCmd.format).toHaveBeenCalledWith("mp3");
     expect(mockFfmpegCmd.seekInput).toHaveBeenCalledWith(0);
     expect(mockFfmpegCmd.duration).toHaveBeenCalledWith(6);
   });

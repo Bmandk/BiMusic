@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'app.dart';
 import 'providers/launch_at_startup_provider.dart';
@@ -58,10 +58,9 @@ Future<void> _initBackgroundService() async {
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Reduce libmpv demuxer buffer from the default 32 MB to 2 MB to cut
-  // initial prebuffer time on Windows/Linux without risking glitches on LAN.
-  JustAudioMediaKit.bufferSize = 2 * 1024 * 1024;
-  JustAudioMediaKit.ensureInitialized();
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    MediaKit.ensureInitialized();
+  }
 
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
     await _initBackgroundService();

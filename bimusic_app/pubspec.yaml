@@ -13,8 +13,8 @@ dependencies:
   riverpod_annotation: ^2.6.0
   dio: ^5.7.0
   just_audio: ^0.9.0
-  just_audio_media_kit: ^2.1.0
-  media_kit_libs_windows_audio: ^1.0.0
+  media_kit: ^1.2.6
+  media_kit_libs_windows_video: ^1.0.0
   audio_service: ^0.18.0
   audio_session: ^0.1.0
   connectivity_plus: ^6.1.0
@@ -32,6 +32,7 @@ dependencies:
   window_manager: ^0.4.3
   tray_manager: ^0.5.0
   launch_at_startup: ^0.3.1
+  rxdart: ^0.28.0
 
 dev_dependencies:
   flutter_test:
@@ -42,7 +43,6 @@ dev_dependencies:
   freezed: ^2.5.0
   json_serializable: ^6.8.0
   mocktail: ^1.0.0
-  rxdart: ^0.28.0
 
 flutter:
   uses-material-design: true
