@@ -565,13 +565,12 @@ describe("?token= query-param authentication", () => {
     expect(res.text).toContain(`token=${token}`);
   });
 
-  it("playlist: Authorization header takes precedence over ?token= when both are provided", async () => {
-    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
-
+  it("playlist: invalid Authorization header is not bypassed by a valid ?token=", async () => {
+    // authenticate (auth.ts) checks Authorization header before ?token=; a bad header
+    // rejects the request even when a valid ?token= is also present.
     const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=invalid-token`)
-      .set("Authorization", `Bearer ${token}`);
-    // Valid header + invalid ?token= — header wins, request succeeds.
-    expect(res.status).toBe(200);
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`)
+      .set("Authorization", "Bearer invalid-bearer-token");
+    expect(res.status).toBe(401);
   });
 });
