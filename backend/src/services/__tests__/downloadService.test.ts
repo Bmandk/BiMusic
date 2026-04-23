@@ -15,7 +15,8 @@ vi.mock("../../config/env.js", () => ({
     OFFLINE_STORAGE_PATH: "./data/offline",
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD: "adminpassword123",
-    TEMP_DIR: "/tmp/bimusic",
+    HLS_CACHE_DIR: "./data/hls",
+    HLS_SEGMENT_SECONDS: 6,
   },
 }));
 
@@ -91,7 +92,7 @@ vi.mock("fluent-ffmpeg", () => ({
   default: mockFfmpegFactory.mockImplementation(() => mockFfmpegCmd),
 }));
 
-vi.mock("../streamService.js", () => ({
+vi.mock("../trackFileResolver.js", () => ({
   resolveFilePath: vi.fn(),
   isPassthrough: vi.fn(() => false),
   registerFfmpegCommand: vi.fn(),
@@ -115,7 +116,7 @@ vi.mock("fs", async (importOriginal) => {
 import { eq } from "drizzle-orm";
 import { db } from "../../db/connection.js";
 import { offlineTracks } from "../../db/schema.js";
-import * as streamService from "../streamService.js";
+import * as streamService from "../trackFileResolver.js";
 import * as fsPromises from "fs/promises";
 import {
   requestDownload,
@@ -348,9 +349,10 @@ describe("processOnePendingDownload", () => {
   });
 
   it("transcodes a pending download and marks it ready", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
-      "/music/track.flac",
-    );
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue({
+      sourcePath: "/music/track.flac",
+      durationMs: 240000,
+    });
 
     const created = requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
     await processOnePendingDownload();
@@ -377,9 +379,10 @@ describe("processOnePendingDownload", () => {
   });
 
   it("marks download as failed when ffmpeg errors", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
-      "/music/track.flac",
-    );
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue({
+      sourcePath: "/music/track.flac",
+      durationMs: 240000,
+    });
 
     // Make ffmpeg call the error callback instead of end
     mockFfmpegCmd.on.mockImplementation(function (
@@ -399,9 +402,10 @@ describe("processOnePendingDownload", () => {
   });
 
   it("processes the oldest pending download first", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
-      "/music/track.flac",
-    );
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue({
+      sourcePath: "/music/track.flac",
+      durationMs: 240000,
+    });
 
     // Insert with specific requestedAt values
     const earlier = new Date(Date.now() - 10000).toISOString();
@@ -444,9 +448,10 @@ describe("processOnePendingDownload", () => {
   });
 
   it("calls registerFfmpegCommand and unregisterFfmpegCommand", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
-      "/music/track.flac",
-    );
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue({
+      sourcePath: "/music/track.flac",
+      durationMs: 240000,
+    });
 
     requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
     await processOnePendingDownload();
@@ -456,9 +461,10 @@ describe("processOnePendingDownload", () => {
   });
 
   it("copies MP3 source directly without transcoding (passthrough)", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
-      "/music/track.mp3",
-    );
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue({
+      sourcePath: "/music/track.mp3",
+      durationMs: 240000,
+    });
     vi.mocked(streamService.isPassthrough).mockReturnValue(true);
 
     requestDownload(TEST_USER, TEST_DEVICE, 100, 320);
@@ -479,9 +485,10 @@ describe("processOnePendingDownload", () => {
   });
 
   it("transcodes non-MP3 source via ffmpeg", async () => {
-    vi.mocked(streamService.resolveFilePath).mockResolvedValue(
-      "/music/track.flac",
-    );
+    vi.mocked(streamService.resolveFilePath).mockResolvedValue({
+      sourcePath: "/music/track.flac",
+      durationMs: 240000,
+    });
     vi.mocked(streamService.isPassthrough).mockReturnValue(false);
 
     requestDownload(TEST_USER, TEST_DEVICE, 100, 320);

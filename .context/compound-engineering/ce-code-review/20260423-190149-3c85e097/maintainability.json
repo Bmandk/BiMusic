@@ -1,0 +1,139 @@
+{
+  "reviewer": "maintainability",
+  "findings": [
+    {
+      "title": "_segmentDuration hardcoded constant couples Flutter client to backend HLS_SEGMENT_SECONDS",
+      "severity": "P1",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 230,
+      "confidence": 95,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Embed the segment duration in the HLS playlist response (e.g. as a custom X-SEGMENT-SECONDS header, or derive it from the EXT-X-TARGETDURATION line that the Flutter client already receives). Parse it in _MediaKitBackend.openQueue rather than using a static constant. Alternatively, expose it as a discoverable API field (e.g. GET /api/stream/:id/playlist returns EXT-X-TARGETDURATION which Flutter should read and store). At minimum, add a runtime assertion in CI: if HLS_SEGMENT_SECONDS != 6 in the backend, the integration test must verify that the Flutter constant matches."
+    },
+    {
+      "title": "TEMP_DIR phantom field in test env mocks and env.test.ts schema copy",
+      "severity": "P2",
+      "file": "backend/src/config/__tests__/env.test.ts",
+      "line": 21,
+      "confidence": 98,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Remove TEMP_DIR from env.test.ts's local schema copy (line 21) and from all unit-test vi.mock('../../config/env.js') objects that still include it (authService.test.ts:19, errorHandler.test.ts:18, auth.test.ts:19, lidarrClient.test.ts:19, libraryService.test.ts:18, playlistService.test.ts:18, requestService.test.ts:18, userService.test.ts:18). TEMP_DIR was removed from the real env schema but these stubs still carry it as an inert extra property, which creates noise and causes env.test.ts to diverge from the actual production schema it is supposed to validate."
+    },
+    {
+      "title": "getSegmentCachePath exported but never used by any route — implementation detail leaking into public API",
+      "severity": "P3",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 82,
+      "confidence": 85,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Remove the export keyword from getSegmentCachePath. Tests that use it directly (hlsService.test.ts line 204) can be updated to assert on the segment path returned by ensureSegment instead, which is the public contract. If the test-only access is considered important, document it explicitly with a // @internal or // @testOnly comment rather than a broad export."
+    },
+    {
+      "title": "generateSegment exported solely for unit testing — not part of any public API",
+      "severity": "P3",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 103,
+      "confidence": 80,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Make generateSegment unexported (remove export). Tests that currently import generateSegment directly (hlsService.test.ts lines 85, 231, 247, 277) can exercise the same code paths through ensureSegment with existsSync mocked to return false, which is how real callers invoke it. This removes coupling between test code and an internal implementation function that may be refactored independently."
+    },
+    {
+      "title": "initHlsCacheDir silently swallows all errors including misconfiguration",
+      "severity": "P2",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 180,
+      "confidence": 90,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The outer mkdirSync call (line 181) already throws if HLS_CACHE_DIR cannot be created — good. But the inner for-loop's outer try/catch (lines 182-201) silently ignores a failure on readdirSync(env.HLS_CACHE_DIR), meaning a path collision (a file at that path rather than a directory) will be silently ignored even though mkdirSync with recursive:true would have created parent dirs without failing. Log a warn for the outer catch on readdirSync to surface misconfiguration: `logger.warn({ dir: env.HLS_CACHE_DIR, err }, 'HLS cache dir scan failed at startup')`. The per-file unlink catches can remain silent (best-effort cleanup)."
+    },
+    {
+      "title": "Triple debug log per segment request creates excessive noise in debug mode",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 150,
+      "confidence": 85,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Collapse the three debug log calls (lines 150-153, 174-183, 192-196) into a single log emitted after ensureSegment resolves, combining trackId, segmentIndex, bitrate, trackKey prefix, segmentPath and cache-hit/miss status. At 6-second segments this generates ~600 log lines per hour per active listener in debug mode. A single structured log per segment request is sufficient for diagnostics."
+    },
+    {
+      "title": "debugPrint used throughout _MediaKitBackend — zero observability in production builds",
+      "severity": "P2",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 245,
+      "confidence": 88,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "debugPrint is a no-op when dart.vm.product is true (release builds), meaning all audio backend diagnostics vanish in production. The file already has a coverage:ignore-file annotation suggesting it is test-excluded. Consider routing critical path events (openQueue failures, seek reloads, track changes) through a thin logger abstraction that can be wired to a production-safe sink (e.g. Firebase Crashlytics breadcrumbs or a simple in-memory ring buffer). At a minimum, error paths (openQueue error, play error, _tryProperty failure) should use a non-stripped mechanism so that production crash reports contain audio context."
+    },
+    {
+      "title": "Segment URL format inconsistency: playlist emits zero-padded 3-digit index but route accepts any integer string",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 131,
+      "confidence": 75,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The playlist emits segment/000 through segment/NNN (zero-padded 3 digits) and the CLAUDE.md documents this as the canonical format, but the route accepts segment/0 and segment/00 equally. This is harmless today but creates an undocumented surface. If a future caching proxy or CDN uses the URL as a cache key, segment/0 and segment/000 would be separate entries. Add a comment in the route or consider validating that :index matches /^\\d{3}$/ and returning 400 for non-padded forms; alternatively document explicitly that the route accepts any non-negative integer to allow flexibility."
+    },
+    {
+      "title": "_queueUris / _queueDurations / _startSegments state spread across _MediaKitBackend without a track-record type",
+      "severity": "P2",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 210,
+      "confidence": 72,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The three parallel lists _queueUris, _queueDurations, and _startSegments (a map keyed by queue index) must stay in sync. If any one of them is updated in openQueue but not reopenQueueAt or jumpTo, a logic bug follows. Consider introducing a private _TrackEntry class { Uri uri; Duration duration; int startSegment = 0; } and replacing the three parallel structures with List<_TrackEntry> _queue. This turns index-based access into a single object lookup and eliminates the off-by-one risk when the lists are cleared at different times (e.g. _startSegments.clear() in jumpTo but _queueDurations not re-fetched until _reopenQueueAt)."
+    },
+    {
+      "title": "lidarrRootPath module-level mutable singleton in trackFileResolver is not reset between integration tests by default",
+      "severity": "P2",
+      "file": "backend/src/services/trackFileResolver.ts",
+      "line": 12,
+      "confidence": 82,
+      "autofix_class": "advisory",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "resetLidarrRootCache() is exported and called in hls.test.ts afterEach, which is correct. However the pattern is easy to forget in future integration tests. The function name is non-obvious (it resets both the path and the promise). Consider renaming to resetLidarrRootFolderCache() and adding a JSDoc comment documenting that it must be called in afterEach whenever Lidarr root folder nock stubs are set up — matching the pattern already enforced for resetLidarrMetadataCache()."
+    }
+  ],
+  "residual_risks": [
+    "If HLS_SEGMENT_SECONDS is ever changed from its default of 6 in a production deployment without a corresponding Flutter client release, seeking will silently miscalculate positions by a factor proportional to the ratio of the new to old segment duration. There is no runtime guard or contract check to catch this drift.",
+    "The in-flight dedup map (inFlightSegments) in hlsService.ts is a module-level singleton. If the server is hot-reloaded in development without a process restart, the map persists across reloads and may reference resolved promises for stale file versions. This only affects development but may cause confusing cache-hit behavior after source files are replaced.",
+    "The _MediaKitBackend._matchUriToQueueIndex method uses string prefix matching on _queueUris. If two tracks share the same numeric Lidarr track ID prefix in their paths (e.g. track ID 1 and track ID 10 both match prefix /api/stream/1/), the regex match could return the wrong queue index. The regex extracts /api/stream/<id>/ including the trailing slash, making this a false alarm for exact IDs — but worth verifying the regex group capture is tight.",
+    "The segment route calls resolveFilePath (which makes two Lidarr API calls) on every segment request before checking the cache. For a track with many simultaneous listeners, this amplifies Lidarr API calls linearly with concurrent streams. The track file metadata could be cached after the first playlist request to avoid repeated Lidarr round-trips per segment."
+  ],
+  "testing_gaps": [
+    "No integration test covers the startSegment query parameter for the playlist endpoint — the unit test in hlsService.test.ts covers buildPlaylist directly but there is no end-to-end test that sends ?startSegment=5 and verifies that the returned playlist begins at segment/005 with EXT-X-MEDIA-SEQUENCE:5.",
+    "No test exercises a non-zero-padded segment index URL (e.g. /segment/0 instead of /segment/000) to document the accepted format.",
+    "No test for initHlsCacheDir when HLS_CACHE_DIR points to an existing regular file instead of a directory — would expose the silent swallow identified in finding #5.",
+    "The _MediaKitBackend.seekTo cross-segment reload path (the _reopenQueueAt branch) has no unit test. The Dart file has a coverage:ignore-file annotation so this path is entirely uncovered.",
+    "TEMP_DIR appears in env.test.ts's local schema copy (line 21) but not in the actual env.ts schema. The test therefore validates a schema that is different from production — the test's 'applies defaults for optional fields' assertion does not cover HLS_CACHE_DIR or HLS_SEGMENT_SECONDS at all.",
+    "No test verifies that startHlsCacheCleanup correctly prunes directories older than 24h while preserving newer ones — the cleanup function is exported but has no corresponding test file."
+  ]
+}

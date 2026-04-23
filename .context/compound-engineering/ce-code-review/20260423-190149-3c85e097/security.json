@@ -1,0 +1,141 @@
+{
+  "reviewer": "security",
+  "findings": [
+    {
+      "title": "JWT access token exposed in server-side access logs via segment URL query parameter",
+      "severity": "P1",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 75,
+      "confidence": 95,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Use short-lived (e.g. 60 s), single-use media tokens scoped only to HLS stream access rather than embedding the full access JWT. Alternatively, configure your reverse proxy/web server to suppress logging of the 'token' query parameter (e.g. nginx 'log_format' with parameter scrubbing). As a partial mitigation, shorten JWT_ACCESS_EXPIRY from the default 15 min to 1–2 min specifically for tokens issued to media clients, or issue a separate, narrowly-scoped 'stream token' (signed with a different secret, carrying only {userId, trackId, exp}) from a dedicated endpoint and validate it in a separate middleware on segment requests."
+    },
+    {
+      "title": "Playlist endpoint silently builds playable playlist with empty token when ?token= is omitted",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 49,
+      "confidence": 90,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "After the authenticate middleware succeeds via Bearer header (no query token), extract the token from req.headers.authorization instead of defaulting to ''. If neither source yields a non-empty token, reject with 400 (token required for HLS segment embedding) or read the raw token string from the Authorization header so segment URIs will be usable. Current behavior is not a security leak (segments will 401), but it is a silent operational failure that produces a playlist that will never play, confusing clients."
+    },
+    {
+      "title": "No per-user concurrency cap on ffmpeg segment transcoding — authenticated DoS vector",
+      "severity": "P2",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 156,
+      "confidence": 85,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add a global (or per-user) semaphore on concurrent ffmpeg processes. A simple approach: maintain a module-level counter 'activeTranscodes' and reject (503) or queue requests when it exceeds a configurable MAX_CONCURRENT_TRANSCODES (e.g. 4). Alternatively, use a pQueue (p-queue npm) with concurrency set to CPU core count. The existing inFlightSegments Map deduplicates identical (trackKey, segmentIndex) pairs, but N distinct segment indices for N different tracks still spawn N parallel ffmpeg processes. A single authenticated user can exhaust server CPU/memory by requesting all segments of many tracks simultaneously."
+    },
+    {
+      "title": "Lidarr metadata cache (5 min TTL) means stale trackFile.path is used for up to 5 minutes after file replacement",
+      "severity": "P3",
+      "file": "backend/src/services/lidarrClient.ts",
+      "line": 164,
+      "confidence": 70,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": true,
+      "suggested_fix": "This is a pre-existing design trade-off. The cache TTL reduces Lidarr API load but means users may receive a 404 for up to 5 minutes after Lidarr re-downloads a track at a new path. Not a security issue per se, but document that the segment cache key already handles same-path file replacement via mtime+size, so the stale path scenario is the only gap. Consider reducing TTL to 60 s or invalidating on 404 from resolveFilePath."
+    },
+    {
+      "title": "HLS playlist M3U8 injection via JWT token value is theoretically possible but practically safe",
+      "severity": "P3",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 75,
+      "confidence": 40,
+      "autofix_class": "advisory",
+      "owner": "downstream-resolver",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "JWT tokens use base64url encoding (A-Za-z0-9-_.) plus two dots as separators. No newlines or M3U8 special characters (#, CR, LF) are possible in a well-formed JWT. However, if the token originates from user input (e.g. a crafted Authorization header that is not a valid JWT), jwt.verify() will reject it before the playlist handler runs. Risk is effectively zero, but for defense-in-depth add an explicit strip of CR/LF from the token variable before embedding: const safeToken = token.replace(/[\\r\\n]/g, '')."
+    },
+    {
+      "title": "resolveFilePath hits Lidarr API on every playlist and segment request — ?startSegment hammering can DoS Lidarr",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 70,
+      "confidence": 80,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The lidarrClient already caches track and trackFile metadata with a 5-minute TTL, so repeated calls for the same trackId will hit the in-memory cache (not Lidarr). However, the first call per TTL window does hit Lidarr. A single authenticated user making rapid playlist requests with unique trackIds can bypass the cache and hammer Lidarr's track API at one request per unique ID. Add a rate limit on /api/stream/:trackId/playlist (e.g. express-rate-limit with max:60/windowMs:60000 per user) to bound this. Additionally, the Lidarr root folder is already cached indefinitely after first fetch, so that path is not a concern."
+    },
+    {
+      "title": "Track-level authorization is absent — any authenticated user can stream any track by ID",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 118,
+      "confidence": 95,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "This appears to be an intentional design decision for a self-hosted, single-library deployment where all authenticated users are trusted family/household members. If multi-tenant or subscription-gated access is ever required, add a user-track authorization table. For now, document this as an explicit architectural decision: all authenticated users have access to all tracks in the library. If the CLAUDE.md intent is confirmed as single-household, mark this P3/advisory."
+    },
+    {
+      "title": "Path traversal via trackId is bounded by Lidarr but Lidarr compromise escalates to arbitrary file read",
+      "severity": "P2",
+      "file": "backend/src/services/trackFileResolver.ts",
+      "line": 52,
+      "confidence": 60,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "resolveFilePath correctly fetches paths from Lidarr (not from user input) and verifies readability. However, remapPath does prefix substitution without ensuring the resulting localPath stays within MUSIC_LIBRARY_PATH. If Lidarr's database is compromised or returns a path like '/../../../etc/passwd' (after stripping the root prefix), the remapped path could escape the library directory. Add a check after remapping: if (!localPath.startsWith(path.resolve(env.MUSIC_LIBRARY_PATH) + path.sep)) throw createError(403, 'FORBIDDEN', 'Resolved path is outside music library'). This is defense-in-depth against Lidarr compromise, not against normal usage."
+    },
+    {
+      "title": "HLS segment cache directory not restricted to MUSIC_LIBRARY_PATH — arbitrary path writeable if trackKey collides",
+      "severity": "P3",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 87,
+      "confidence": 30,
+      "autofix_class": "advisory",
+      "owner": "downstream-resolver",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "The trackKey is sha256(sourcePath:mtime:size:bitrate), which is collision-resistant. The segment cache path is HLS_CACHE_DIR/<trackKey>/segment<NNN>.mp3. Because trackKey is always a 64-hex-char string, path traversal into the cache dir is impossible — mkdirSync on a hex string cannot escape the parent. Risk is negligible."
+    },
+    {
+      "title": "statSync on sourcePath in segment handler is not guarded — uncaught ENOENT throws unhandled error before cache key computation",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 166,
+      "confidence": 80,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "resolveFilePath already calls access(localPath, R_OK) and throws a 404 if the file is unreadable, but statSync on line 166 is called AFTER resolveFilePath returns. There is a TOCTOU window where the file could be deleted between access() check and statSync(). Wrap statSync in a try/catch and return a 404 if it throws ENOENT, rather than letting it propagate as an unhandled 500. Example: try { const stat = statSync(sourcePath); } catch (e) { if (e.code === 'ENOENT') { res.status(404)...; return; } throw e; }"
+    }
+  ],
+  "residual_risks": [
+    "JWT in query parameters is a fundamental architectural trade-off required by libmpv's inability to set custom HTTP headers on media streams. Even with short-lived tokens, the token is visible in any HTTP access log, proxy log, or browser devtools network tab. This risk cannot be fully eliminated without replacing libmpv or using a signed-cookie-based auth scheme (which mpv also doesn't support). Accepted as a known limitation of the HLS-over-libmpv approach.",
+    "The HLS cache directory (data/hls/) holds transcoded MP3 segments. If an attacker gains read access to the filesystem (e.g. via a separate path traversal in another route), they can read cached audio segments without authentication. The cache directory should not be web-accessible and should be outside the web root.",
+    "The Lidarr metadata TTL cache (500 entries, 5 min TTL, LRU-eviction via insertion-order map) can be filled by an attacker with 500 unique track IDs, causing older entries to be evicted and forcing re-fetches from Lidarr. This is a minor amplification vector, not a critical issue.",
+    "Segment files are served with serveFile() which reads arbitrary filesystem paths derived from HLS_CACHE_DIR + trackKey + segmentIndex. The trackKey is a hex string, so no traversal is possible. Confirmed safe.",
+    "No CORS policy is visible in the route file. If the backend is exposed to a browser context with permissive CORS, the ?token= in segment URLs may be captured by third-party scripts via the Referrer header or timing attacks. Ensure CORS is restricted to the frontend origin only."
+  ],
+  "testing_gaps": [
+    "No test covering the empty-token playlist case (playlist requested via Bearer header with no ?token=): the returned playlist has token= (empty) in all segment URIs, which will cause silent 401 failures when a non-mpv client tries to play segments. Should be a unit test in stream.test.ts.",
+    "No integration test for concurrent segment requests to the same (trackKey, segmentIndex) — the inFlightSegments dedup map is exercised but not tested under actual concurrency. A test with Promise.all([N segment requests]) would verify the dedup path.",
+    "No test for the statSync TOCTOU window in the segment handler (file deleted between resolveFilePath and statSync).",
+    "No rate limiting tests — if a rate limit is added to the playlist endpoint, its enforcement should be tested with a mock that fires more than the limit.",
+    "No test for the remapPath boundary check (path escaping MUSIC_LIBRARY_PATH). If the recommended guard is added, a unit test should verify it blocks paths like '../../../etc/passwd' returned by a mocked Lidarr.",
+    "The startSegment parameter validation is tested implicitly but no explicit test checks startSegment >= segmentCount returns 400 (only the < 0 and NaN cases are covered by the pattern).",
+    "No test that verifies the token value is NOT logged at any log level — a regression test on the logger mock would catch accidental token logging in future changes."
+  ]
+}

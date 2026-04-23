@@ -8,7 +8,7 @@ import {
   deleteDownload,
   markDownloadComplete,
 } from "../services/downloadService.js";
-import { serveFile } from "../services/streamService.js";
+import { serveFile } from "../services/trackFileResolver.js";
 import { createError } from "../middleware/errorHandler.js";
 
 const router = Router();

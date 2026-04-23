@@ -50,7 +50,8 @@ vi.mock('fluent-ffmpeg', () => ({
 import { createApp } from '../../src/app.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { bootstrapAdminIfNeeded } from '../../src/services/userService.js';
-import { initTempDir, resetLidarrRootCache } from '../../src/services/streamService.js';
+import { resetLidarrRootCache } from '../../src/services/trackFileResolver.js';
+import { initHlsCacheDir } from '../../src/services/hlsService.js';
 import { processOnePendingDownload } from '../../src/services/downloadService.js';
 
 const LIDARR = 'http://localhost:8686';
@@ -121,7 +122,7 @@ function stubLidarr(trackId: number, trackFileId: number, filePath: string) {
 beforeAll(async () => {
   runMigrations();
   await bootstrapAdminIfNeeded();
-  initTempDir();
+  initHlsCacheDir();
   app = createApp();
 
   fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bimusic-download-test-'));

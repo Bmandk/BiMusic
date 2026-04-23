@@ -1,0 +1,114 @@
+{
+  "reviewer": "kieran-typescript",
+  "findings": [
+    {
+      "title": "HLS_SEGMENT_SECONDS allows float values — invalid TARGETDURATION",
+      "severity": "P1",
+      "file": "backend/src/config/env.ts",
+      "line": 45,
+      "confidence": 95,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Change `z.coerce.number().default(6)` to `z.coerce.number().int().positive().default(6)`. RFC 8216 §4.3.1.1 requires #EXT-X-TARGETDURATION to be a decimal-integer. A float like 6.5 would produce '#EXT-X-TARGETDURATION:6.5' which violates the HLS spec. Adding `.int()` rejects non-integer env values at startup via Zod's parse-time validation, surfacing misconfiguration clearly at boot rather than producing a silent spec violation."
+    },
+    {
+      "title": "buildPlaylist does not guard against float segmentSeconds in TARGETDURATION",
+      "severity": "P2",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 64,
+      "confidence": 90,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Change `#EXT-X-TARGETDURATION:${segmentSeconds}` to `#EXT-X-TARGETDURATION:${Math.ceil(segmentSeconds)}`. This is a defence-in-depth fix: even if the Zod schema is already fixed with `.int()`, the playlist builder should produce a spec-compliant integer TARGETDURATION regardless of the caller. RFC 8216 §4.3.1.1 states this value 'MUST be a decimal-integer'. Math.ceil is the conservative choice (it ensures the actual segment duration never exceeds the declared value, which is the only hard requirement)."
+    },
+    {
+      "title": "statSync in async route handler blocks event loop under concurrency",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 166,
+      "confidence": 85,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Replace `const stat = statSync(sourcePath)` with `const stat = await fs.promises.stat(sourcePath)` and add `import { promises as fsPromises } from 'fs'` (keeping the existing `statSync` import only for `serveFile` in trackFileResolver). The stat call happens on every segment request to compute the cache key — with concurrent listeners it creates a small but real event-loop stall. The segment handler is already async; switching to the async stat is a minimal, safe change."
+    },
+    {
+      "title": "parseBitrate returns 320 for undefined but documents no default — silent behaviour mismatch risk",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 18,
+      "confidence": 70,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The return type `number | null` does not distinguish between 'valid bitrate' and 'defaulted to 320'. The CLAUDE.md says 'defaults to 320 when absent', so this is intentional. However, the function name `parseBitrate` implies parse-only, not parse-with-default. Consider renaming to `resolveBitrate` or adding a JSDoc comment documenting the implicit default, to prevent a future maintainer from changing the undefined branch without realising it changes the user-visible default."
+    },
+    {
+      "title": "All FS operations in hlsService.ts are synchronous — risk under high segment concurrency",
+      "severity": "P2",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 1,
+      "confidence": 80,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "mkdirSync, readdirSync, statSync, renameSync, unlinkSync, existsSync, and rmdirSync all block the Node.js event loop. For initHlsCacheDir() (startup only) and startHlsCacheCleanup (hourly, non-critical path) the sync usage is acceptable. For ensureSegment() which is on the hot request path, the existsSync() call at line 166 could be replaced with a try/catch on fs.promises.access(). The mkdirSync and renameSync inside generateSegment() run inside a Promise executor off the await chain and are harder to swap; consider wrapping them with fs.promises.mkdir and fs.promises.rename. Requires verification that the in-flight dedup map still functions correctly after async refactor."
+    },
+    {
+      "title": "LidarrTrack.duration is typed number (non-nullable) — resolveFilePath durationMs is safe",
+      "severity": "P3",
+      "file": "backend/src/types/lidarr.ts",
+      "line": 75,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Confirmed: `LidarrTrack.duration` is typed `number` (not `number | null` or `number | undefined`), so `resolveFilePath` cannot return `durationMs: undefined`. No code change needed. However, if Lidarr ever returns a track with a missing or null duration field at runtime (API inconsistency), the TypeScript type would not catch it. Consider a runtime guard: `if (!Number.isFinite(track.duration)) throw createError(500, 'INTERNAL_ERROR', 'Track has no duration')` in `resolveFilePath` for belt-and-suspenders safety."
+    },
+    {
+      "title": "startSegment validation does not check upper bound against segmentCount before resolveFilePath",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 53,
+      "confidence": 75,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The NaN and negative check on startSegment (line 55-62) is correct. The upper-bound check (startSegment >= segmentCount at line 74) happens after the async resolveFilePath call. A very large startSegment (e.g. 999999) is still caught before any playlist is sent, so there is no correctness bug. This is advisory only: an extremely large startSegment is rejected before ffmpeg is touched, which is good. No action required."
+    },
+    {
+      "title": "parseBitrate: String(raw) may produce '[object Object]' for object query params",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 19,
+      "confidence": 65,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Express 5 types query params as `unknown`. If the client sends `?bitrate[]=128` (array form), `raw` would be `string[]`. `String(['128'])` produces '128' which would accidentally parse as 128 and pass validation. This is an unlikely attack surface since only authenticated clients use this route, but `VALID_BITRATES.has(parseInt(String(raw), 10))` would succeed for the array case. Consider adding `if (typeof raw !== 'string') return null` before the parseInt."
+    }
+  ],
+  "residual_risks": [
+    "Float HLS_SEGMENT_SECONDS produces spec-violating playlists — fixed at Zod layer (P1) but buildPlaylist has no independent guard until P2 fix is applied.",
+    "All synchronous FS in hlsService hot path (existsSync per segment request) could cause latency spikes under heavy concurrent segment fetches; acceptable for current scale but should be tracked.",
+    "LidarrTrack.duration is trusting Lidarr's API contract; if Lidarr returns 0 or null at runtime (not reflected in TypeScript type), segmentCount would be 0 and the playlist would be empty rather than erroring clearly.",
+    "The inFlightSegments dedup map grows unboundedly if a generateSegment promise never settles (e.g. ffmpeg hangs). The .finally() cleanup only runs on settle; a hung ffmpeg process would leak one entry per hung request. Consider a timeout wrapper around generateSegment."
+  ],
+  "testing_gaps": [
+    "No unit test exercises buildPlaylist with a float segmentSeconds value to assert TARGETDURATION is an integer — would catch the P1 regression if the Zod .int() guard is ever removed.",
+    "No integration test verifies that HLS_SEGMENT_SECONDS=6.5 in env causes startup validation failure (process.exit(1)) rather than a runtime spec violation.",
+    "The concurrent dedup path in ensureSegment (two simultaneous callers for the same segment returning the same Promise) is not covered by existing tests — a race condition in the Map lifecycle would be invisible.",
+    "parseBitrate is tested implicitly via route integration tests but has no dedicated unit test for edge cases: array-form query params (?bitrate[]=128), negative values (-128), or very large integers (99999).",
+    "statSync failure (file deleted between resolveFilePath and statSync in the segment handler) is not tested — would throw a synchronous exception inside an async handler, which Express 5 would not catch automatically unless the handler's try/catch wraps it."
+  ]
+}
