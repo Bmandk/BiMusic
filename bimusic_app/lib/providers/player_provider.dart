@@ -9,6 +9,7 @@ import '../models/track.dart';
 import '../services/audio_service.dart';
 import '../services/auth_service.dart';
 import 'auth_provider.dart';
+import 'backend_config_provider.dart';
 import 'backend_url_provider.dart';
 import 'bitrate_provider.dart';
 import 'download_provider.dart';
@@ -145,6 +146,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     final token = ref.read(authServiceProvider).accessToken;
     final bitrate = ref.read(bitrateProvider);
     final baseUrl = ref.read(backendUrlProvider).valueOrNull ?? '';
+    final segmentSeconds = ref.read(backendConfigProvider).valueOrNull ?? 6;
     final startIndex = queue.indexOf(track);
 
     state = state.copyWith(
@@ -181,6 +183,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       albumTitle: albumTitle,
       imageUrl: imageUrl,
       localFilePaths: localFilePaths,
+      segmentSeconds: segmentSeconds,
     );
   }
 

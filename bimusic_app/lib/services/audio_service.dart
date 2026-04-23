@@ -1,5 +1,6 @@
 // coverage:ignore-file
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
@@ -9,6 +10,7 @@ import 'package:media_kit/media_kit.dart' hide Track;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rxdart/rxdart.dart';
 import '../models/track.dart';
+import 'hls_seek_utils.dart';
 
 // ---------------------------------------------------------------------------
 // Platform-agnostic player backend abstraction
@@ -59,6 +61,7 @@ abstract class _PlayerBackend {
   Future<void> setVolume(double v);
   Future<void> setLoopMode(_LoopMode mode);
   Future<void> setShuffle(bool enabled);
+  void updateSegmentDuration(Duration d);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +179,67 @@ class _JustAudioBackend implements _PlayerBackend {
 
   @override
   Future<void> setShuffle(bool enabled) => _p.setShuffleModeEnabled(enabled);
+
+  @override
+  void updateSegmentDuration(Duration d) {}
+}
+
+// ---------------------------------------------------------------------------
+// HLS queue state value object
+// ---------------------------------------------------------------------------
+
+// Groups all per-queue mutable state into one object so updates are atomic.
+// Replace `_queue` with a new `_QueueState` instance; never mutate fields in place.
+class _QueueState {
+  const _QueueState({
+    this.uris = const [],
+    this.durations = const [],
+    this.startSegments = const {},
+    this.segmentOffset = Duration.zero,
+    this.currentIndex,
+  });
+
+  final List<Uri> uris;
+  final List<Duration> durations;
+  // Per-track segment index override (key = queue index, value = segment number).
+  final Map<int, int> startSegments;
+  final Duration segmentOffset;
+  final int? currentIndex;
+
+  int get length => uris.length;
+
+  _QueueState withCurrentIndex(int? index) => _QueueState(
+        uris: uris,
+        durations: durations,
+        startSegments: startSegments,
+        segmentOffset: segmentOffset,
+        currentIndex: index,
+      );
+
+  _QueueState withSegmentOffset(Duration offset) => _QueueState(
+        uris: uris,
+        durations: durations,
+        startSegments: startSegments,
+        segmentOffset: offset,
+        currentIndex: currentIndex,
+      );
+
+  _QueueState withStartSegment(int trackIndex, int segment) => _QueueState(
+        uris: uris,
+        durations: durations,
+        startSegments: {...startSegments, trackIndex: segment},
+        segmentOffset: segmentOffset,
+        currentIndex: currentIndex,
+      );
+
+  // Drop all seek overrides and reset offset — used when jumping to a new track.
+  _QueueState resetNavigation() => _QueueState(
+        uris: uris,
+        durations: durations,
+        startSegments: const {},
+        segmentOffset: Duration.zero,
+        currentIndex: currentIndex,
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -195,42 +259,24 @@ class _MediaKitBackend implements _PlayerBackend {
   AudioProcessingState _ps = AudioProcessingState.idle;
   final _psCtrl = StreamController<AudioProcessingState>.broadcast();
 
-  // Queue state. mpv's native playlist demuxer flattens HLS into per-segment
-  // playlist entries and advances `playlist-pos` through them (every 6s rather
-  // than every ~4min), plus mpv reports each segment's duration (6s) as the
-  // file duration and its position resets to 0 at every segment boundary. We
-  // can't trust any of those values as track-level state. Instead we observe
-  // the current file URL via `path`, match it back to our original queue by
-  // track ID, and derive a track-relative position by adding the current
-  // segment's offset to mpv's in-segment position.
+  // Queue and per-track HLS seek state, consolidated into a single value object
+  // so every update is atomic — see _QueueState above.
   //
-  // Index and duration use BehaviorSubject so a late Riverpod subscriber
-  // (e.g. a widget built after playback started) still receives the most
-  // recent value on subscribe — a plain broadcast controller would drop it.
-  List<Uri> _queueUris = const [];
-  List<Duration> _queueDurations = const [];
-  int? _currentIndex;
+  // mpv's native playlist demuxer flattens HLS into per-segment entries and
+  // advances `playlist-pos` every 6 s; we observe the current file URL via
+  // `path`, match it back to our original queue by track ID, and derive a
+  // track-relative position as segmentOffset + mpv's in-segment position.
+  //
+  // Index and duration use BehaviorSubject so late Riverpod subscribers
+  // (widgets built after playback started) still receive the most recent value.
+  _QueueState _queue = const _QueueState();
   final _indexCtrl = BehaviorSubject<int?>();
   final _durationCtrl = BehaviorSubject<Duration?>();
 
-  // Per-track startSegment override. Used to implement cross-segment seeking:
-  // mpv's native playlist demuxer can only seek within the currently-loaded
-  // 6-second segment, so to jump elsewhere in the track we reload the
-  // playlist with `?startSegment=N` and seek within the new first segment.
-  // Key: index into `_queueUris`. Absent or 0 = play from the beginning.
-  final Map<int, int> _startSegments = {};
+  // Authoritative value comes from GET /api/health → segmentSeconds (default 6).
+  // Updated before every playQueue call via updateSegmentDuration().
+  Duration _segmentDuration = const Duration(seconds: 6);
 
-  // Track-relative position = _segmentOffset + mpv's in-segment position.
-  // Updated when `path` observer fires with a new segment URL.
-  Duration _segmentOffset = Duration.zero;
-
-  // Must match backend `HLS_SEGMENT_SECONDS` (default 6) — used to compute
-  // the offset of segment N (`N * _segmentDuration`). If the backend default
-  // ever changes, this must too.
-  static const _segmentDuration = Duration(seconds: 6);
-
-  // Track URL pattern: /api/stream/<trackId>/playlist.m3u8 or segment/000 both carry the track ID.
-  static final _trackIdPattern = RegExp(r'/api/stream/(\d+)/');
   static final _segmentIndexPattern = RegExp(r'/segment/(\d+)');
 
   void _emit(AudioProcessingState s) {
@@ -242,59 +288,39 @@ class _MediaKitBackend implements _PlayerBackend {
     try {
       await np.setProperty(key, value);
     } catch (e, st) {
-      debugPrint('[BiMusicAudio][mpv-set] $key = $value FAILED: $e\n$st');
+      dev.log('[BiMusicAudio][mpv-set] $key = $value FAILED: $e\n$st');
     }
   }
 
   /// Reverse-lookup the current mpv file URL into our original queue index.
-  /// Returns the index of the matching queue entry, or null if no match.
-  int? _matchUriToQueueIndex(String path) {
-    if (_queueUris.isEmpty) return null;
-    for (var i = 0; i < _queueUris.length; i++) {
-      if (_queueUris[i].toString() == path) return i;
-    }
-    final m = _trackIdPattern.firstMatch(path);
-    if (m == null) return null;
-    final prefix = m.group(0)!; // "/api/stream/<id>/"
-    for (var i = 0; i < _queueUris.length; i++) {
-      if (_queueUris[i].toString().contains(prefix)) return i;
-    }
-    return null;
-  }
+  int? _matchUriToQueueIndex(String path) =>
+      matchHlsUriToQueueIndex(path, _queue.uris);
 
   Future<void> _updateFromPath(String path) async {
     final matched = _matchUriToQueueIndex(path);
     final segMatch = _segmentIndexPattern.firstMatch(path);
-    final trackChanged = matched != null && matched != _currentIndex;
-
-    // Segment offset follows the URL. On a track boundary we reset to zero
-    // (the first segment's URL will push it to 0 anyway on the next tick, but
-    // resetting here avoids briefly reporting the previous track's final
-    // segment offset for the new track). Within a track, every segment URL
-    // updates the offset.
-    if (trackChanged) {
-      _segmentOffset = Duration.zero;
-    } else if (segMatch != null) {
-      _segmentOffset =
-          _segmentDuration * int.parse(segMatch.group(1)!);
-    }
+    final trackChanged = matched != null && matched != _queue.currentIndex;
 
     if (trackChanged) {
-      debugPrint('[BiMusicAudio] track change: index=$matched path=$path');
-      _currentIndex = matched;
+      _queue = _queue.withCurrentIndex(matched).withSegmentOffset(Duration.zero);
+      dev.log('[BiMusicAudio] track change: index=$matched path=$path');
       _indexCtrl.add(matched);
-      if (matched < _queueDurations.length &&
-          _queueDurations[matched] > Duration.zero) {
-        _durationCtrl.add(_queueDurations[matched]);
+      if (matched < _queue.durations.length &&
+          _queue.durations[matched] > Duration.zero) {
+        _durationCtrl.add(_queue.durations[matched]);
       }
+    } else if (segMatch != null) {
+      _queue = _queue.withSegmentOffset(
+        _segmentDuration * int.parse(segMatch.group(1)!),
+      );
     }
   }
 
   /// Build the Media URL for queue index [i], applying any `startSegment`
   /// override. File URIs are returned unchanged.
   Uri _resolveUri(int i) {
-    final uri = _queueUris[i];
-    final start = _startSegments[i];
+    final uri = _queue.uris[i];
+    final start = _queue.startSegments[i];
     if (start == null || start == 0) return uri;
     return uri.replace(queryParameters: {
       ...uri.queryParameters,
@@ -311,15 +337,15 @@ class _MediaKitBackend implements _PlayerBackend {
   /// "error running command _command(seek, X, absolute)".
   Future<void> _reopenQueueAt(int index, Duration withinSegment) async {
     final wasPlaying = _p.state.playing;
-    _currentIndex = index;
+    _queue = _queue.withCurrentIndex(index);
     _indexCtrl.add(index);
-    if (index < _queueDurations.length &&
-        _queueDurations[index] > Duration.zero) {
-      _durationCtrl.add(_queueDurations[index]);
+    if (index < _queue.durations.length &&
+        _queue.durations[index] > Duration.zero) {
+      _durationCtrl.add(_queue.durations[index]);
     }
 
     final medias = List<Media>.generate(
-      _queueUris.length,
+      _queue.uris.length,
       (i) {
         final uri = _resolveUri(i).toString();
         final start = (i == index && withinSegment > Duration.zero)
@@ -353,7 +379,7 @@ class _MediaKitBackend implements _PlayerBackend {
       await np.observeProperty('path', _updateFromPath);
     }
 
-    _p.stream.log.listen((log) => debugPrint(
+    _p.stream.log.listen((log) => dev.log(
           '[BiMusicAudio][mpv][${log.level}][${log.prefix}] ${log.text}',
         ));
 
@@ -366,7 +392,7 @@ class _MediaKitBackend implements _PlayerBackend {
       if (done) _emit(AudioProcessingState.completed);
     });
     _p.stream.error.listen((err) {
-      if (err.isNotEmpty) debugPrint('[BiMusicAudio] media_kit error: $err');
+      if (err.isNotEmpty) dev.log('[BiMusicAudio] media_kit error: $err');
     });
   }
 
@@ -376,18 +402,18 @@ class _MediaKitBackend implements _PlayerBackend {
     int initialIndex, {
     List<Duration>? durations,
   }) async {
-    _queueUris = uris;
-    _queueDurations = durations ?? const [];
-    _startSegments.clear();
-    _segmentOffset = Duration.zero;
-    _currentIndex = initialIndex;
+    _queue = _QueueState(
+      uris: uris,
+      durations: durations ?? const [],
+      currentIndex: initialIndex,
+    );
     _indexCtrl.add(initialIndex);
-    if (initialIndex < _queueDurations.length &&
-        _queueDurations[initialIndex] > Duration.zero) {
-      _durationCtrl.add(_queueDurations[initialIndex]);
+    if (initialIndex < _queue.durations.length &&
+        _queue.durations[initialIndex] > Duration.zero) {
+      _durationCtrl.add(_queue.durations[initialIndex]);
     }
 
-    debugPrint(
+    dev.log(
       '[BiMusicAudio] openQueue: initialIndex=$initialIndex count=${uris.length}',
     );
     _emit(AudioProcessingState.loading);
@@ -395,7 +421,7 @@ class _MediaKitBackend implements _PlayerBackend {
     try {
       await _p.open(Playlist(medias, index: initialIndex), play: false);
     } catch (e, st) {
-      debugPrint('[BiMusicAudio] openQueue: _p.open threw: $e\n$st');
+      dev.log('[BiMusicAudio] openQueue: _p.open threw: $e\n$st');
       rethrow;
     }
   }
@@ -411,7 +437,7 @@ class _MediaKitBackend implements _PlayerBackend {
 
   @override
   Stream<Duration> get positionStream =>
-      _p.stream.position.map((p) => _segmentOffset + p);
+      _p.stream.position.map((p) => _queue.segmentOffset + p);
 
   @override
   Stream<Duration?> get durationStream => _durationCtrl.stream;
@@ -423,7 +449,7 @@ class _MediaKitBackend implements _PlayerBackend {
   bool get playing => _p.state.playing;
 
   @override
-  Duration get position => _segmentOffset + _p.state.position;
+  Duration get position => _queue.segmentOffset + _p.state.position;
 
   @override
   Duration get bufferedPosition => _p.state.buffer;
@@ -432,14 +458,16 @@ class _MediaKitBackend implements _PlayerBackend {
   double get speed => _p.state.rate;
 
   @override
-  int? get currentIndex => _currentIndex;
+  int? get currentIndex => _queue.currentIndex;
 
   @override
   bool get hasNext =>
-      _currentIndex != null && _currentIndex! + 1 < _queueUris.length;
+      _queue.currentIndex != null &&
+      _queue.currentIndex! + 1 < _queue.length;
 
   @override
-  bool get hasPrevious => _currentIndex != null && _currentIndex! > 0;
+  bool get hasPrevious =>
+      _queue.currentIndex != null && _queue.currentIndex! > 0;
 
   @override
   Future<void> play() => _p.play();
@@ -452,14 +480,14 @@ class _MediaKitBackend implements _PlayerBackend {
 
   @override
   Future<void> seekTo(Duration pos, {int? index}) async {
-    if (index != null && index != _currentIndex) {
+    if (index != null && index != _queue.currentIndex) {
       await jumpTo(index);
     }
-    final targetIndex = _currentIndex;
-    if (targetIndex == null || targetIndex >= _queueUris.length) return;
+    final targetIndex = _queue.currentIndex;
+    if (targetIndex == null || targetIndex >= _queue.length) return;
 
     // Local files: mpv seeks natively within a single file.
-    if (_queueUris[targetIndex].scheme == 'file') {
+    if (_queue.uris[targetIndex].scheme == 'file') {
       await _p.seek(pos);
       return;
     }
@@ -468,40 +496,39 @@ class _MediaKitBackend implements _PlayerBackend {
     // currently-loaded segment, mpv can seek within it directly. Otherwise
     // we must reload the playlist starting from that segment — mpv's native
     // playlist demuxer can't cross segment boundaries on its own.
-    final segmentMs = _segmentDuration.inMilliseconds;
-    final clampedMs = pos.inMilliseconds < 0 ? 0 : pos.inMilliseconds;
-    final targetSegment = clampedMs ~/ segmentMs;
-    final withinSegment =
-        Duration(milliseconds: clampedMs - targetSegment * segmentMs);
-    final currentSegment = _segmentOffset.inMilliseconds ~/ segmentMs;
+    final target = computeHlsSeekTarget(
+      seekTo: pos,
+      currentSegmentOffset: _queue.segmentOffset,
+      segmentDuration: _segmentDuration,
+    );
 
-    if (targetSegment == currentSegment) {
-      await _p.seek(withinSegment);
+    if (target.sameSegment) {
+      await _p.seek(target.withinSegment);
       return;
     }
 
-    _startSegments[targetIndex] = targetSegment;
-    _segmentOffset = Duration(milliseconds: targetSegment * segmentMs);
-    await _reopenQueueAt(targetIndex, withinSegment);
+    _queue = _queue
+        .withStartSegment(targetIndex, target.targetSegment)
+        .withSegmentOffset(_segmentDuration * target.targetSegment);
+    await _reopenQueueAt(targetIndex, target.withinSegment);
   }
 
   @override
   Future<void> seekToNext() async {
-    if (hasNext) await jumpTo(_currentIndex! + 1);
+    if (hasNext) await jumpTo(_queue.currentIndex! + 1);
   }
 
   @override
   Future<void> seekToPrevious() async {
-    if (hasPrevious) await jumpTo(_currentIndex! - 1);
+    if (hasPrevious) await jumpTo(_queue.currentIndex! - 1);
   }
 
   @override
   Future<void> jumpTo(int index) async {
-    if (index < 0 || index >= _queueUris.length) return;
+    if (index < 0 || index >= _queue.length) return;
     // Explicit navigation: drop any startSegment overrides so every track
     // plays from its beginning regardless of prior seeks.
-    _startSegments.clear();
-    _segmentOffset = Duration.zero;
+    _queue = _queue.resetNavigation();
     await _reopenQueueAt(index, Duration.zero);
   }
 
@@ -518,6 +545,9 @@ class _MediaKitBackend implements _PlayerBackend {
 
   @override
   Future<void> setShuffle(bool enabled) => _p.setShuffle(enabled);
+
+  @override
+  void updateSegmentDuration(Duration d) => _segmentDuration = d;
 }
 
 // ---------------------------------------------------------------------------
@@ -561,6 +591,8 @@ class BiMusicAudioHandler extends BaseAudioHandler {
 
   Future<void> setVolume(double v) => _backend.setVolume(v.clamp(0.0, 1.0));
 
+  void updateSegmentDuration(Duration d) => _backend.updateSegmentDuration(d);
+
   /// Rebuilds the audio source playlist with fresh stream URLs after token refresh.
   Future<void> updateToken(String newToken) async {
     _accessToken = newToken;
@@ -589,18 +621,18 @@ class BiMusicAudioHandler extends BaseAudioHandler {
 
     _backend.processingStateStream.listen(
       (_) {
-        debugPrint(
+        dev.log(
           '[BiMusicAudio] processingState: ${_backend.processingState} playing=${_backend.playing}',
         );
         _broadcastState();
       },
       onError: (Object e, StackTrace st) =>
-          debugPrint('[BiMusicAudio] processingStateStream error: $e\n$st'),
+          dev.log('[BiMusicAudio] processingStateStream error: $e\n$st'),
     );
     _backend.playingStream.listen(
       (_) => _broadcastState(),
       onError: (Object e, StackTrace st) =>
-          debugPrint('[BiMusicAudio] playingStream error: $e\n$st'),
+          dev.log('[BiMusicAudio] playingStream error: $e\n$st'),
     );
     _backend.indexStream.listen(_onCurrentIndexChanged);
     _backend.durationStream.listen(_onDurationChanged);
@@ -632,6 +664,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     String? albumTitle,
     String? imageUrl,
     Map<int, String> localFilePaths = const {},
+    int segmentSeconds = 6,
   }) async {
     await _initCompleter.future;
 
@@ -643,6 +676,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     _albumTitle = albumTitle;
     _imageUrl = imageUrl;
     _localFilePaths = localFilePaths;
+    _backend.updateSegmentDuration(Duration(seconds: segmentSeconds));
 
     queue.add(tracks.map(_trackToMediaItem).toList());
     mediaItem.add(_trackToMediaItem(tracks[startIndex]));
@@ -656,13 +690,13 @@ class BiMusicAudioHandler extends BaseAudioHandler {
             .toList(),
       );
     } catch (e, st) {
-      debugPrint('[BiMusicAudio] openQueue error: $e\n$st');
+      dev.log('[BiMusicAudio] openQueue error: $e\n$st');
       rethrow;
     }
     try {
       await _backend.play();
     } catch (e, st) {
-      debugPrint('[BiMusicAudio] play error: $e\n$st');
+      dev.log('[BiMusicAudio] play error: $e\n$st');
       rethrow;
     }
   }
@@ -670,7 +704,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   Uri _uriForTrack(Track t) {
     final localPath = _localFilePaths[t.id];
     if (localPath != null) {
-      debugPrint('[BiMusicAudio] Track ${t.id}: using local file $localPath');
+      dev.log('[BiMusicAudio] Track ${t.id}: using local file $localPath');
       return Uri.file(localPath);
     }
     final params = <String, String>{
@@ -679,7 +713,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     };
     final uri = Uri.parse('$_baseUrl/api/stream/${t.id}/playlist.m3u8')
         .replace(queryParameters: params);
-    debugPrint('[BiMusicAudio] Track ${t.id}: stream URL = $uri');
+    dev.log('[BiMusicAudio] Track ${t.id}: stream URL = $uri');
     return uri;
   }
 
