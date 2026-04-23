@@ -184,16 +184,19 @@ export function serveFile(
     const start = parseInt(startStr, 10);
     const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
 
-    if (isNaN(start) || isNaN(end) || start > end || end >= fileSize) {
+    if (isNaN(start) || isNaN(end) || start > end || start >= fileSize) {
       res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).end();
       return;
     }
+    // Clamp end per RFC 7233 §2.1: a valid start with an oversized end is
+    // satisfiable — clamp to the last byte rather than returning 416.
+    const clampedEnd = Math.min(end, fileSize - 1);
 
-    const chunkSize = end - start + 1;
+    const chunkSize = clampedEnd - start + 1;
     res.status(206);
-    res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+    res.setHeader("Content-Range", `bytes ${start}-${clampedEnd}/${fileSize}`);
     res.setHeader("Content-Length", chunkSize);
-    const rangeStream = createReadStream(filePath, { start, end });
+    const rangeStream = createReadStream(filePath, { start, end: clampedEnd });
     rangeStream.on("error", (err: Error) => {
       logger.error({ err, filePath }, "File read error during range serve");
       if (!res.headersSent) res.status(500).end();

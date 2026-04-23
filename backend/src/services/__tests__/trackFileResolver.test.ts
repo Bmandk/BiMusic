@@ -377,8 +377,8 @@ describe("serveFile", () => {
     );
   });
 
-  it("returns 416 when range is out of bounds", () => {
-    const req = makeReq("bytes=9999-20000");
+  it("returns 416 when start >= fileSize (unsatisfiable)", () => {
+    const req = makeReq("bytes=10000-20000");
     const res = makeMockRes();
 
     serveFile("/music/track.mp3", req, res as never);
@@ -389,6 +389,20 @@ describe("serveFile", () => {
       "bytes */10000",
     );
     expect(res.end).toHaveBeenCalled();
+  });
+
+  it("clamps end to fileSize-1 per RFC 7233 when start is valid but end overshoots", () => {
+    const req = makeReq("bytes=9999-20000");
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(206);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 9999-9999/10000",
+    );
+    expect(res.setHeader).toHaveBeenCalledWith("Content-Length", 1);
   });
 
   it("returns 400 for malformed Range header (non-bytes unit)", () => {

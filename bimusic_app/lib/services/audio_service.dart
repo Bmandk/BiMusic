@@ -472,13 +472,18 @@ class _MediaKitBackend implements _PlayerBackend {
   int? get currentIndex => _queue.currentIndex;
 
   @override
-  bool get hasNext =>
-      _queue.currentIndex != null &&
-      _queue.currentIndex! + 1 < _queue.length;
+  bool get hasNext {
+    if (_queue.currentIndex == null) return false;
+    if (_isShuffled) return _queue.length > 1;
+    return _queue.currentIndex! + 1 < _queue.length;
+  }
 
   @override
-  bool get hasPrevious =>
-      _queue.currentIndex != null && _queue.currentIndex! > 0;
+  bool get hasPrevious {
+    if (_queue.currentIndex == null) return false;
+    if (_isShuffled) return _queue.length > 1;
+    return _queue.currentIndex! > 0;
+  }
 
   @override
   Future<void> play() => _p.play();
@@ -733,7 +738,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
   Uri _uriForTrack(Track t) {
     final localPath = _localFilePaths[t.id];
     if (localPath != null) {
-      dev.log('[BiMusicAudio] Track ${t.id}: using local file $localPath');
+      dev.log('[BiMusicAudio] Track ${t.id}: using local file');
       return Uri.file(localPath);
     }
     final params = <String, String>{
@@ -742,13 +747,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     };
     final uri = Uri.parse('$_baseUrl/api/stream/${t.id}/playlist.m3u8')
         .replace(queryParameters: params);
-    final logUri = uri.replace(
-      queryParameters: {
-        for (final e in uri.queryParameters.entries)
-          e.key: e.key == 'token' ? '[REDACTED]' : e.value,
-      },
-    );
-    dev.log('[BiMusicAudio] Track ${t.id}: stream URL = $logUri');
+    dev.log('[BiMusicAudio] Track ${t.id}: stream URL prepared');
     return uri;
   }
 
