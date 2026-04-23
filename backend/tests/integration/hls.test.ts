@@ -425,9 +425,10 @@ describe("GET /api/stream/:id/segment/:index — index validation", () => {
   it("returns 400 when segment index >= segmentCount", async () => {
     stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
 
-    // SEGMENT_COUNT = 40; index 40 is out-of-range
+    // SEGMENT_COUNT is the first out-of-range index
+    const outOfRangeIndex = String(SEGMENT_COUNT).padStart(3, "0");
     const res = await request(app)
-      .get(`/api/stream/${TRACK_ID}/segment/040?bitrate=128`)
+      .get(`/api/stream/${TRACK_ID}/segment/${outOfRangeIndex}?bitrate=128`)
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(400);
@@ -562,5 +563,15 @@ describe("?token= query-param authentication", () => {
     expect(res.status).toBe(200);
     // Segment URIs must contain the token so mpv can authenticate the segment requests.
     expect(res.text).toContain(`token=${token}`);
+  });
+
+  it("playlist: Authorization header takes precedence over ?token= when both are provided", async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, "track.flac"));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=invalid-token`)
+      .set("Authorization", `Bearer ${token}`);
+    // Valid header + invalid ?token= — header wins, request succeeds.
+    expect(res.status).toBe(200);
   });
 });
