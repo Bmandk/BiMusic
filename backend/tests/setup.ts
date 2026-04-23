@@ -1,5 +1,6 @@
 // Set environment variables before any module is imported.
 // This file runs as a Vitest setupFile for the integration project.
+import os from 'os';
 
 process.env['PORT'] = '3099';
 process.env['NODE_ENV'] = 'test';
@@ -10,7 +11,8 @@ process.env['JWT_REFRESH_EXPIRY'] = '30d';
 process.env['DB_PATH'] = ':memory:';
 process.env['LIDARR_URL'] = 'http://localhost:8686';
 process.env['LIDARR_API_KEY'] = 'test-api-key';
-process.env['MUSIC_LIBRARY_PATH'] = '/music';
+// Tests create fixture files under os.tmpdir(), so the library path must match.
+process.env['MUSIC_LIBRARY_PATH'] = os.tmpdir();
 process.env['OFFLINE_STORAGE_PATH'] = './data/offline';
 process.env['ADMIN_USERNAME'] = 'admin';
 process.env['ADMIN_PASSWORD'] = 'adminpassword123';

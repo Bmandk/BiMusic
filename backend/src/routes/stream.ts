@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { statSync } from "fs";
+import { stat } from "fs/promises";
+import rateLimit from "express-rate-limit";
 import { authenticate } from "../middleware/auth.js";
+import { createError } from "../middleware/errorHandler.js";
 import { resolveFilePath, serveFile } from "../services/trackFileResolver.js";
 import {
   computeTrackKey,
@@ -12,6 +14,20 @@ import { logger } from "../utils/logger.js";
 
 const router = Router();
 
+// 300 requests per minute per IP — generous for normal HLS scrubbing (40 segs × 7 concurrent tracks)
+// but still blocks automated abuse.
+const streamLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded" },
+  },
+});
+
+router.use(streamLimiter);
+
 const VALID_BITRATES = new Set([128, 320]);
 
 function parseBitrate(raw: unknown): number | null {
@@ -19,6 +35,20 @@ function parseBitrate(raw: unknown): number | null {
   const s = typeof raw === "string" ? raw : String(raw);
   const n = parseInt(s, 10);
   return VALID_BITRATES.has(n) ? n : null;
+}
+
+/** Extract the bearer token from the request: ?token= query param takes precedence,
+ *  falling back to the Authorization header so callers that authenticated via header
+ *  still get working segment URIs embedded in the playlist. */
+function extractToken(req: Request): string {
+  if (typeof req.query["token"] === "string" && req.query["token"]) {
+    return req.query["token"];
+  }
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    return auth.slice(7);
+  }
+  return "";
 }
 
 async function handlePlaylist(
@@ -29,36 +59,25 @@ async function handlePlaylist(
   try {
     const trackId = parseInt(req.params["trackId"] as string, 10);
     if (isNaN(trackId)) {
-      res.status(400).json({
-        error: { code: "BAD_REQUEST", message: "Invalid track ID" },
-      });
+      next(createError(400, "BAD_REQUEST", "Invalid track ID"));
       return;
     }
 
     const bitrate = parseBitrate(req.query["bitrate"]);
     if (bitrate === null) {
-      res.status(400).json({
-        error: {
-          code: "BAD_REQUEST",
-          message: "Invalid bitrate. Must be 128 or 320",
-        },
-      });
+      next(
+        createError(400, "BAD_REQUEST", "Invalid bitrate. Must be 128 or 320"),
+      );
       return;
     }
 
-    const token =
-      typeof req.query["token"] === "string" ? req.query["token"] : "";
+    const token = extractToken(req);
 
     const startSegmentRaw = req.query["startSegment"];
     const startSegment =
       startSegmentRaw === undefined ? 0 : parseInt(String(startSegmentRaw), 10);
     if (isNaN(startSegment) || startSegment < 0) {
-      res.status(400).json({
-        error: {
-          code: "BAD_REQUEST",
-          message: "Invalid startSegment",
-        },
-      });
+      next(createError(400, "BAD_REQUEST", "Invalid startSegment"));
       return;
     }
 
@@ -72,12 +91,7 @@ async function handlePlaylist(
     const segmentCount = Math.ceil(durationMs / (segmentSeconds * 1000));
 
     if (startSegment >= segmentCount) {
-      res.status(400).json({
-        error: {
-          code: "BAD_REQUEST",
-          message: "startSegment out of range",
-        },
-      });
+      next(createError(400, "BAD_REQUEST", "startSegment out of range"));
       return;
     }
 
@@ -122,28 +136,25 @@ router.get(
     try {
       const trackId = parseInt(req.params["trackId"] as string, 10);
       if (isNaN(trackId)) {
-        res.status(400).json({
-          error: { code: "BAD_REQUEST", message: "Invalid track ID" },
-        });
+        next(createError(400, "BAD_REQUEST", "Invalid track ID"));
         return;
       }
 
       const segmentIndex = parseInt(req.params["index"] as string, 10);
       if (isNaN(segmentIndex) || segmentIndex < 0) {
-        res.status(400).json({
-          error: { code: "BAD_REQUEST", message: "Invalid segment index" },
-        });
+        next(createError(400, "BAD_REQUEST", "Invalid segment index"));
         return;
       }
 
       const bitrate = parseBitrate(req.query["bitrate"]);
       if (bitrate === null) {
-        res.status(400).json({
-          error: {
-            code: "BAD_REQUEST",
-            message: "Invalid bitrate. Must be 128 or 320",
-          },
-        });
+        next(
+          createError(
+            400,
+            "BAD_REQUEST",
+            "Invalid bitrate. Must be 128 or 320",
+          ),
+        );
         return;
       }
 
@@ -157,17 +168,20 @@ router.get(
       const segmentCount = Math.ceil(durationMs / (segmentSeconds * 1000));
 
       if (segmentIndex >= segmentCount) {
-        res.status(400).json({
-          error: { code: "BAD_REQUEST", message: "Segment index out of range" },
-        });
+        next(createError(400, "BAD_REQUEST", "Segment index out of range"));
         return;
       }
 
-      const stat = statSync(sourcePath);
+      let fileStat: Awaited<ReturnType<typeof stat>>;
+      try {
+        fileStat = await stat(sourcePath);
+      } catch {
+        throw createError(404, "NOT_FOUND", "Track file is not readable");
+      }
       const trackKey = computeTrackKey(
         sourcePath,
-        stat.mtimeMs,
-        stat.size,
+        fileStat.mtimeMs,
+        fileStat.size,
         bitrate,
       );
 

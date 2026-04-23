@@ -1,0 +1,165 @@
+{
+  "reviewer": "adversarial",
+  "findings": [
+    {
+      "title": "No per-user or global ffmpeg concurrency cap — trivial CPU/disk exhaustion",
+      "severity": "P1",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 172,
+      "confidence": 95,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add a global semaphore (e.g. a simple counter + queue) that caps total concurrent ffmpeg invocations (suggested limit: 4–8). Any call to ensureSegment() that would exceed the cap should await a slot. Per-user limiting is optional for a self-hosted app but a global cap is critical. Alternatively, enforce via an env var MAX_CONCURRENT_TRANSCODES. The dedup map already prevents duplicate (trackKey, segIndex) pairs — the gap is the unlimited number of distinct keys. A user with a valid JWT can fire segment/000 through segment/999 across 100 tracks simultaneously, launching up to 100 000 concurrent ffmpeg processes (they would immediately fail due to ulimit, but the attempt itself may OOM the process manager)."
+    },
+    {
+      "title": "Disk exhaustion: no total cache size cap, only a 24-hour age eviction",
+      "severity": "P1",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 205,
+      "confidence": 90,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add an LRU-based size cap alongside the time-based eviction. Measure the total size of HLS_CACHE_DIR at the start of each hourly cleanup pass; if it exceeds a configurable HLS_CACHE_MAX_BYTES threshold, evict directories in order of oldest mtime until the total drops below the threshold. Without this, an attacker requesting 1000 distinct tracks at both bitrates can consume 19 GB+ of disk space that persists for up to 24 hours before the hourly cleanup even starts working. Even a single user with 1000-track library can accidentally fill a small VPS disk."
+    },
+    {
+      "title": "Segment endpoint calls statSync() and resolveFilePath() on every request — no per-segment auth cache",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 155,
+      "confidence": 85,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Every segment request calls resolveFilePath() which makes two Lidarr HTTP calls (getTrack + getTrackFile, both cached in memory for 5 min). Then statSync() on the source file, then computeTrackKey(). For a 40-segment track played at normal speed this is 40 sequential Lidarr metadata lookups (mostly cache hits after the first), 40 stat() syscalls, and 40 SHA-256 computations. Under seek-storm conditions (rapid seeking across segments), the Lidarr metadata cache avoids the worst case, but the stat() and SHA-256 are unconditional. This is a DoS multiplier: a rapid seek attacker can force many stat() calls on a network-mounted filesystem. Consider caching (sourcePath, mtime, size, trackKey) keyed by trackId for the duration of a streaming session (say, 30 min TTL)."
+    },
+    {
+      "title": "JWT in query string persists in server access logs, proxy logs, and browser history",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 49,
+      "confidence": 98,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "This is a known design constraint (libmpv cannot send custom headers). Mitigations: (1) use short-lived segment-scoped tokens (e.g. 5 min access tokens, not the default 15 min) — already partially addressed by the existing JWT_ACCESS_EXPIRY. (2) Ensure the request logger in app.ts does NOT log query strings for /api/stream/* paths — currently pino logs req.path (path only, not query) so this is OK, but verify no middleware adds query logging. (3) Document in ops guide that any reverse proxy in front of the backend must be configured to strip/hash query strings from access logs for /api/stream/* paths."
+    },
+    {
+      "title": "Empty token embedded in all segment URIs when playlist is fetched via Bearer header without ?token=",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 49,
+      "confidence": 99,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Lines 49-51: if req.query['token'] is absent and authentication was via Bearer header, token is set to empty string ''. The playlist is returned successfully but all 40+ embedded segment URIs contain 'token=', causing every segment fetch to return 401. The UX breaks silently — the user sees a loading spinner or immediate error with no feedback. Fix: if token is '' after authentication succeeds, extract it from the Authorization header instead: const authHeader = req.headers.authorization; const token = typeof req.query['token'] === 'string' ? req.query['token'] : (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : ''). This way the playlist always embeds a usable token."
+    },
+    {
+      "title": "parseInt('1e2', 10) === 1 — scientific notation in segment index silently truncates",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 131,
+      "confidence": 80,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Replace parseInt() with a strict decimal-only regex check: const raw = req.params['index'] as string; if (!/^\\d{1,5}$/.test(raw)) { return 400; } const segmentIndex = Number(raw). This prevents '1e2', '0x0a', '1.5', etc. from being silently truncated. The only valid input is a 1-5 digit decimal string. Similarly harden the trackId and startSegment parsers in the same file."
+    },
+    {
+      "title": "HLS cleanup uses directory mtime (not latest file mtime) — active cache dirs can be prematurely evicted on some filesystems",
+      "severity": "P3",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 217,
+      "confidence": 70,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "statSync(dir).mtimeMs reflects the directory entry's modification time, which is updated when files are added or removed from the directory. On Linux ext4/xfs this is reliable. On macOS APFS and Windows NTFS, directory mtime may lag. More importantly, when a new segment is written to a directory that already has segments (sparse seek pattern), the directory mtime IS updated. But if a track's segments are all cached and the directory is simply being read (served), the mtime is NOT updated — the directory looks stale even if it was accessed recently. Consider using a separate .accessed sentinel file per cache directory, touched on each serve, to track real last-access time; or accept the minor risk for a self-hosted app."
+    },
+    {
+      "title": "Seek storm: every cross-segment seek reopens the entire mpv queue (all N tracks) causing O(N) media_kit overhead",
+      "severity": "P3",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 312,
+      "confidence": 75,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "_reopenQueueAt() calls _p.open(Playlist(medias, index: index)) where medias contains ALL tracks in the queue. For a 50-track album this allocates 50 Media objects and passes them to libmpv on every cross-segment seek. This is fine for typical use but a seek-happy user seeking every second will hammer the media_kit/libmpv layer. Consider whether media_kit supports in-place playlist-item URL replacement — if so, only replace the single item at the seek target index rather than rebuilding the entire playlist."
+    },
+    {
+      "title": "No rate limiting on segment or playlist endpoints — stream endpoints lack the login rate limiter applied elsewhere",
+      "severity": "P1",
+      "file": "backend/src/routes/stream.ts",
+      "line": 114,
+      "confidence": 92,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The /api/auth/login route has express-rate-limit at 10 req/min. The stream endpoints have no rate limiting at all. A valid JWT holder can send thousands of segment requests per second. Even without triggering ffmpeg (cache hits are fast), this ties up Node.js event loop iterations and can degrade all other API users. Add a per-IP or per-userId rate limiter on /:trackId/segment/:index — e.g. 200 req/min per user should be more than enough for legitimate playback (a 40-segment track takes 240 seconds to play, so even with seek storms this is ample headroom)."
+    },
+    {
+      "title": "resolveFilePath() calls getLidarrRootPath() which stores a permanent module-level singleton — Lidarr root folder changes require server restart",
+      "severity": "P3",
+      "file": "backend/src/services/trackFileResolver.ts",
+      "line": 36,
+      "confidence": 85,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": true,
+      "suggested_fix": "lidarrRootPath is cached indefinitely (lidarrRootPath = roots[0].path). If the Lidarr root folder is reconfigured, all subsequent resolveFilePath calls will use the stale path until the backend restarts. This is pre-existing behavior. Add a TTL (e.g. 1 hour) to lidarrRootPath by recording when it was set and re-fetching when stale. This also affects HLS streaming specifically because a stale root causes all segment transcodes to silently fail with 404 'Track file is not readable'."
+    },
+    {
+      "title": "Part file collision: two concurrent generateSegment() calls for the same key could race through the existsSync → inFlightSegments.get window",
+      "severity": "P2",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 163,
+      "confidence": 65,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "ensureSegment() checks existsSync(segPath) (line 166) then checks inFlightSegments.get(key) (line 169). Because Node.js is single-threaded and there are no await points between lines 166 and 175, this specific check-then-act is safe in Node.js — two concurrent calls cannot interleave between the existsSync check and the inFlightSegments.set. Confidence is lowered because the worker pool is not used here, but the analysis holds for a single-threaded event loop. Mark as confirmed-safe after review."
+    },
+    {
+      "title": "Token embedded in M3U8 playlist body is returned with no-store but segment responses lack CORS/security headers",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 105,
+      "confidence": 60,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "The playlist correctly sets Cache-Control: no-store to prevent caching of the token-bearing M3U8. Segment responses go through serveFile() which does NOT set Cache-Control headers, allowing browsers/proxies to cache segment content. This is generally desirable (segments are immutable given their cache-key design), but segment responses also lack Content-Disposition: attachment to discourage direct browser rendering. Low severity for a self-hosted app with no public internet exposure, but worth noting if a reverse proxy with public caching is added."
+    }
+  ],
+  "residual_risks": [
+    "JWT in query string is an irreducible risk given the libmpv constraint — any log aggregator or proxy touching /api/stream/* must be explicitly configured to redact query strings to avoid credential leakage in logs.",
+    "No total ffmpeg process cap means a buggy or misbehaving client could accidentally spawn excessive ffmpeg processes even without malicious intent (e.g. a seek loop in the Flutter client that rapidly requests new playlists).",
+    "HLS cache on disk has no encryption — any process with read access to HLS_CACHE_DIR can extract transcoded audio segments. Acceptable for a self-hosted app but noteworthy if MUSIC_LIBRARY_PATH contains legally-restricted content.",
+    "The metadata cache (METADATA_CACHE_TTL=5min, METADATA_CACHE_MAX=500) does not enforce per-user scoping — track metadata for all users shares one cache. A cache poisoning attack via Lidarr API tampering could serve wrong file paths to all users for up to 5 minutes.",
+    "Cleanup uses rmdirSync (not rmSync with recursive) — if a race condition introduces a sub-directory inside a track cache dir, cleanup silently fails to remove the parent directory, and the entry is no longer eligible for future cleanup since its mtime will be updated."
+  ],
+  "testing_gaps": [
+    "No integration test covers concurrent segment requests for the same (trackKey, segmentIndex) — the dedup promise map behavior is untested under actual concurrency.",
+    "No test for the empty-token playlist-then-segment flow (Bearer-only auth at playlist time → 401 on all segments).",
+    "No load/stress test validates that the server remains responsive under N simultaneous ffmpeg transcodes — the ffmpeg concurrency behavior is entirely untested.",
+    "No test for startSegment >= segmentCount validation with a real durationMs value — the boundary check at stream.ts line 74 is exercised only by arithmetic, not by an integration test with a real (mocked) track.",
+    "The hourly cleanup (startHlsCacheCleanup) is never exercised in any test — stale-entry eviction logic is completely untested.",
+    "No test verifies that .part files created by a crashed ffmpeg process are correctly removed by initHlsCacheDir() on restart.",
+    "The seek-storm scenario (_reopenQueueAt called in rapid succession) has no test — it is unclear whether media_kit/libmpv silently drops interleaved open() calls or queues them, which could cause position desync."
+  ]
+}

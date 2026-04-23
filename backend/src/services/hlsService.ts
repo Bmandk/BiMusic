@@ -1,13 +1,6 @@
 import { createHash } from "crypto";
-import {
-  mkdirSync,
-  readdirSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  existsSync,
-  rmdirSync,
-} from "fs";
+import { mkdirSync, readdirSync, renameSync, unlinkSync, existsSync } from "fs";
+import { readdir, stat as statAsync, unlink, rmdir } from "fs/promises";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import { env } from "../config/env.js";
@@ -19,6 +12,35 @@ import {
 
 // In-flight dedup map: segmentKey → Promise<segmentPath>
 const inFlightSegments = new Map<string, Promise<string>>();
+
+// Concurrency cap: at most 4 parallel ffmpeg transcodes.
+// Callers beyond the cap queue and are served as slots free up.
+const MAX_CONCURRENT_TRANSCODES = 4;
+let activeTranscodes = 0;
+const transcodeWaitQueue: Array<() => void> = [];
+
+function acquireTranscodeSlot(): Promise<void> {
+  if (activeTranscodes < MAX_CONCURRENT_TRANSCODES) {
+    activeTranscodes++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => transcodeWaitQueue.push(resolve));
+}
+
+function releaseTranscodeSlot(): void {
+  const next = transcodeWaitQueue.shift();
+  if (next) {
+    next(); // transfer slot directly to next waiter
+  } else {
+    activeTranscodes--;
+  }
+}
+
+// Maximum seconds before an ffmpeg transcode is killed and the caller gets an error.
+const SEGMENT_TRANSCODE_TIMEOUT_MS = 60_000;
+
+// Maximum cached track-key directories before LRU eviction during cleanup.
+const MAX_CACHE_DIRS = 500;
 
 /**
  * Stable cache key for a (source file, bitrate) pair.
@@ -61,7 +83,7 @@ export function buildPlaylist(
   const lines: string[] = [
     "#EXTM3U",
     "#EXT-X-VERSION:3",
-    `#EXT-X-TARGETDURATION:${segmentSeconds}`,
+    `#EXT-X-TARGETDURATION:${Math.ceil(segmentSeconds)}`,
     `#EXT-X-MEDIA-SEQUENCE:${startSegment}`,
     "#EXT-X-PLAYLIST-TYPE:VOD",
   ];
@@ -99,6 +121,7 @@ export function getSegmentCachePath(
  *
  * Writes to a .part file then atomically renames to the final path.
  * Registers the ffmpeg command for graceful shutdown.
+ * Acquires a concurrency slot and times out after SEGMENT_TRANSCODE_TIMEOUT_MS.
  */
 export async function generateSegment(opts: {
   sourcePath: string;
@@ -115,6 +138,8 @@ export async function generateSegment(opts: {
 
   const segmentStart = segmentIndex * segmentSeconds;
 
+  await acquireTranscodeSlot();
+
   return new Promise<string>((resolve, reject) => {
     const cmd = ffmpeg()
       .input(sourcePath)
@@ -124,9 +149,39 @@ export async function generateSegment(opts: {
       .audioBitrate(bitrate)
       .duration(segmentSeconds)
       .format("mp3")
-      .output(partPath)
+      .output(partPath);
+
+    let done = false;
+
+    const timeout = setTimeout(() => {
+      if (done) return;
+      done = true;
+      try {
+        cmd.kill("SIGTERM");
+      } catch {
+        /* ignore */
+      }
+      unregisterFfmpegCommand(cmd);
+      releaseTranscodeSlot();
+      try {
+        unlinkSync(partPath);
+      } catch {
+        /* ignore */
+      }
+      reject(
+        new Error(
+          `ffmpeg segment transcode timed out after ${SEGMENT_TRANSCODE_TIMEOUT_MS}ms`,
+        ),
+      );
+    }, SEGMENT_TRANSCODE_TIMEOUT_MS);
+
+    cmd
       .on("end", () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timeout);
         unregisterFfmpegCommand(cmd);
+        releaseTranscodeSlot();
         try {
           renameSync(partPath, segPath);
           resolve(segPath);
@@ -135,7 +190,11 @@ export async function generateSegment(opts: {
         }
       })
       .on("error", (err: Error) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timeout);
         unregisterFfmpegCommand(cmd);
+        releaseTranscodeSlot();
         try {
           unlinkSync(partPath);
         } catch {
@@ -201,40 +260,73 @@ export function initHlsCacheDir(): void {
   }
 }
 
-/** Hourly prune of cache subdirectories not written to in the last 24 hours. */
+/** Hourly prune: removes dirs older than 24 h and caps total dirs at MAX_CACHE_DIRS. */
 export function startHlsCacheCleanup(): void {
   const ONE_HOUR = 60 * 60 * 1000;
   const MAX_AGE = 24 * ONE_HOUR;
 
-  setInterval(() => {
+  const runCleanup = async () => {
     try {
       const now = Date.now();
-      for (const entry of readdirSync(env.HLS_CACHE_DIR)) {
+      const entries = await readdir(env.HLS_CACHE_DIR);
+
+      type DirEntry = { dir: string; mtimeMs: number };
+      const dirs: DirEntry[] = [];
+
+      for (const entry of entries) {
         const dir = path.join(env.HLS_CACHE_DIR, entry);
         try {
-          const stat = statSync(dir);
-          if (!stat.isDirectory()) continue;
-          if (now - stat.mtimeMs > MAX_AGE) {
-            for (const file of readdirSync(dir)) {
-              try {
-                unlinkSync(path.join(dir, file));
-              } catch {
-                /* ignore */
-              }
-            }
+          const s = await statAsync(dir);
+          if (!s.isDirectory()) continue;
+
+          const hasInflight = [...inFlightSegments.keys()].some((k) =>
+            k.startsWith(entry),
+          );
+
+          if (now - s.mtimeMs > MAX_AGE) {
+            // Skip dirs with active in-flight segments — they'll be cleaned next run.
+            if (hasInflight) continue;
+            const files = await readdir(dir);
+            await Promise.allSettled(
+              files.map((f) => unlink(path.join(dir, f))),
+            );
             try {
-              rmdirSync(dir);
+              await rmdir(dir);
+              logger.info({ dir }, "Cleaned up stale HLS cache directory");
+            } catch {
+              /* non-empty dir — leave for next run */
+            }
+          } else if (!hasInflight) {
+            dirs.push({ dir, mtimeMs: s.mtimeMs });
+          }
+        } catch {
+          /* ignore per-entry errors */
+        }
+      }
+
+      // LRU eviction: if remaining dirs exceed MAX_CACHE_DIRS, remove the oldest.
+      if (dirs.length > MAX_CACHE_DIRS) {
+        dirs.sort((a, b) => a.mtimeMs - b.mtimeMs);
+        const toEvict = dirs.slice(0, dirs.length - MAX_CACHE_DIRS);
+        await Promise.allSettled(
+          toEvict.map(async ({ dir }) => {
+            try {
+              const files = await readdir(dir);
+              await Promise.allSettled(
+                files.map((f) => unlink(path.join(dir, f))),
+              );
+              await rmdir(dir);
+              logger.info({ dir }, "Evicted HLS cache directory (LRU cap)");
             } catch {
               /* ignore */
             }
-            logger.info({ dir }, "Cleaned up stale HLS cache directory");
-          }
-        } catch {
-          /* ignore */
-        }
+          }),
+        );
       }
     } catch (err) {
       logger.error({ err }, "HLS cache cleanup failed");
     }
-  }, ONE_HOUR);
+  };
+
+  setInterval(() => void runCleanup(), ONE_HOUR);
 }

@@ -401,3 +401,119 @@ describe('GET /api/stream/:id/segment/:index — index validation', () => {
   });
 });
 
+// ────────────────────────────────────────────────────
+// startSegment parameter (cross-segment seeking)
+// ────────────────────────────────────────────────────
+
+describe('GET /api/stream/:id/playlist — startSegment', () => {
+  const TRACK_ID = 40;
+  const FILE_ID = 400;
+
+  it('returns a playlist starting at the requested segment', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=10`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const lines = res.text.split('\n');
+    // First segment URI in the playlist should be segment/010
+    const firstSegUri = lines.find((l) => l.startsWith('segment/'));
+    expect(firstSegUri).toMatch(/^segment\/010/);
+  });
+
+  it('EXT-X-MEDIA-SEQUENCE equals startSegment', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=5`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.text).toContain('#EXT-X-MEDIA-SEQUENCE:5');
+  });
+
+  it('emits only the remaining segments when startSegment > 0', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=10`)
+      .set('Authorization', `Bearer ${token}`);
+
+    // Total segments = 40; startSegment=10 → 30 remaining
+    const extinf = (res.text.match(/#EXTINF:/g) ?? []).length;
+    expect(extinf).toBe(SEGMENT_COUNT - 10);
+  });
+
+  it('returns 400 when startSegment >= segmentCount', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=40`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('BAD_REQUEST');
+  });
+
+  it('returns 400 for negative startSegment', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=tok&startSegment=-1`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ────────────────────────────────────────────────────
+// Token via query parameter (?token=) authentication
+// ────────────────────────────────────────────────────
+
+describe('?token= query-param authentication', () => {
+  const TRACK_ID = 50;
+  const FILE_ID = 500;
+
+  it('playlist: authenticates via ?token= without Authorization header', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128&token=${token}`);
+    // No Authorization header — only ?token=
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/vnd\.apple\.mpegurl/);
+  });
+
+  it('segment: authenticates via ?token= without Authorization header', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/segment/000?bitrate=128&token=${token}`);
+    // No Authorization header — only ?token=
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/audio\/mpeg/);
+  });
+
+  it('playlist: returns 401 when ?token= is absent and no Authorization header', async () => {
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128`);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('playlist: Authorization-only auth embeds the token in segment URIs', async () => {
+    stubLidarr(TRACK_ID, FILE_ID, path.join(fixtureDir, 'track.flac'));
+
+    const res = await request(app)
+      .get(`/api/stream/${TRACK_ID}/playlist?bitrate=128`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    // Segment URIs must contain the token so mpv can authenticate the segment requests.
+    expect(res.text).toContain(`token=${token}`);
+  });
+});
+

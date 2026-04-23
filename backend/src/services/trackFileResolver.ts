@@ -38,7 +38,10 @@ async function getLidarrRootPath(): Promise<string> {
       "Cached Lidarr root folder for path remapping",
     );
     return lidarrRootPath;
-  })();
+  })().catch((err) => {
+    lidarrRootPromise = null;
+    throw err;
+  });
 
   return lidarrRootPromise;
 }
@@ -111,6 +114,26 @@ export async function resolveFilePath(
 
   const lidarrRoot = await getLidarrRootPath();
   const localPath = remapPath(trackFile.path, lidarrRoot);
+
+  // Boundary check: ensure the resolved path stays within MUSIC_LIBRARY_PATH.
+  // remapPath can produce an out-of-bounds path if Lidarr returns a crafted
+  // file path containing ".." sequences.
+  const libraryRoot = path.resolve(env.MUSIC_LIBRARY_PATH);
+  const resolvedLocal = path.resolve(localPath);
+  if (
+    resolvedLocal !== libraryRoot &&
+    !resolvedLocal.startsWith(libraryRoot + path.sep)
+  ) {
+    logger.warn(
+      { trackId, lidarrPath: trackFile.path, resolvedLocal, libraryRoot },
+      "Resolved path is outside music library — possible path traversal",
+    );
+    throw createError(
+      403,
+      "FORBIDDEN",
+      "Track file is outside the music library",
+    );
+  }
 
   try {
     await access(localPath, constants.R_OK);

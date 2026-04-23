@@ -1,0 +1,189 @@
+{
+  "reviewer": "project-standards",
+  "findings": [
+    {
+      "title": "Validation errors use res.status().json() instead of createError+next(err)",
+      "severity": "P2",
+      "file": "backend/src/routes/stream.ts",
+      "line": 32,
+      "confidence": 90,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Replace all `res.status(400).json({ error: ... }); return;` blocks in handlePlaylist and the segment handler with `next(createError(400, 'BAD_REQUEST', '<message>')); return;`. Import createError from errorHandler. This ensures 4xx responses also flow through the central error handler (consistent logging via logger.warn, uniform JSON shape)."
+    },
+    {
+      "title": "serveFile Range error uses res.status(400).json() instead of createError pattern",
+      "severity": "P2",
+      "file": "backend/src/services/trackFileResolver.ts",
+      "line": 155,
+      "confidence": 85,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "serveFile() is called from a route handler where next() is available. Either pass next as a parameter and call next(createError(400, 'BAD_REQUEST', 'Invalid Range header')) instead of res.status(400).json(), or move Range validation into the route handler itself. The 416 response (status 416, setHeader, .end()) is an RFC-correct usage that does not need to go through the error handler."
+    },
+    {
+      "title": "Integration tests only test Bearer header auth on segment endpoint — ?token= query param path not covered",
+      "severity": "P2",
+      "file": "backend/tests/integration/hls.test.ts",
+      "line": 334,
+      "confidence": 95,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add an integration test that authenticates via ?token=<jwt> query parameter (no Authorization header) for both the playlist and segment endpoints. This is the production use-case for mpv/libmpv on Windows (documented in CLAUDE.md: 'libmpv does not support custom request headers on media streams'). Without this test the critical mpv auth path goes untested. Example: `request(app).get('/api/stream/10/playlist?bitrate=128&token=<jwt>').expect(200)`"
+    },
+    {
+      "title": "parseBitrate returns 320 when bitrate param is absent — potential unintended default",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 18,
+      "confidence": 70,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "CLAUDE.md documents the playlist endpoint as `?bitrate=128|320`. Silently defaulting to 320 when the param is omitted could cause unexpected high-bitrate transcoding for clients that simply forget the parameter. Consider returning null (invalid) when bitrate is absent and requiring it explicitly, or document the 320 default in CLAUDE.md. Minor concern — verify this is intentional."
+    },
+    {
+      "title": "media_kit and media_kit_libs_windows_video versions match CLAUDE.md requirements",
+      "severity": "P3",
+      "file": "bimusic_app/pubspec.yaml",
+      "line": 16,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — media_kit: ^1.2.6 and media_kit_libs_windows_video: ^1.0.0 are present. The audio-only variant (media_kit_libs_windows_audio) is NOT present. No action needed."
+    },
+    {
+      "title": "MediaKit.ensureInitialized() called before AudioService.init() in main()",
+      "severity": "P3",
+      "file": "bimusic_app/lib/main.dart",
+      "line": 61,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — MediaKit.ensureInitialized() is called at line 62, before AudioService.init() at line 69. Windows/Linux guard is correct. No action needed."
+    },
+    {
+      "title": "HLS_CACHE_DIR default matches CLAUDE.md documentation",
+      "severity": "P3",
+      "file": "backend/src/config/env.ts",
+      "line": 44,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — HLS_CACHE_DIR defaults to './data/hls' and HLS_SEGMENT_SECONDS defaults to 6, matching CLAUDE.md. No action needed."
+    },
+    {
+      "title": "Express 5 params typed with 'as string' cast (not '!' non-null assertion)",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 30,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — req.params['trackId'] as string and req.params['index'] as string are used consistently. No action needed."
+    },
+    {
+      "title": "Token not logged — only hasToken boolean is logged",
+      "severity": "P3",
+      "file": "backend/src/routes/stream.ts",
+      "line": 65,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — logger.debug logs { hasToken: !!token } (boolean), never the token value itself. No action needed."
+    },
+    {
+      "title": "CommonJS module system used — no import.meta.url present",
+      "severity": "P3",
+      "file": "backend/src/services/hlsService.ts",
+      "line": 1,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — hlsService.ts and trackFileResolver.ts use CommonJS-compatible imports. __dirname is used in env.ts. No import.meta.url present. No action needed."
+    },
+    {
+      "title": "auth middleware supports both Bearer header AND ?token= query param",
+      "severity": "P3",
+      "file": "backend/src/middleware/auth.ts",
+      "line": 17,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — authenticate() checks Authorization header first, then falls back to req.query['token']. Both HLS endpoints use the authenticate middleware. No action needed."
+    },
+    {
+      "title": "_MediaKitBackend.init() sets both required libmpv properties",
+      "severity": "P3",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 337,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — load-unsafe-playlists=yes (line 341) and cache-dir=Directory.systemTemp.path (line 346) are both set via NativePlayer.setProperty(). No action needed."
+    },
+    {
+      "title": "Stream URLs use plain http:// — no forced HLS demuxer property attempted",
+      "severity": "P3",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 680,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — _uriForTrack builds plain http(s):// URLs ending in /playlist.m3u8. demuxer=lavf is NOT set (correctly avoided per CLAUDE.md note that it is read-only). No action needed."
+    },
+    {
+      "title": "Providers use manual Riverpod 2 style, not @Riverpod codegen",
+      "severity": "P3",
+      "file": "bimusic_app/lib/services/audio_service.dart",
+      "line": 775,
+      "confidence": 99,
+      "autofix_class": "advisory",
+      "owner": "release",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "COMPLIANT — audioHandlerProvider is declared as Provider<BiMusicAudioHandler>(...), manual style. No @Riverpod annotation used. No action needed."
+    }
+  ],
+  "residual_risks": [
+    "The ?token= query param auth path (the production mpv use-case) is not covered by any integration test. If the authenticate middleware regresses on query-param auth, streaming from Windows clients would silently break.",
+    "Validation errors in stream.ts return the raw JSON shape manually (res.status().json()) rather than going through the central errorHandler. If the error response schema ever changes in errorHandler, stream.ts validation errors would diverge in format.",
+    "serveFile() in trackFileResolver.ts sends a 400 JSON response directly (bypassing errorHandler) for invalid Range headers, and logs the error at warn level independently — these bypass the requestId correlation in the central error handler.",
+    "_segmentDuration is hardcoded to Duration(seconds: 6) in the Flutter client and must be kept in sync with the backend HLS_SEGMENT_SECONDS default (currently 6). If the backend default changes, the Flutter client will compute incorrect seek offsets without any compile-time or runtime warning.",
+    "The HLS cache cleanup runs every hour but uses directory mtime for staleness, which may not update on all platforms when files inside are read (not written). A busy track segment could theoretically be evicted if directory mtime is not updated on read-only access."
+  ],
+  "testing_gaps": [
+    "No integration test for ?token= query-param authentication on playlist or segment endpoints — only Bearer header is tested.",
+    "No test for startSegment query param on the playlist endpoint (valid range, out-of-range, boundary values like startSegment=0 and startSegment=segmentCount-1).",
+    "No test for the playlist.m3u8 alias with a ?token= (query-param) auth scenario.",
+    "No test for concurrent segment requests (the in-flight dedup Map<segmentKey, Promise<string>> in hlsService.ts is untested — two simultaneous requests for the same segment should only invoke ffmpeg once).",
+    "No test for the HLS cache cleanup logic (startHlsCacheCleanup / pruning dirs older than 24h).",
+    "No Flutter widget test covering the _MediaKitBackend seek cross-segment path (seekTo triggers _reopenQueueAt with a startSegment override).",
+    "No Flutter test covering updateToken() on BiMusicAudioHandler (token refresh while playback is active)."
+  ]
+}

@@ -187,6 +187,44 @@ describe("buildPlaylist", () => {
     const pl = buildPlaylist(6000, 1, 6, 320, "tok");
     expect(pl).toContain("segment/000");
   });
+
+  it("uses Math.ceil for TARGETDURATION (float segmentSeconds)", () => {
+    const pl = buildPlaylist(24000, 4, 6.5, 128, "tok");
+    expect(pl).toContain("#EXT-X-TARGETDURATION:7");
+  });
+});
+
+describe("buildPlaylist — startSegment", () => {
+  it("first URI in output is segment/<startSegment> when startSegment > 0", () => {
+    const pl = buildPlaylist(240000, 40, 6, 128, "tok", 10);
+    const lines = pl.split("\n");
+    const firstSeg = lines.find((l) => l.startsWith("segment/"));
+    expect(firstSeg).toMatch(/^segment\/010/);
+  });
+
+  it("EXT-X-MEDIA-SEQUENCE equals startSegment", () => {
+    const pl = buildPlaylist(240000, 40, 6, 128, "tok", 5);
+    expect(pl).toContain("#EXT-X-MEDIA-SEQUENCE:5");
+  });
+
+  it("emits segmentCount - startSegment EXTINF lines", () => {
+    const pl = buildPlaylist(240000, 40, 6, 128, "tok", 10);
+    const count = (pl.match(/#EXTINF:/g) ?? []).length;
+    expect(count).toBe(30);
+  });
+
+  it("segment URIs keep original track-relative indices", () => {
+    const pl = buildPlaylist(240000, 40, 6, 128, "tok", 38);
+    expect(pl).toContain("segment/038");
+    expect(pl).toContain("segment/039");
+    expect(pl).not.toContain("segment/000");
+  });
+
+  it("startSegment=0 behaves identically to omitting startSegment", () => {
+    const pl0 = buildPlaylist(24000, 4, 6, 320, "tok", 0);
+    const plDef = buildPlaylist(24000, 4, 6, 320, "tok");
+    expect(pl0).toBe(plDef);
+  });
 });
 
 describe("ensureSegment cache-hit", () => {

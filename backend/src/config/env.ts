@@ -42,7 +42,7 @@ const envSchema = z.object({
   ADMIN_USERNAME: z.string().default("admin"),
   ADMIN_PASSWORD: z.string().min(8),
   HLS_CACHE_DIR: z.string().default("./data/hls"),
-  HLS_SEGMENT_SECONDS: z.coerce.number().default(6),
+  HLS_SEGMENT_SECONDS: z.coerce.number().int().positive().default(6),
 });
 
 const result = envSchema.safeParse(process.env);
