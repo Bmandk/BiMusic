@@ -20,9 +20,11 @@ class PlaylistImportService {
     final normalized = contents
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n');
+    final cleaned =
+        normalized.startsWith('﻿') ? normalized.substring(1) : normalized;
 
     const converter = CsvToListConverter(eol: '\n');
-    final rows = converter.convert(normalized);
+    final rows = converter.convert(cleaned);
 
     if (rows.isEmpty) throw const FormatException('CSV file is empty');
 
@@ -150,31 +152,31 @@ class PlaylistImportService {
   ) {
     final aLower = albumName.toLowerCase();
     final rLower = artistName.toLowerCase();
+    final firstCollaborator =
+        rLower.contains(',') ? rLower.split(',').first.trim() : null;
 
-    bool artistMatches(LidarrArtistResult a) {
-      final name = a.artistName.toLowerCase();
-      if (name == rLower) return true;
-      // Fall back to first collaborator (e.g. "Artist A, Artist B" → "Artist A")
-      if (rLower.contains(',')) {
-        return name == rLower.split(',').first.trim();
-      }
-      return false;
-    }
-
-    for (final a in albums) {
-      if (a.title.toLowerCase() == aLower && artistMatches(a.artist)) return a;
-    }
-    if (aLower.length >= 3) {
+    LidarrAlbumResult? scan(bool Function(String artistLower) artistOk) {
       for (final a in albums) {
-        final tLower = a.title.toLowerCase();
-        if (tLower.length >= 3 &&
-            (tLower.contains(aLower) || aLower.contains(tLower)) &&
-            artistMatches(a.artist)) {
+        if (a.title.toLowerCase() == aLower &&
+            artistOk(a.artist.artistName.toLowerCase())) {
           return a;
         }
       }
+      if (aLower.length >= 3) {
+        for (final a in albums) {
+          final tLower = a.title.toLowerCase();
+          if (tLower.length >= 3 &&
+              (tLower.contains(aLower) || aLower.contains(tLower)) &&
+              artistOk(a.artist.artistName.toLowerCase())) {
+            return a;
+          }
+        }
+      }
+      return null;
     }
-    return null;
+
+    return scan((n) => n == rLower) ??
+        (firstCollaborator != null ? scan((n) => n == firstCollaborator) : null);
   }
 
   LidarrArtistResult? _matchArtist(
@@ -182,12 +184,15 @@ class PlaylistImportService {
     String artistName,
   ) {
     final lower = artistName.toLowerCase();
-    final first =
-        lower.contains(',') ? lower.split(',').first.trim() : lower;
 
     for (final a in artists) {
-      final name = a.artistName.toLowerCase();
-      if (name == lower || name == first) return a;
+      if (a.artistName.toLowerCase() == lower) return a;
+    }
+    if (lower.contains(',')) {
+      final first = lower.split(',').first.trim();
+      for (final a in artists) {
+        if (a.artistName.toLowerCase() == first) return a;
+      }
     }
     return null;
   }

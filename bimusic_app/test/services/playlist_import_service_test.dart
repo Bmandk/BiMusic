@@ -105,6 +105,16 @@ void main() {
       expect(rows[0].albumName, 'Timely!!');
       expect(rows[0].artistName, 'Anri');
     });
+
+    test('strips UTF-8 BOM from start of file', () {
+      const csv = '﻿'
+          'Track URI,Track Name,Album Name,Artist Name(s)\n'
+          'id1,"A Song","Timely!!","Anri"\n';
+
+      final rows = service.parseCsv(csv);
+      expect(rows.length, 1);
+      expect(rows[0].albumName, 'Timely!!');
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -300,6 +310,41 @@ void main() {
 
       final result = await service.processAlbum(multiArtistAlbum);
       expect(result.status, ImportStatus.requestedAlbum);
+    });
+
+    test('prefers exact full-name album match over collaborator-fallback match',
+        () async {
+      const multiArtistAlbum = ImportAlbum(
+        albumName: 'Collab Album',
+        artistName: 'Artist A, Artist B',
+        trackCount: 1,
+      );
+      // Two results: collaborator-fallback match first, exact full-name match second
+      const collaboratorMatch = LidarrAlbumResult(
+        id: 1,
+        title: 'Collab Album',
+        artist: LidarrArtistResult(id: 1, artistName: 'Artist A', images: []),
+        images: [],
+      );
+      const exactMatch = LidarrAlbumResult(
+        id: 2,
+        title: 'Collab Album',
+        artist: LidarrArtistResult(
+            id: 2, artistName: 'Artist A, Artist B', images: []),
+        images: [],
+      );
+
+      when(() => mockSearch.searchLidarr(any())).thenAnswer(
+        (_) async => const LidarrSearchResults(
+            artists: [], albums: [collaboratorMatch, exactMatch]),
+      );
+      when(() => mockSearch.requestAlbum(2, coverUrl: null))
+          .thenAnswer((_) async => _fakeRequest());
+
+      final result = await service.processAlbum(multiArtistAlbum);
+      expect(result.status, ImportStatus.requestedAlbum);
+      verify(() => mockSearch.requestAlbum(2, coverUrl: null)).called(1);
+      verifyNever(() => mockSearch.requestAlbum(1, coverUrl: null));
     });
 
     test('skips duplicate artist request when id already in requestedArtistIds',
