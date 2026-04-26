@@ -12,7 +12,16 @@ class PlaylistsScreen extends ConsumerWidget {
     final playlistsAsync = ref.watch(playlistProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Playlists')),
+      appBar: AppBar(
+        title: const Text('Playlists'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Import from CSV',
+            onPressed: () => context.go('/playlists/import'),
+          ),
+        ],
+      ),
       body: playlistsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(

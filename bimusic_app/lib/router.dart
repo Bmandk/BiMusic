@@ -10,6 +10,7 @@ import 'ui/screens/home_screen.dart';
 import 'ui/screens/library_screen.dart';
 import 'ui/screens/login_screen.dart';
 import 'ui/screens/playlist_detail_screen.dart';
+import 'ui/screens/playlist_import_screen.dart';
 import 'ui/screens/playlists_screen.dart';
 import 'ui/screens/search_screen.dart';
 import 'ui/screens/settings_screen.dart';
@@ -110,6 +111,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/playlists',
                 builder: (context, state) => const PlaylistsScreen(), // coverage:ignore-line
                 routes: [
+                  GoRoute(
+                    path: 'import',
+                    builder: (context, state) => const PlaylistImportScreen(), // coverage:ignore-line
+                  ),
                   GoRoute(
                     path: ':id',
                     builder: (context, state) => PlaylistDetailScreen( // coverage:ignore-line

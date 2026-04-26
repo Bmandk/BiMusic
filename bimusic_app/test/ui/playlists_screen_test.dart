@@ -207,4 +207,11 @@ void main() {
     await tester.pump();
     expect(find.byIcon(Icons.queue_music), findsWidgets);
   });
+
+  testWidgets('shows import CSV icon button in AppBar', (tester) async {
+    await tester.pumpWidget(buildSubject([]));
+    await tester.pump();
+    expect(find.byIcon(Icons.upload_file), findsOneWidget);
+    expect(find.byTooltip('Import from CSV'), findsOneWidget);
+  });
 }
