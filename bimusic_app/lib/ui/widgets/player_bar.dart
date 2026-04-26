@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/backend_url_provider.dart';
@@ -74,9 +75,19 @@ class PlayerBar extends ConsumerWidget {
         ? position.inMilliseconds / duration.inMilliseconds
         : 0.0;
 
-    return GestureDetector(
-      onTap: () => _openFullPlayer(context),
-      child: Column(
+    return Listener(
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent) {
+          final notifier = ref.read(playerNotifierProvider.notifier);
+          final currentVolume =
+              ref.read(playerNotifierProvider.select((s) => s.volume));
+          final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
+          notifier.setVolume((currentVolume + delta).clamp(0.0, 1.0));
+        }
+      },
+      child: GestureDetector(
+        onTap: () => _openFullPlayer(context),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           LinearProgressIndicator(
@@ -185,7 +196,8 @@ class PlayerBar extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -212,7 +224,7 @@ class _VolumeControl extends ConsumerWidget {
           onPressed: () => notifier.toggleMute(),
         ),
         SizedBox(
-          width: 100,
+          width: 200,
           child: Slider(
             value: volume,
             onChanged: (v) => notifier.setVolume(v),
