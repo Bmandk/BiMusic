@@ -39,6 +39,7 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
       allowedExtensions: ['csv'],
       withData: true,
     );
+    if (!mounted) return;
     if (picked == null || picked.files.isEmpty) return;
 
     final file = picked.files.single;
@@ -94,6 +95,7 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
 
     final service = _service ??
         PlaylistImportService(ref.read(searchServiceProvider));
+    final requestedArtistIds = <String>{};
 
     for (int i = 0; i < _albums.length; i++) {
       if (!mounted) return;
@@ -104,7 +106,10 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
         );
       });
 
-      final result = await service.processAlbum(_albums[i]);
+      final result = await service.processAlbum(
+        _albums[i],
+        requestedArtistIds: requestedArtistIds,
+      );
 
       if (!mounted) return;
       setState(() {

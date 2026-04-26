@@ -75,13 +75,13 @@ void main() {
       expect(() => service.parseCsv(''), throwsA(isA<FormatException>()));
     });
 
-    test('takes first artist when multiple artists are listed', () {
+    test('preserves full artist string when multiple artists are listed', () {
       const csv =
           'Track URI,Track Name,Album Name,Artist Name(s)\n'
           'id1,"Song","Album","Artist A, Artist B"\n';
 
       final rows = service.parseCsv(csv);
-      expect(rows[0].artistName, 'Artist A');
+      expect(rows[0].artistName, 'Artist A, Artist B');
     });
 
     test('skips rows with empty album or artist', () {
@@ -276,6 +276,66 @@ void main() {
 
       final result = await service.processAlbum(testAlbum);
       expect(result.status, ImportStatus.notFound);
+    });
+
+    test('matches album when artist field has multiple collaborators', () async {
+      const multiArtistAlbum = ImportAlbum(
+        albumName: 'Collab Album',
+        artistName: 'Artist A, Artist B',
+        trackCount: 1,
+      );
+      const albumResult = LidarrAlbumResult(
+        id: 99,
+        title: 'Collab Album',
+        artist: LidarrArtistResult(id: 5, artistName: 'Artist A', images: []),
+        images: [],
+      );
+
+      when(() => mockSearch.searchLidarr(any())).thenAnswer(
+        (_) async =>
+            const LidarrSearchResults(artists: [], albums: [albumResult]),
+      );
+      when(() => mockSearch.requestAlbum(99, coverUrl: null))
+          .thenAnswer((_) async => _fakeRequest());
+
+      final result = await service.processAlbum(multiArtistAlbum);
+      expect(result.status, ImportStatus.requestedAlbum);
+    });
+
+    test('skips duplicate artist request when id already in requestedArtistIds',
+        () async {
+      const artistResult = LidarrArtistResult(
+        id: 1,
+        artistName: 'Anri',
+        foreignArtistId: 'mbid-anri-123',
+        images: [],
+      );
+
+      when(() => mockSearch.searchLidarr(any())).thenAnswer(
+        (_) async =>
+            const LidarrSearchResults(artists: [artistResult], albums: []),
+      );
+      when(() => mockSearch.requestArtist(
+            foreignArtistId: any(named: 'foreignArtistId'),
+            artistName: any(named: 'artistName'),
+            coverUrl: any(named: 'coverUrl'),
+          )).thenAnswer((_) async => _fakeRequest());
+
+      final ids = <String>{};
+
+      // First call — should request
+      final r1 = await service.processAlbum(testAlbum, requestedArtistIds: ids);
+      expect(r1.status, ImportStatus.requestedArtist);
+
+      // Second call with same artist — should NOT call requestArtist again
+      final r2 = await service.processAlbum(testAlbum, requestedArtistIds: ids);
+      expect(r2.status, ImportStatus.requestedArtist);
+
+      verify(() => mockSearch.requestArtist(
+            foreignArtistId: 'mbid-anri-123',
+            artistName: any(named: 'artistName'),
+            coverUrl: any(named: 'coverUrl'),
+          )).called(1); // only once, not twice
     });
   });
 }

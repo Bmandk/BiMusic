@@ -12,6 +12,9 @@ class PlaylistImportService {
   /// Parses a Spotify/Exportify CSV string into track rows.
   ///
   /// Required column headers: "Track Name", "Album Name", "Artist Name(s)".
+  /// The full artist string is preserved (e.g. "Artist A, Artist B") so that
+  /// [processAlbum] can try a full-name match before falling back to the first
+  /// collaborator.
   /// Throws [FormatException] when any required header is absent.
   List<ImportRow> parseCsv(String contents) {
     final normalized = contents
@@ -43,9 +46,8 @@ class PlaylistImportService {
       if (row.length < minLen) continue;
       final trackName = row[trackIdx].toString().trim();
       final albumName = row[albumIdx].toString().trim();
-      final rawArtist = row[artistIdx].toString().trim();
-      // Take only the first artist when multiple are comma-separated.
-      final artistName = rawArtist.split(',').first.trim();
+      // Preserve the full artist string; matching logic handles collaborators.
+      final artistName = row[artistIdx].toString().trim();
 
       if (albumName.isEmpty || artistName.isEmpty) continue;
       result.add(ImportRow(
@@ -84,12 +86,20 @@ class PlaylistImportService {
   ///
   /// Strategy:
   /// 1. Search Lidarr with "$artistName $albumName".
-  /// 2. Try to match an album by artist + title → POST /api/requests/album.
+  /// 2. Try to match an album by artist + title (full name, then first
+  ///    collaborator if the artist field contains a comma) →
+  ///    POST /api/requests/album.
   /// 3. Fall back to matching an artist → POST /api/requests/artist.
+  ///    If [requestedArtistIds] is provided, duplicate artist requests for the
+  ///    same [LidarrArtistResult.foreignArtistId] are skipped (the same status
+  ///    is returned without a second API call).
   /// 4. Return [ImportStatus.notFound] if nothing matched.
   ///
   /// Errors are caught and returned as [ImportStatus.failed].
-  Future<ImportItemResult> processAlbum(ImportAlbum album) async {
+  Future<ImportItemResult> processAlbum(
+    ImportAlbum album, {
+    Set<String>? requestedArtistIds,
+  }) async {
     try {
       final results = await _search.searchLidarr(
         '${album.artistName} ${album.albumName}',
@@ -108,11 +118,14 @@ class PlaylistImportService {
 
       final artistMatch = _matchArtist(results.artists, album.artistName);
       if (artistMatch != null && artistMatch.foreignArtistId != null) {
-        await _search.requestArtist(
-          foreignArtistId: artistMatch.foreignArtistId!,
-          artistName: artistMatch.artistName,
-          coverUrl: artistMatch.coverUrl,
-        );
+        final id = artistMatch.foreignArtistId!;
+        if (requestedArtistIds == null || requestedArtistIds.add(id)) {
+          await _search.requestArtist(
+            foreignArtistId: id,
+            artistName: artistMatch.artistName,
+            coverUrl: artistMatch.coverUrl,
+          );
+        }
         return ImportItemResult(
           album: album,
           status: ImportStatus.requestedArtist,
@@ -138,18 +151,25 @@ class PlaylistImportService {
     final aLower = albumName.toLowerCase();
     final rLower = artistName.toLowerCase();
 
-    for (final a in albums) {
-      if (a.title.toLowerCase() == aLower &&
-          a.artist.artistName.toLowerCase() == rLower) {
-        return a;
+    bool artistMatches(LidarrArtistResult a) {
+      final name = a.artistName.toLowerCase();
+      if (name == rLower) return true;
+      // Fall back to first collaborator (e.g. "Artist A, Artist B" → "Artist A")
+      if (rLower.contains(',')) {
+        return name == rLower.split(',').first.trim();
       }
+      return false;
+    }
+
+    for (final a in albums) {
+      if (a.title.toLowerCase() == aLower && artistMatches(a.artist)) return a;
     }
     if (aLower.length >= 3) {
       for (final a in albums) {
         final tLower = a.title.toLowerCase();
         if (tLower.length >= 3 &&
             (tLower.contains(aLower) || aLower.contains(tLower)) &&
-            a.artist.artistName.toLowerCase() == rLower) {
+            artistMatches(a.artist)) {
           return a;
         }
       }
@@ -162,8 +182,12 @@ class PlaylistImportService {
     String artistName,
   ) {
     final lower = artistName.toLowerCase();
+    final first =
+        lower.contains(',') ? lower.split(',').first.trim() : lower;
+
     for (final a in artists) {
-      if (a.artistName.toLowerCase() == lower) return a;
+      final name = a.artistName.toLowerCase();
+      if (name == lower || name == first) return a;
     }
     return null;
   }
