@@ -204,10 +204,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
     return ref.read(audioHandlerProvider).setShuffleMode(newMode);
   }
 
+  Future<void> adjustVolumeBy(double delta) =>
+      setVolume(state.volume + delta);
+
   Future<void> setVolume(double v) async {
     final clamped = v.clamp(0.0, 1.0);
-    await ref.read(audioHandlerProvider).setVolume(clamped);
     state = state.copyWith(volume: clamped);
+    await ref.read(audioHandlerProvider).setVolume(clamped);
+    // Skip persistence if a newer call has already moved state forward.
+    if (state.volume != clamped) return;
     _volumePersistDebounce?.cancel();
     _volumePersistDebounce = Timer(const Duration(milliseconds: 250), () {
       const FlutterSecureStorage()
