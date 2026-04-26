@@ -12,6 +12,8 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.dart text eol=lf
+*.cc text eol=lf
+*.cmake text eol=lf
 
 # Windows-native scripts should keep CRLF regardless of platform.
 *.ps1 text eol=crlf
