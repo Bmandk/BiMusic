@@ -8,6 +8,9 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockSearchService extends Mock implements SearchService {}
 
+void _stubSearch(_MockSearchService mock, LidarrSearchResults results) =>
+    when(() => mock.searchLidarr(any())).thenAnswer((_) async => results);
+
 MusicRequest _fakeRequest() => const MusicRequest(
       id: 'fake-id',
       type: 'album',
@@ -189,10 +192,8 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [], albums: [albumResult]),
-      );
+      _stubSearch(mockSearch,
+          const LidarrSearchResults(artists: [], albums: [albumResult]));
       when(() => mockSearch.requestAlbum(42, coverUrl: null))
           .thenAnswer((_) async => _fakeRequest());
 
@@ -214,10 +215,8 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [], albums: [albumResult]),
-      );
+      _stubSearch(mockSearch,
+          const LidarrSearchResults(artists: [], albums: [albumResult]));
       when(() => mockSearch.requestAlbum(7, coverUrl: null))
           .thenAnswer((_) async => _fakeRequest());
 
@@ -233,10 +232,8 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [artistResult], albums: []),
-      );
+      _stubSearch(mockSearch,
+          const LidarrSearchResults(artists: [artistResult], albums: []));
       when(() => mockSearch.requestArtist(
             foreignArtistId: any(named: 'foreignArtistId'),
             artistName: any(named: 'artistName'),
@@ -254,10 +251,8 @@ void main() {
     });
 
     test('returns notFound when no match in results', () async {
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [], albums: []),
-      );
+      _stubSearch(
+          mockSearch, const LidarrSearchResults(artists: [], albums: []));
 
       final result = await service.processAlbum(testAlbum);
       expect(result.status, ImportStatus.notFound);
@@ -279,10 +274,8 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [artistResult], albums: []),
-      );
+      _stubSearch(mockSearch,
+          const LidarrSearchResults(artists: [artistResult], albums: []));
 
       final result = await service.processAlbum(testAlbum);
       expect(result.status, ImportStatus.notFound);
@@ -301,10 +294,8 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [], albums: [albumResult]),
-      );
+      _stubSearch(mockSearch,
+          const LidarrSearchResults(artists: [], albums: [albumResult]));
       when(() => mockSearch.requestAlbum(99, coverUrl: null))
           .thenAnswer((_) async => _fakeRequest());
 
@@ -334,10 +325,10 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async => const LidarrSearchResults(
-            artists: [], albums: [collaboratorMatch, exactMatch]),
-      );
+      _stubSearch(
+          mockSearch,
+          const LidarrSearchResults(
+              artists: [], albums: [collaboratorMatch, exactMatch]));
       when(() => mockSearch.requestAlbum(2, coverUrl: null))
           .thenAnswer((_) async => _fakeRequest());
 
@@ -356,10 +347,8 @@ void main() {
         images: [],
       );
 
-      when(() => mockSearch.searchLidarr(any())).thenAnswer(
-        (_) async =>
-            const LidarrSearchResults(artists: [artistResult], albums: []),
-      );
+      _stubSearch(mockSearch,
+          const LidarrSearchResults(artists: [artistResult], albums: []));
       when(() => mockSearch.requestArtist(
             foreignArtistId: any(named: 'foreignArtistId'),
             artistName: any(named: 'artistName'),
