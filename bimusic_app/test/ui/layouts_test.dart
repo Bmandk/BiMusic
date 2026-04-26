@@ -73,6 +73,9 @@ class _StubPlayerNotifier extends Notifier<PlayerState>
   Future<void> setVolume(double v) async {}
 
   @override
+  Future<void> adjustVolumeBy(double delta) async {}
+
+  @override
   Future<void> toggleMute() async {}
 }
 

@@ -71,6 +71,8 @@ class _FakePlayerNotifier extends Notifier<PlayerState>
   @override
   Future<void> setVolume(double v) async {}
   @override
+  Future<void> adjustVolumeBy(double delta) async {}
+  @override
   Future<void> toggleMute() async {}
 }
 

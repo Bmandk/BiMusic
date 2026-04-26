@@ -204,6 +204,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
     return ref.read(audioHandlerProvider).setShuffleMode(newMode);
   }
 
+  Future<void> adjustVolumeBy(double delta) =>
+      setVolume(state.volume + delta);
+
   Future<void> setVolume(double v) async {
     final clamped = v.clamp(0.0, 1.0);
     await ref.read(audioHandlerProvider).setVolume(clamped);

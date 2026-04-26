@@ -77,12 +77,9 @@ class PlayerBar extends ConsumerWidget {
 
     return Listener(
       onPointerSignal: (event) {
-        if (event is PointerScrollEvent) {
-          final notifier = ref.read(playerNotifierProvider.notifier);
-          final currentVolume =
-              ref.read(playerNotifierProvider.select((s) => s.volume));
+        if (event is PointerScrollEvent && event.scrollDelta.dy != 0.0) {
           final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
-          notifier.setVolume((currentVolume + delta).clamp(0.0, 1.0));
+          ref.read(playerNotifierProvider.notifier).adjustVolumeBy(delta);
         }
       },
       child: GestureDetector(
