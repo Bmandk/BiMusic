@@ -58,6 +58,8 @@ export function errorHandler(
     );
   }
 
+  if (res.headersSent) return;
+
   res.status(statusCode).json({
     error: { code, message },
   });

@@ -16,6 +16,10 @@ import requestsRouter from "./routes/requests.js";
 export function createApp() {
   const app = express();
 
+  // Trust one level of reverse proxy (nginx/traefik in production)
+  // Required for express-rate-limit to correctly read the client IP from X-Forwarded-For
+  app.set("trust proxy", 1);
+
   app.use(express.json());
 
   // Attach request ID
