@@ -144,11 +144,14 @@ class PlaylistImportService {
         return a;
       }
     }
-    for (final a in albums) {
-      if ((a.title.toLowerCase().contains(aLower) ||
-              aLower.contains(a.title.toLowerCase())) &&
-          a.artist.artistName.toLowerCase() == rLower) {
-        return a;
+    if (aLower.length >= 3) {
+      for (final a in albums) {
+        final tLower = a.title.toLowerCase();
+        if (tLower.length >= 3 &&
+            (tLower.contains(aLower) || aLower.contains(tLower)) &&
+            a.artist.artistName.toLowerCase() == rLower) {
+          return a;
+        }
       }
     }
     return null;

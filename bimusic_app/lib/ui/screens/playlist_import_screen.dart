@@ -29,6 +29,7 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
   bool _playlistCreated = false;
   String? _parseError;
   String? _importError;
+  PlaylistImportService? _service;
 
   Future<void> _pickFile() async {
     setState(() => _parseError = null);
@@ -76,6 +77,7 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
         _results = albums.map((a) => ImportItemResult(album: a)).toList();
         _playlistName = playlistName;
         _phase = _Phase.preview;
+        _service = service;
       });
     } on FormatException catch (e) {
       setState(() => _parseError = e.message);
@@ -90,7 +92,8 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
       _currentIndex = 0;
     });
 
-    final service = PlaylistImportService(ref.read(searchServiceProvider));
+    final service = _service ??
+        PlaylistImportService(ref.read(searchServiceProvider));
 
     for (int i = 0; i < _albums.length; i++) {
       if (!mounted) return;
@@ -228,6 +231,7 @@ class _PlaylistImportScreenState extends ConsumerState<PlaylistImportScreen> {
                   _phase = _Phase.pick;
                   _albums = [];
                   _results = [];
+                  _service = null;
                 }),
                 child: const Text('Cancel'),
               ),
@@ -411,7 +415,7 @@ class _ResultTile extends StatelessWidget {
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
       ImportStatus.requestedAlbum =>
-        Icon(Icons.check_circle, color: Colors.green[600], size: 20),
+        Icon(Icons.check_circle, color: cs.tertiary, size: 20),
       ImportStatus.requestedArtist =>
         Icon(Icons.person, color: cs.secondary, size: 20),
       ImportStatus.notFound =>

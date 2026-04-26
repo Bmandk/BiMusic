@@ -64,7 +64,7 @@ void main() {
     expect(find.byIcon(Icons.upload_file), findsOneWidget);
   });
 
-  testWidgets('shows supportted format hint', (tester) async {
+  testWidgets('shows supported format hint', (tester) async {
     await tester.pumpWidget(_buildSubject(mockSearch));
 
     expect(
