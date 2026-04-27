@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/Bmandk/BiMusic/compare/bimusic_app-v1.2.0...bimusic_app-v1.3.0) (2026-04-27)
+
+
+### Features
+
+* **flutter:** CSV playlist import with Lidarr album requests ([#30](https://github.com/Bmandk/BiMusic/issues/30)) ([ab559d5](https://github.com/Bmandk/BiMusic/commit/ab559d50f9ab05138e5859236cc6ad1dd00b65f8))
+* **flutter:** Scroll-to-volume on player bar + wider volume slider ([#27](https://github.com/Bmandk/BiMusic/issues/27)) ([75009cd](https://github.com/Bmandk/BiMusic/commit/75009cd6ab98b82af4ef0ddca1b8f18c4c855bb9))
+* **flutter:** Spacebar toggles play/pause globally ([#31](https://github.com/Bmandk/BiMusic/issues/31)) ([1808413](https://github.com/Bmandk/BiMusic/commit/1808413a301acbe487ae55b59c502eea9533c864))
+
+
+### Bug Fixes
+
+* **flutter:** Fix volume not persisting across app launches ([#33](https://github.com/Bmandk/BiMusic/issues/33)) ([b78f144](https://github.com/Bmandk/BiMusic/commit/b78f144e27323922435ae8138d882e2cbcc1bfdf))
+* **flutter:** Shrink album art and fix overflow in desktop full player ([#32](https://github.com/Bmandk/BiMusic/issues/32)) ([78ab401](https://github.com/Bmandk/BiMusic/commit/78ab40179fad6213711d4049ca4a6a14236b2742))
+
 ## [1.2.0](https://github.com/Bmandk/BiMusic/compare/bimusic_app-v1.1.0...bimusic_app-v1.2.0) (2026-04-23)
 
 
