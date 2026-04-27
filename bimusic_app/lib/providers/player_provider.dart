@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
@@ -117,22 +118,42 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   Future<void> _loadPersistedVolume() async {
+    // Yield so build() returns and Riverpod initializes state before we read it.
+    // Without this, accessing state.volume here throws "uninitialized provider"
+    // because build() hasn't returned yet.
+    await Future<void>.value();
+    dev.log('[Volume] _loadPersistedVolume: start, current state.volume=${state.volume}');
     try {
       // Capture the default volume before the async read so we can detect
       // whether the user already changed it while we were waiting.
       final volumeBeforeLoad = state.volume;
       const storage = FlutterSecureStorage();
+      dev.log('[Volume] _loadPersistedVolume: reading from storage...');
       final value = await storage.read(key: _kVolumeStorageKey);
-      if (value == null) return;
+      dev.log('[Volume] _loadPersistedVolume: storage read returned: $value');
+      if (value == null) {
+        dev.log('[Volume] _loadPersistedVolume: no stored value, using default');
+        return;
+      }
       final v = double.tryParse(value);
-      if (v == null) return;
+      if (v == null) {
+        dev.log('[Volume] _loadPersistedVolume: could not parse "$value" as double');
+        return;
+      }
       final clamped = v.clamp(0.0, 1.0);
       // Only apply if the user hasn't already changed the volume.
-      if (state.volume != volumeBeforeLoad) return;
+      if (state.volume != volumeBeforeLoad) {
+        dev.log('[Volume] _loadPersistedVolume: user changed volume during load (${state.volume} != $volumeBeforeLoad), skipping');
+        return;
+      }
+      dev.log('[Volume] _loadPersistedVolume: applying volume=$clamped');
       state = state.copyWith(volume: clamped);
       if (clamped > 0) _preMuteVolume = clamped;
       await ref.read(audioHandlerProvider).setVolume(clamped);
-    } catch (_) {}
+      dev.log('[Volume] _loadPersistedVolume: backend setVolume($clamped) done');
+    } catch (e, st) {
+      dev.log('[Volume] _loadPersistedVolume: ERROR: $e\n$st');
+    }
   }
 
   Future<void> play(
@@ -209,16 +230,25 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   Future<void> setVolume(double v) async {
     final clamped = v.clamp(0.0, 1.0);
+    dev.log('[Volume] setVolume: requested=$v clamped=$clamped');
     state = state.copyWith(volume: clamped);
     await ref.read(audioHandlerProvider).setVolume(clamped);
     // Skip persistence if a newer call has already moved state forward.
-    if (state.volume != clamped) return;
+    if (state.volume != clamped) {
+      dev.log('[Volume] setVolume: stale call (state.volume=${state.volume} != $clamped), skipping persistence');
+      return;
+    }
     _volumePersistDebounce?.cancel();
     _volumePersistDebounce = Timer(const Duration(milliseconds: 250), () {
+      dev.log('[Volume] setVolume: debounce fired, writing $clamped to storage');
       const FlutterSecureStorage()
           .write(key: _kVolumeStorageKey, value: clamped.toString())
-          .catchError((_) {});
+          .then((_) => dev.log('[Volume] setVolume: storage write succeeded'))
+          .catchError((Object e) {
+        dev.log('[Volume] setVolume: storage write FAILED: $e');
+      });
     });
+    dev.log('[Volume] setVolume: debounce timer armed for $clamped');
   }
 
   Future<void> toggleMute() async {
