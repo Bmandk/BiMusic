@@ -70,10 +70,14 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
 
     final track = playerState.currentTrack!;
 
+    final headers = token != null
+        ? <String, String>{'Authorization': 'Bearer $token'}
+        : <String, String>{};
+
     if (widget.embedded) {
-      return _buildScaffold(
+      return _buildEmbeddedContent(
         context, colorScheme, playerState, track,
-        token, base, position, duration, maxMs, sliderValue, null,
+        headers, base, position, duration, maxMs, sliderValue,
       );
     }
 
@@ -85,6 +89,247 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
       builder: (context, scrollController) => _buildScaffold(
         context, colorScheme, playerState, track,
         token, base, position, duration, maxMs, sliderValue, scrollController,
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    PlayerState playerState,
+    Track track,
+    Map<String, String> headers,
+    String? base,
+    Duration position,
+    Duration duration,
+    double maxMs,
+    double sliderValue,
+  ) {
+    // Size image to fit within the dialog without scrolling.
+    // Dialog insets: 24 top + 24 bottom = 48 px consumed from screen height.
+    // Fixed chrome height (header row + spacings + title/artist/slider/controls): ~320 px.
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    const controlsFixedHeight = 320.0;
+    const horizontalPadding = 64.0;
+    const maxDialogContentWidth = 480.0 - horizontalPadding;
+    final imageSize = ((screenHeight - 48) - controlsFixedHeight)
+        .clamp(80.0, maxDialogContentWidth)
+        .toDouble();
+
+    final Widget albumArtWidget = ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: imageSize,
+        height: imageSize,
+        child: playerState.imageUrl != null && base != null
+            ? CachedNetworkImage(
+                imageUrl: resolveBackendUrl(base, playerState.imageUrl!),
+                httpHeaders: headers,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => ColoredBox(
+                  color: colorScheme.surfaceContainerHighest,
+                ),
+                errorWidget: (_, __, ___) => ColoredBox(
+                  color: colorScheme.surfaceContainerHighest,
+                  child: const Icon(Icons.album, size: 64),
+                ),
+              )
+            : ColoredBox(
+                color: colorScheme.surfaceContainerHighest,
+                child: const Icon(Icons.album, size: 64),
+              ),
+      ),
+    );
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header row — replaces AppBar so the Scaffold isn't needed
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Collapse player',
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                Expanded(
+                  child: Text(
+                    playerState.albumTitle ?? '',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Up Next',
+                  icon: Icon(
+                    Icons.queue_music_rounded,
+                    color: _showQueue ? colorScheme.primary : null,
+                  ),
+                  onPressed: () => setState(() => _showQueue = !_showQueue),
+                ),
+              ],
+            ),
+          ),
+          if (_showQueue)
+            SizedBox(
+              height: 320,
+              child: _QueuePanel(scrollController: null, playerState: playerState),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 16),
+                  albumArtWidget,
+                  const SizedBox(height: 24),
+                  Text(
+                    track.title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    playerState.artistName ?? '',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Slider(
+                    value: sliderValue.clamp(0.0, 1.0),
+                    onChanged: (v) => setState(() => _dragValue = v),
+                    onChangeEnd: (v) {
+                      final targetMs = (v * maxMs).roundToDouble();
+                      ref.read(playerNotifierProvider.notifier).seekTo(
+                        Duration(milliseconds: targetMs.round()),
+                      );
+                      _seekFallbackTimer?.cancel();
+                      _seekFallbackTimer = Timer(const Duration(milliseconds: 3000), () {
+                        if (!mounted) return;
+                        setState(() {
+                          _seekTargetMs = null;
+                          _dragValue = null;
+                        });
+                      });
+                      setState(() {
+                        _dragValue = v;
+                        _seekTargetMs = targetMs;
+                      });
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(
+                            _dragValue != null
+                                ? Duration(milliseconds: (_dragValue! * maxMs).round())
+                                : position,
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Text(
+                          _formatDuration(duration),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        tooltip: playerState.isShuffled ? 'Shuffle on' : 'Shuffle off',
+                        icon: Icon(
+                          Icons.shuffle_rounded,
+                          color: playerState.isShuffled ? colorScheme.primary : null,
+                        ),
+                        onPressed: () =>
+                            ref.read(playerNotifierProvider.notifier).toggleShuffle(),
+                      ),
+                      IconButton(
+                        tooltip: 'Skip previous',
+                        iconSize: 40,
+                        icon: const Icon(Icons.skip_previous_rounded),
+                        onPressed: () =>
+                            ref.read(playerNotifierProvider.notifier).skipPrev(),
+                      ),
+                      Semantics(
+                        button: true,
+                        label: playerState.isPlaying ? 'Pause' : 'Play',
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(16),
+                          ),
+                          onPressed: () {
+                            final notifier = ref.read(playerNotifierProvider.notifier);
+                            if (playerState.isPlaying) {
+                              notifier.pause();
+                            } else {
+                              notifier.resume();
+                            }
+                          },
+                          child: Icon(
+                            playerState.isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Skip next',
+                        iconSize: 40,
+                        icon: const Icon(Icons.skip_next_rounded),
+                        onPressed: () =>
+                            ref.read(playerNotifierProvider.notifier).skipNext(),
+                      ),
+                      IconButton(
+                        tooltip: switch (playerState.repeatMode) {
+                          AudioServiceRepeatMode.none => 'Repeat off',
+                          AudioServiceRepeatMode.group => 'Repeat all',
+                          _ => 'Repeat one',
+                        },
+                        icon: Icon(
+                          playerState.repeatMode == AudioServiceRepeatMode.one
+                              ? Icons.repeat_one_rounded
+                              : Icons.repeat_rounded,
+                          color: playerState.repeatMode != AudioServiceRepeatMode.none
+                              ? colorScheme.primary
+                              : null,
+                        ),
+                        onPressed: () {
+                          final next = switch (playerState.repeatMode) {
+                            AudioServiceRepeatMode.none => AudioServiceRepeatMode.group,
+                            AudioServiceRepeatMode.group => AudioServiceRepeatMode.one,
+                            _ => AudioServiceRepeatMode.none,
+                          };
+                          ref.read(playerNotifierProvider.notifier).setRepeat(next);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

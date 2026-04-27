@@ -61,22 +61,24 @@ class DesktopLayout extends ConsumerWidget {
               children: [
                 SizedBox(
                   width: 220,
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 16),
-                      for (int i = 0; i < _destinations.length; i++)
-                        ListTile(
-                          leading: Icon(
-                            i == selectedIndex
-                                ? _destinations[i].selectedIcon
-                                : _destinations[i].icon,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        for (int i = 0; i < _destinations.length; i++)
+                          ListTile(
+                            leading: Icon(
+                              i == selectedIndex
+                                  ? _destinations[i].selectedIcon
+                                  : _destinations[i].icon,
+                            ),
+                            title: Text(_destinations[i].label),
+                            selected: i == selectedIndex,
+                            selectedColor: theme.colorScheme.primary,
+                            onTap: () => navigationShell.goBranch(i),
                           ),
-                          title: Text(_destinations[i].label),
-                          selected: i == selectedIndex,
-                          selectedColor: theme.colorScheme.primary,
-                          onTap: () => navigationShell.goBranch(i),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const VerticalDivider(width: 1),
