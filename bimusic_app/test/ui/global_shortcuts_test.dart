@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:bimusic_app/models/track.dart';
 import 'package:bimusic_app/providers/player_provider.dart';
+import 'package:bimusic_app/ui/widgets/global_shortcuts_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -69,27 +70,8 @@ Widget _buildApp(PlayerState state, List<String> calls) {
     overrides: [
       playerNotifierProvider.overrideWith(() => _SpyPlayerNotifier(state, calls)),
     ],
-    child: MaterialApp(
-      home: Consumer(
-        builder: (context, ref, _) => CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.space): () {
-              final playerState = ref.read(playerNotifierProvider);
-              if (!playerState.hasTrack) return;
-              final notifier = ref.read(playerNotifierProvider.notifier);
-              if (playerState.isPlaying) {
-                notifier.pause();
-              } else {
-                notifier.resume();
-              }
-            },
-          },
-          child: const Focus(
-            autofocus: true,
-            child: SizedBox.expand(),
-          ),
-        ),
-      ),
+    child: const MaterialApp(
+      home: GlobalShortcutsWrapper(child: SizedBox.expand()),
     ),
   );
 }
