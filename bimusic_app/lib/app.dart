@@ -8,6 +8,7 @@ import 'config/theme.dart';
 import 'providers/backend_url_provider.dart';
 import 'router.dart';
 import 'ui/screens/backend_setup_screen.dart';
+import 'ui/widgets/global_shortcuts_wrapper.dart';
 import 'ui/widgets/update_launch_listener.dart';
 
 class BiMusicApp extends ConsumerWidget {
@@ -44,6 +45,9 @@ class BiMusicApp extends ConsumerWidget {
                 darkTheme: AppTheme.dark,
                 themeMode: ThemeMode.system,
                 routerConfig: ref.watch(routerProvider),
+                builder: (context, child) => GlobalShortcutsWrapper(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
     );
