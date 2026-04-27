@@ -113,7 +113,8 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     const horizontalPadding = 64.0;
     const maxDialogContentWidth = 480.0 - horizontalPadding;
     final imageSize = ((screenHeight - 48) - controlsFixedHeight)
-        .clamp(80.0, maxDialogContentWidth);
+        .clamp(80.0, maxDialogContentWidth)
+        .toDouble();
 
     final Widget albumArtWidget = ClipRRect(
       borderRadius: BorderRadius.circular(12),
@@ -158,6 +159,8 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   child: Text(
                     playerState.albumTitle ?? '',
                     textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
