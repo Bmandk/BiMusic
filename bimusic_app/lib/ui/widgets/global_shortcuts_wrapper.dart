@@ -13,7 +13,7 @@ class GlobalShortcutsWrapper extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.space): () {
+        const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): () {
           final playerState = ref.read(playerNotifierProvider);
           if (!playerState.hasTrack) return;
           final notifier = ref.read(playerNotifierProvider.notifier);
