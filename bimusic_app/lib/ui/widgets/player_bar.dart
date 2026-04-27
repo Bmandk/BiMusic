@@ -24,7 +24,7 @@ class PlayerBar extends ConsumerWidget {
       // On desktop, show as a dialog panel (centered, constrained width)
       showDialog<void>(
         context: context,
-        builder: (dialogContext) => Dialog(
+        builder: (_) => Dialog(
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 80,
             vertical: 24,
@@ -34,11 +34,7 @@ class PlayerBar extends ConsumerWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 480,
-              maxHeight: (MediaQuery.sizeOf(dialogContext).height - 48)
-                  .clamp(0.0, double.infinity),
-            ),
+            constraints: const BoxConstraints(maxWidth: 480),
             child: const FullPlayer(embedded: true),
           ),
         ),
