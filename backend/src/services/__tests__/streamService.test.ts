@@ -15,8 +15,7 @@ vi.mock("../../config/env.js", () => ({
     OFFLINE_STORAGE_PATH: "./data/offline",
     ADMIN_USERNAME: "admin",
     ADMIN_PASSWORD: "adminpassword123",
-    HLS_CACHE_DIR: "./data/hls",
-    HLS_SEGMENT_SECONDS: 6,
+    TEMP_DIR: "/tmp/bimusic",
   },
 }));
 
@@ -41,13 +40,38 @@ vi.mock("../lidarrClient.js", () => ({
   getRootFolders: vi.fn(),
 }));
 
+const mockFfmpegCmd = vi.hoisted(() => ({
+  noVideo: vi.fn().mockReturnThis(),
+  audioCodec: vi.fn().mockReturnThis(),
+  audioBitrate: vi.fn().mockReturnThis(),
+  output: vi.fn().mockReturnThis(),
+  on: vi.fn().mockImplementation(function (
+    this: unknown,
+    event: string,
+    cb: (...args: unknown[]) => void,
+  ) {
+    if (event === "end") setTimeout(() => cb(), 0);
+    return this;
+  }),
+  run: vi.fn(),
+  kill: vi.fn(),
+}));
+
+vi.mock("fluent-ffmpeg", () => ({
+  default: vi.fn(() => mockFfmpegCmd),
+}));
+
 const mockReadStream = { pipe: vi.fn(), on: vi.fn() };
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
   return {
     ...actual,
-    statSync: vi.fn(() => ({ size: 10000, mtimeMs: Date.now() - 1000 })),
+    mkdirSync: vi.fn(),
+    readdirSync: vi.fn(),
+    statSync: vi.fn(() => ({ size: 1000, mtimeMs: Date.now() - 1000 })),
+    existsSync: vi.fn(() => false),
+    unlinkSync: vi.fn(),
     createReadStream: vi.fn(() => mockReadStream),
   };
 });
@@ -66,15 +90,33 @@ import {
   registerFfmpegCommand,
   unregisterFfmpegCommand,
   killAllActiveTranscodes,
+  initTempDir,
   resolveFilePath,
+  getTempFilePath,
   isPassthrough,
+  ensureTranscoded,
   serveFile,
-} from "../trackFileResolver.js";
+} from "../streamService.js";
 
 beforeEach(() => {
   resetLidarrRootCache();
   vi.clearAllMocks();
+
+  // Reset existsSync to return false (no cached transcode)
+  vi.mocked(fs.existsSync).mockReturnValue(false);
+
+  // Reset ffmpeg mock to default success behavior
+  mockFfmpegCmd.on.mockImplementation(function (
+    this: unknown,
+    event: string,
+    cb: (...args: unknown[]) => void,
+  ) {
+    if (event === "end") setTimeout(() => cb(), 0);
+    return this;
+  });
+
   vi.mocked(fsp.access).mockResolvedValue(undefined);
+  vi.mocked(fs.readdirSync).mockReturnValue([]);
 });
 
 describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTranscodes", () => {
@@ -104,7 +146,7 @@ describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTransco
     const cmd = { kill } as unknown as FfmpegCommand;
     registerFfmpegCommand(cmd);
     killAllActiveTranscodes();
-    killAllActiveTranscodes();
+    killAllActiveTranscodes(); // second call: set is now empty
     expect(kill).toHaveBeenCalledTimes(1);
   });
 
@@ -119,35 +161,37 @@ describe("registerFfmpegCommand / unregisterFfmpegCommand / killAllActiveTransco
   });
 });
 
-describe("resolveFilePath", () => {
-  it("remaps a Lidarr path to MUSIC_LIBRARY_PATH and returns durationMs", async () => {
-    vi.mocked(lidarrClient.getTrack).mockResolvedValue({
-      id: 1,
-      hasFile: true,
-      trackFileId: 10,
-      duration: 240000,
-    } as never);
-    vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
-      id: 10,
-      path: "/music/Artist/Album/track.flac",
-    } as never);
-    vi.mocked(lidarrClient.getRootFolders).mockResolvedValue([
-      { path: "/music/" },
-    ] as never);
-
-    const result = await resolveFilePath(1);
-    expect(result.sourcePath).toContain("Artist");
-    expect(result.sourcePath).toContain("Album");
-    expect(result.sourcePath).toContain("track.flac");
-    expect(result.durationMs).toBe(240000);
+describe("initTempDir", () => {
+  it("creates the temp directory", () => {
+    initTempDir();
+    expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp/bimusic", {
+      recursive: true,
+    });
   });
 
-  it("returns durationMs: 0 when track duration is 0", async () => {
+  it("deletes files found in the temp directory", () => {
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      "file1.mp3",
+      "file2.mp3",
+    ] as never);
+    initTempDir();
+    expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
+  });
+
+  it("handles readdirSync throwing without crashing", () => {
+    vi.mocked(fs.readdirSync).mockImplementation(() => {
+      throw new Error("Dir not found");
+    });
+    expect(() => initTempDir()).not.toThrow();
+  });
+});
+
+describe("resolveFilePath", () => {
+  it("remaps a Lidarr path to MUSIC_LIBRARY_PATH", async () => {
     vi.mocked(lidarrClient.getTrack).mockResolvedValue({
       id: 1,
       hasFile: true,
       trackFileId: 10,
-      duration: 0,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -158,8 +202,10 @@ describe("resolveFilePath", () => {
     ] as never);
 
     const result = await resolveFilePath(1);
-    expect(result.durationMs).toBe(0);
-    expect(result.sourcePath).toContain("Artist");
+    // /music stripped, /c/test-music prepended
+    expect(result).toContain("Artist");
+    expect(result).toContain("Album");
+    expect(result).toContain("track.flac");
   });
 
   it("throws 404 when track has no file", async () => {
@@ -167,7 +213,6 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: false,
       trackFileId: null,
-      duration: 0,
     } as never);
     vi.mocked(lidarrClient.getRootFolders).mockResolvedValue([
       { path: "/music" },
@@ -181,7 +226,6 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: undefined,
-      duration: 0,
     } as never);
     vi.mocked(lidarrClient.getRootFolders).mockResolvedValue([
       { path: "/music" },
@@ -195,7 +239,6 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
-      duration: 0,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -213,7 +256,6 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
-      duration: 0,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -232,7 +274,6 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
-      duration: 0,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -243,12 +284,11 @@ describe("resolveFilePath", () => {
     await expect(resolveFilePath(1)).rejects.toMatchObject({ statusCode: 500 });
   });
 
-  it("caches the Lidarr root path (getRootFolders called only once)", async () => {
+  it("caches the Lidarr root path (getRootFolders called only once across multiple calls)", async () => {
     vi.mocked(lidarrClient.getTrack).mockResolvedValue({
       id: 1,
       hasFile: true,
       trackFileId: 10,
-      duration: 120000,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
@@ -269,19 +309,39 @@ describe("resolveFilePath", () => {
       id: 1,
       hasFile: true,
       trackFileId: 10,
-      duration: 60000,
     } as never);
     vi.mocked(lidarrClient.getTrackFile).mockResolvedValue({
       id: 10,
-      path: "/c/test-music/Artist/track.flac",
+      path: "/c/test-music/Artist/track.flac", // already remapped
     } as never);
     vi.mocked(lidarrClient.getRootFolders).mockResolvedValue([
       { path: "/music" },
     ] as never);
 
     const result = await resolveFilePath(1);
-    expect(result.sourcePath).toBe("/c/test-music/Artist/track.flac");
-    expect(result.durationMs).toBe(60000);
+    expect(result).toBe("/c/test-music/Artist/track.flac");
+  });
+});
+
+describe("getTempFilePath", () => {
+  it("returns a deterministic path based on source and bitrate", () => {
+    const p1 = getTempFilePath("/music/track.flac", 320);
+    const p2 = getTempFilePath("/music/track.flac", 320);
+    expect(p1).toBe(p2);
+    expect(p1).toMatch(/[/\\]tmp[/\\]bimusic/);
+    expect(p1).toMatch(/\.mp3$/);
+  });
+
+  it("returns different paths for different bitrates", () => {
+    const p128 = getTempFilePath("/music/track.flac", 128);
+    const p320 = getTempFilePath("/music/track.flac", 320);
+    expect(p128).not.toBe(p320);
+  });
+
+  it("returns different paths for different source files", () => {
+    const p1 = getTempFilePath("/music/track1.flac", 320);
+    const p2 = getTempFilePath("/music/track2.flac", 320);
+    expect(p1).not.toBe(p2);
   });
 });
 
@@ -304,6 +364,63 @@ describe("isPassthrough", () => {
 
   it("returns false for .ogg files", () => {
     expect(isPassthrough("/music/track.ogg")).toBe(false);
+  });
+});
+
+describe("ensureTranscoded", () => {
+  it("returns temp path when file already exists (no transcoding)", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const result = await ensureTranscoded("/music/track.flac", 320);
+    const expected = getTempFilePath("/music/track.flac", 320);
+    expect(result).toBe(expected);
+    // ffmpeg should NOT have been called
+    expect(mockFfmpegCmd.run).not.toHaveBeenCalled();
+  });
+
+  it("transcodes and returns temp path when file does not exist", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const result = await ensureTranscoded("/music/track.flac", 320);
+    const expected = getTempFilePath("/music/track.flac", 320);
+    expect(result).toBe(expected);
+    expect(mockFfmpegCmd.run).toHaveBeenCalled();
+    expect(mockFfmpegCmd.audioCodec).toHaveBeenCalledWith("libmp3lame");
+    expect(mockFfmpegCmd.audioBitrate).toHaveBeenCalledWith(320);
+  });
+
+  it("throws TRANSCODE_ERROR when ffmpeg fails", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    mockFfmpegCmd.on.mockImplementation(function (
+      this: unknown,
+      event: string,
+      cb: (...args: unknown[]) => void,
+    ) {
+      if (event === "error")
+        setTimeout(() => cb(new Error("ffmpeg crashed")), 0);
+      return this;
+    });
+
+    await expect(
+      ensureTranscoded("/music/track.flac", 320),
+    ).rejects.toMatchObject({
+      code: "TRANSCODE_ERROR",
+    });
+  });
+
+  it("deduplicates concurrent transcode requests (same promise reused)", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    // Both calls should share one ffmpeg invocation
+    const [p1, p2] = await Promise.all([
+      ensureTranscoded("/music/track.flac", 320),
+      ensureTranscoded("/music/track.flac", 320),
+    ]);
+
+    expect(p1).toBe(p2);
+    // ffmpeg cmd.run() should only be called once for the same key
+    expect(mockFfmpegCmd.run).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -377,8 +494,21 @@ describe("serveFile", () => {
     );
   });
 
-  it("returns 416 when start >= fileSize (unsatisfiable)", () => {
-    const req = makeReq("bytes=10000-20000");
+  it("clamps end to fileSize-1 when range end exceeds file size (RFC 7233)", () => {
+    const req = makeReq("bytes=9999-20000"); // end exceeds file size — should be clamped
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(206);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 9999-9999/10000",
+    );
+  });
+
+  it("returns 416 when start is at or beyond file size", () => {
+    const req = makeReq("bytes=10000-10999"); // start >= fileSize
     const res = makeMockRes();
 
     serveFile("/music/track.mp3", req, res as never);
@@ -389,20 +519,6 @@ describe("serveFile", () => {
       "bytes */10000",
     );
     expect(res.end).toHaveBeenCalled();
-  });
-
-  it("clamps end to fileSize-1 per RFC 7233 when start is valid but end overshoots", () => {
-    const req = makeReq("bytes=9999-20000");
-    const res = makeMockRes();
-
-    serveFile("/music/track.mp3", req, res as never);
-
-    expect(res.status).toHaveBeenCalledWith(206);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      "Content-Range",
-      "bytes 9999-9999/10000",
-    );
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Length", 1);
   });
 
   it("returns 400 for malformed Range header (non-bytes unit)", () => {
@@ -421,6 +537,8 @@ describe("serveFile", () => {
 
     serveFile("/music/track.mp3", req, res as never);
 
+    // "bytes=" splits to ["bytes", ""] and range is "" (falsy),
+    // triggering the !range check in serveFile which returns 400.
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
@@ -433,6 +551,34 @@ describe("serveFile", () => {
     expect(res.status).toHaveBeenCalledWith(416);
   });
 
+  it("returns 416 for multi-range requests", () => {
+    const req = makeReq("bytes=0-100, 200-300");
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(416);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes */10000",
+    );
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it("handles suffix range (bytes=-N) returning last N bytes", () => {
+    const req = makeReq("bytes=-500");
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(206);
+    // start = 10000 - 500 = 9500, end = 9999
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 9500-9999/10000",
+    );
+  });
+
   it("sets Accept-Ranges and Content-Type headers always", () => {
     const req = makeReq(undefined);
     const res = makeMockRes();
@@ -441,17 +587,6 @@ describe("serveFile", () => {
 
     expect(res.setHeader).toHaveBeenCalledWith("Accept-Ranges", "bytes");
     expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "audio/mpeg");
-  });
-
-  it("uses custom contentType when provided", () => {
-    const req = makeReq(undefined);
-    const res = makeMockRes();
-
-    serveFile("/music/segment000.ts", req, res as never, {
-      contentType: "video/mp2t",
-    });
-
-    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "video/mp2t");
   });
 
   it("sends 500 on read stream error when headers not yet sent", () => {

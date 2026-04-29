@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -23,8 +21,6 @@ class FullPlayer extends ConsumerStatefulWidget {
 
 class _FullPlayerState extends ConsumerState<FullPlayer> {
   double? _dragValue;
-  double? _seekTargetMs;
-  Timer? _seekFallbackTimer;
   bool _showQueue = false;
 
   String _formatDuration(Duration d) {
@@ -33,10 +29,13 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     return '$m:$s';
   }
 
-  @override
-  void dispose() {
-    _seekFallbackTimer?.cancel();
-    super.dispose();
+  Future<void> _handleSeekEnd(double v, double maxMs) async {
+    final target = Duration(milliseconds: (v * maxMs).round());
+    try {
+      await ref.read(playerNotifierProvider.notifier).seekTo(target);
+    } finally {
+      if (mounted) setState(() => _dragValue = null);
+    }
   }
 
   @override
@@ -47,16 +46,6 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final token = ref.watch(authServiceProvider).accessToken;
     final base = ref.watch(backendUrlProvider).valueOrNull;
     final colorScheme = Theme.of(context).colorScheme;
-
-    ref.listen<AsyncValue<Duration>>(playerPositionProvider, (_, next) {
-      if (_seekTargetMs == null || !mounted) return;
-      final ms = next.valueOrNull?.inMilliseconds.toDouble();
-      if (ms != null && (ms - _seekTargetMs!).abs() < 500) {
-        _seekFallbackTimer?.cancel();
-        _seekTargetMs = null;
-        setState(() => _dragValue = null);
-      }
-    });
 
     final position = positionAsync.valueOrNull ?? Duration.zero;
     final duration = durationAsync.valueOrNull ?? Duration.zero;
@@ -210,24 +199,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   Slider(
                     value: sliderValue.clamp(0.0, 1.0),
                     onChanged: (v) => setState(() => _dragValue = v),
-                    onChangeEnd: (v) {
-                      final targetMs = (v * maxMs).roundToDouble();
-                      ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: targetMs.round()),
-                      );
-                      _seekFallbackTimer?.cancel();
-                      _seekFallbackTimer = Timer(const Duration(milliseconds: 3000), () {
-                        if (!mounted) return;
-                        setState(() {
-                          _seekTargetMs = null;
-                          _dragValue = null;
-                        });
-                      });
-                      setState(() {
-                        _dragValue = v;
-                        _seekTargetMs = targetMs;
-                      });
-                    },
+                    onChangeEnd: (v) => _handleSeekEnd(v, maxMs),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -435,24 +407,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   Slider(
                     value: sliderValue.clamp(0.0, 1.0),
                     onChanged: (v) => setState(() => _dragValue = v),
-                    onChangeEnd: (v) {
-                      final targetMs = (v * maxMs).roundToDouble();
-                      ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: targetMs.round()),
-                      );
-                      _seekFallbackTimer?.cancel();
-                      _seekFallbackTimer = Timer(const Duration(milliseconds: 3000), () {
-                        if (!mounted) return;
-                        setState(() {
-                          _seekTargetMs = null;
-                          _dragValue = null;
-                        });
-                      });
-                      setState(() {
-                        _dragValue = v;
-                        _seekTargetMs = targetMs;
-                      });
-                    },
+                    onChangeEnd: (v) => _handleSeekEnd(v, maxMs),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),

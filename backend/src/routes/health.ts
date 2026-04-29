@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { env } from "../config/env.js";
 
 function readVersion(): string {
   try {
@@ -18,11 +17,7 @@ const version = readVersion();
 const router = Router();
 
 router.get("/", (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: "ok",
-    version,
-    segmentSeconds: env.HLS_SEGMENT_SECONDS,
-  });
+  res.status(200).json({ status: "ok", version });
 });
 
 export default router;
