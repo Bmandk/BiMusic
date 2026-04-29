@@ -54,7 +54,7 @@ function shapeTrack(t: LidarrTrack): Track {
     albumId: t.albumId,
     artistId: t.artistId,
     hasFile: t.hasFile,
-    streamUrl: `/api/stream/${t.id}/playlist`,
+    streamUrl: `/api/stream/${t.id}`,
   };
 }
 

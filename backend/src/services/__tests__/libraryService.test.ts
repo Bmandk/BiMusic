@@ -264,7 +264,7 @@ describe("getAlbumTracks", () => {
       albumId: 10,
       artistId: 1,
       hasFile: true,
-      streamUrl: "/api/stream/100/playlist",
+      streamUrl: "/api/stream/100",
     });
   });
 
@@ -300,7 +300,7 @@ describe("getTrack", () => {
     expect(result).toMatchObject({
       id: 100,
       title: "Test Track",
-      streamUrl: "/api/stream/100/playlist",
+      streamUrl: "/api/stream/100",
     });
   });
 

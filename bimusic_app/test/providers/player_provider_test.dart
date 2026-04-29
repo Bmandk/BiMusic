@@ -9,7 +9,6 @@ import 'package:bimusic_app/models/download_task.dart';
 import 'package:bimusic_app/models/track.dart';
 import 'package:bimusic_app/models/user.dart';
 import 'package:bimusic_app/providers/auth_provider.dart';
-import 'package:bimusic_app/providers/backend_config_provider.dart';
 import 'package:bimusic_app/providers/backend_url_provider.dart';
 import 'package:bimusic_app/providers/bitrate_preference_provider.dart';
 import 'package:bimusic_app/providers/download_provider.dart';
@@ -194,7 +193,6 @@ void main() {
           albumTitle: any(named: 'albumTitle'),
           imageUrl: any(named: 'imageUrl'),
           localFilePaths: any(named: 'localFilePaths'),
-          segmentSeconds: any(named: 'segmentSeconds'),
         )).thenAnswer((_) async {});
     when(() => mockHandler.setVolume(any())).thenAnswer((_) async {});
     when(() => mockHandler.updateToken(any())).thenAnswer((_) async {});
@@ -210,7 +208,6 @@ void main() {
         ),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
         backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
-        backendConfigProvider.overrideWith((_) async => 6),
       ],
     );
   });
@@ -385,7 +382,6 @@ void main() {
             albumTitle: 'Test Album',
             imageUrl: 'http://img.jpg',
             localFilePaths: any(named: 'localFilePaths'),
-            segmentSeconds: 6,
           )).called(1);
     });
 
@@ -408,7 +404,6 @@ void main() {
             albumTitle: any(named: 'albumTitle'),
             imageUrl: any(named: 'imageUrl'),
             localFilePaths: any(named: 'localFilePaths'),
-            segmentSeconds: any(named: 'segmentSeconds'),
           )).called(1);
     });
 
@@ -431,7 +426,6 @@ void main() {
             albumTitle: any(named: 'albumTitle'),
             imageUrl: any(named: 'imageUrl'),
             localFilePaths: any(named: 'localFilePaths'),
-            segmentSeconds: any(named: 'segmentSeconds'),
           )).called(1);
     });
 
@@ -448,7 +442,6 @@ void main() {
           ),
           deviceIdProvider.overrideWith((_) async => 'test-dev'),
           backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
-          backendConfigProvider.overrideWith((_) async => 6),
         ],
       );
       addTearDown(localContainer.dispose);
@@ -472,7 +465,6 @@ void main() {
             albumTitle: any(named: 'albumTitle'),
             imageUrl: any(named: 'imageUrl'),
             localFilePaths: any(named: 'localFilePaths'),
-            segmentSeconds: any(named: 'segmentSeconds'),
           )).called(1);
     });
   });
@@ -520,7 +512,6 @@ void main() {
           ),
           deviceIdProvider.overrideWith((_) async => 'test-dev'),
           backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
-          backendConfigProvider.overrideWith((_) async => 6),
         ],
       );
       addTearDown(localContainer.dispose);
@@ -546,7 +537,6 @@ void main() {
           albumTitle: any(named: 'albumTitle'),
           imageUrl: any(named: 'imageUrl'),
           localFilePaths: {1: '/local/track1.mp3'},
-          segmentSeconds: any(named: 'segmentSeconds'),
         ),
       ).called(1);
     });
@@ -564,7 +554,6 @@ void main() {
         ),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
         backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
-        backendConfigProvider.overrideWith((_) async => 6),
       ]);
       addTearDown(c.dispose);
 
@@ -586,7 +575,6 @@ void main() {
         ),
         deviceIdProvider.overrideWith((_) async => 'test-dev'),
         backendUrlProvider.overrideWith(() => _StubBackendUrlNotifier()),
-        backendConfigProvider.overrideWith((_) async => 6),
       ]);
       addTearDown(c.dispose);
 

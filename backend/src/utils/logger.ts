@@ -1,13 +1,5 @@
 import pino from "pino";
 
-// Redact token query-param values so JWTs never appear in log files.
-// Covers req.query.token (if a full req object is ever logged) and the
-// common manual pattern { url: req.url }.
-const redact: pino.redactOptions = {
-  paths: ["req.query.token", "*.query.token"],
-  censor: "[REDACTED]",
-};
-
 function createLogger() {
   const isDev =
     process.env["NODE_ENV"] === "development" ||
@@ -16,7 +8,6 @@ function createLogger() {
   if (isDev) {
     return pino({
       level: "debug",
-      redact,
       transport: {
         target: "pino-pretty",
         options: { colorize: true },
@@ -24,7 +15,7 @@ function createLogger() {
     });
   }
 
-  return pino({ level: "info", redact });
+  return pino({ level: "info" });
 }
 
 export const logger = createLogger();

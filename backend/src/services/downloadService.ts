@@ -12,7 +12,7 @@ import {
   isPassthrough,
   registerFfmpegCommand,
   unregisterFfmpegCommand,
-} from "./trackFileResolver.js";
+} from "./streamService.js";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 
@@ -221,7 +221,7 @@ export async function processOnePendingDownload(): Promise<void> {
     .run();
 
   try {
-    const { sourcePath } = await resolveFilePath(pending.lidarrTrackId);
+    const sourcePath = await resolveFilePath(pending.lidarrTrackId);
     const outputDir = path.join(env.OFFLINE_STORAGE_PATH, pending.userId);
     mkdirSync(outputDir, { recursive: true });
     const outputPath = getOfflineFilePath(
