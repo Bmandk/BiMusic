@@ -19,18 +19,18 @@ import { getTrack, getTrackFile, getRootFolders } from "./lidarrClient.js";
 import { createError } from "../middleware/errorHandler.js";
 import { logger } from "../utils/logger.js";
 
-// Cached Lidarr root folder path (fetched once on first stream request).
-let lidarrRootPath: string | null = null;
-let lidarrRootPromise: Promise<string> | null = null;
+// Cached Lidarr root folder paths (fetched once on first stream request).
+let lidarrRootPaths: string[] | null = null;
+let lidarrRootPromise: Promise<string[]> | null = null;
 
-/** Reset cached Lidarr root path (for tests). */
+/** Reset cached Lidarr root paths (for tests). */
 export function resetLidarrRootCache(): void {
-  lidarrRootPath = null;
+  lidarrRootPaths = null;
   lidarrRootPromise = null;
 }
 
-async function getLidarrRootPath(): Promise<string> {
-  if (lidarrRootPath !== null) return lidarrRootPath;
+async function getLidarrRootPaths(): Promise<string[]> {
+  if (lidarrRootPaths !== null) return lidarrRootPaths;
   if (lidarrRootPromise !== null) return lidarrRootPromise;
 
   lidarrRootPromise = (async () => {
@@ -44,12 +44,12 @@ async function getLidarrRootPath(): Promise<string> {
         );
       }
       // Normalise: strip trailing slashes for reliable prefix matching.
-      lidarrRootPath = roots[0].path.replace(/[\\/]+$/, "");
+      lidarrRootPaths = roots.map((r) => r.path.replace(/[\\/]+$/, ""));
       logger.info(
-        { lidarrRootPath, musicLibraryPath: env.MUSIC_LIBRARY_PATH },
-        "Cached Lidarr root folder for path remapping",
+        { lidarrRootPaths, musicLibraryPath: env.MUSIC_LIBRARY_PATH },
+        "Cached Lidarr root folders for path remapping",
       );
-      return lidarrRootPath;
+      return lidarrRootPaths;
     } catch (err) {
       lidarrRootPromise = null;
       throw err;
@@ -61,17 +61,21 @@ async function getLidarrRootPath(): Promise<string> {
 
 /**
  * Remap a Lidarr absolute path to the local MUSIC_LIBRARY_PATH.
+ * Uses the longest matching root for multi-root Lidarr setups.
  * e.g. Lidarr returns "/music/Artist/Album/track.flac"
  *      MUSIC_LIBRARY_PATH = "/c/test-music"
  *      → "/c/test-music/Artist/Album/track.flac"
  */
-function remapPath(lidarrFilePath: string, lidarrRoot: string): string {
-  // Normalise separators to forward slashes for comparison.
+function remapPath(lidarrFilePath: string, lidarrRoots: string[]): string {
   const normFile = lidarrFilePath.replace(/\\/g, "/");
-  const normRoot = lidarrRoot.replace(/\\/g, "/");
+  // Pick the longest matching root to handle nested/overlapping root paths.
+  const matchingRoot = lidarrRoots
+    .map((r) => r.replace(/\\/g, "/"))
+    .filter((r) => normFile === r || normFile.startsWith(r + "/"))
+    .sort((a, b) => b.length - a.length)[0];
 
-  if (normFile === normRoot || normFile.startsWith(normRoot + "/")) {
-    const relative = normFile.slice(normRoot.length);
+  if (matchingRoot) {
+    const relative = normFile.slice(matchingRoot.length);
     return path.join(env.MUSIC_LIBRARY_PATH, relative);
   }
   // If already under MUSIC_LIBRARY_PATH, return as-is.
@@ -177,8 +181,8 @@ export async function resolveFilePath(trackId: number): Promise<string> {
     throw createError(404, "NOT_FOUND", "Track file path is not set");
   }
 
-  const lidarrRoot = await getLidarrRootPath();
-  const localPath = remapPath(trackFile.path, lidarrRoot);
+  const lidarrRoots = await getLidarrRootPaths();
+  const localPath = remapPath(trackFile.path, lidarrRoots);
 
   try {
     await access(localPath, constants.R_OK);
@@ -351,6 +355,13 @@ export async function streamTranscoded(
     settled = true;
     inProgressTranscodes.delete(tempPath);
     if (err) {
+      if (!ffmpegEnded) {
+        try {
+          cmd.kill("SIGKILL");
+        } catch {
+          /* ignore */
+        }
+      }
       try {
         unlinkSync(partPath);
       } catch {
@@ -484,16 +495,36 @@ export function serveFile(filePath: string, req: Request, res: Response): void {
       return;
     }
 
-    const [startStr, endStr] = range.split("-");
-    const start = parseInt(startStr, 10);
-    let end = endStr ? parseInt(endStr, 10) : fileSize - 1;
-
-    if (isNaN(start) || isNaN(end) || start >= fileSize || start > end) {
+    // Reject multi-range requests (not worth implementing; clients should use single ranges).
+    if (range.includes(",")) {
       res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).end();
       return;
     }
 
-    end = Math.min(end, fileSize - 1);
+    const [startStr, endStr] = range.split("-");
+    let start: number;
+    let end: number;
+
+    if (startStr === "") {
+      // Suffix range: bytes=-N (last N bytes).
+      const suffixLength = parseInt(endStr, 10);
+      if (isNaN(suffixLength) || suffixLength <= 0) {
+        res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).end();
+        return;
+      }
+      start = Math.max(0, fileSize - suffixLength);
+      end = fileSize - 1;
+    } else {
+      start = parseInt(startStr, 10);
+      end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+
+      if (isNaN(start) || isNaN(end) || start >= fileSize || start > end) {
+        res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).end();
+        return;
+      }
+
+      end = Math.min(end, fileSize - 1);
+    }
 
     const chunkSize = end - start + 1;
     res.status(206);

@@ -551,6 +551,34 @@ describe("serveFile", () => {
     expect(res.status).toHaveBeenCalledWith(416);
   });
 
+  it("returns 416 for multi-range requests", () => {
+    const req = makeReq("bytes=0-100, 200-300");
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(416);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes */10000",
+    );
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it("handles suffix range (bytes=-N) returning last N bytes", () => {
+    const req = makeReq("bytes=-500");
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(206);
+    // start = 10000 - 500 = 9500, end = 9999
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 9500-9999/10000",
+    );
+  });
+
   it("sets Accept-Ranges and Content-Type headers always", () => {
     const req = makeReq(undefined);
     const res = makeMockRes();
