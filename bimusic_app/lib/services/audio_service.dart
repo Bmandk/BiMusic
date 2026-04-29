@@ -99,14 +99,17 @@ class BiMusicAudioHandler extends BaseAudioHandler {
     _imageUrl = imageUrl;
     _localFilePaths = localFilePaths;
 
+    if (tracks.isEmpty) return;
+    final clampedIndex = startIndex.clamp(0, tracks.length - 1);
+
     final sources = tracks.map(_sourceForTrack).toList();
     queue.add(tracks.map(_trackToMediaItem).toList());
-    mediaItem.add(_trackToMediaItem(tracks[startIndex]));
+    mediaItem.add(_trackToMediaItem(tracks[clampedIndex]));
 
     final playlist = ConcatenatingAudioSource(children: sources);
     // preload: false — returns immediately without waiting for duration probe;
     // play() drives the actual load so first bytes reach the client sooner.
-    await _player.setAudioSource(playlist, initialIndex: startIndex, preload: false);
+    await _player.setAudioSource(playlist, initialIndex: clampedIndex, preload: false);
     await _player.play();
   }
 

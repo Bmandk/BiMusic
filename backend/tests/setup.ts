@@ -1,5 +1,7 @@
 // Set environment variables before any module is imported.
 // This file runs as a Vitest setupFile for the integration project.
+import os from 'os';
+import path from 'path';
 
 process.env['PORT'] = '3099';
 process.env['NODE_ENV'] = 'test';
@@ -14,4 +16,4 @@ process.env['MUSIC_LIBRARY_PATH'] = '/music';
 process.env['OFFLINE_STORAGE_PATH'] = './data/offline';
 process.env['ADMIN_USERNAME'] = 'admin';
 process.env['ADMIN_PASSWORD'] = 'adminpassword123';
-process.env['TEMP_DIR'] = '/tmp/bimusic';
+process.env['TEMP_DIR'] = path.join(os.tmpdir(), `bimusic-${process.pid}`);

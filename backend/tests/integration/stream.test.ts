@@ -179,6 +179,17 @@ describe('GET /api/stream/:trackId — auth & validation', () => {
     expect(res.status).toBe(401);
   });
 
+  it('returns 401 for invalid ?token= query param', async () => {
+    const res = await request(app).get('/api/stream/1?token=invalid.token.value');
+    expect(res.status).toBe(401);
+  });
+
+  it('accepts valid JWT via ?token= query param (passes auth, may fail at track lookup)', async () => {
+    nock(LIDARR).get('/api/v1/track/1').reply(404);
+    const res = await request(app).get(`/api/stream/1?token=${token}`);
+    expect(res.status).not.toBe(401);
+  });
+
   it('returns 400 for unsupported bitrate value', async () => {
     const res = await request(app)
       .get('/api/stream/1?bitrate=256')

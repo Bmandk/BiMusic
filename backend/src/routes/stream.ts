@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { authenticate } from "../middleware/auth.js";
+import { createError } from "../middleware/errorHandler.js";
 import {
   resolveFilePath,
   isPassthrough,
@@ -16,30 +17,28 @@ router.get(
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const trackId = parseInt(req.params["trackId"] as string, 10);
-      if (isNaN(trackId)) {
-        res.status(400).json({
-          error: { code: "BAD_REQUEST", message: "Invalid track ID" },
-        });
-        return;
+      const trackIdRaw = req.params["trackId"] as string;
+      if (!/^\d+$/.test(trackIdRaw)) {
+        throw createError(400, "BAD_REQUEST", "Invalid track ID");
       }
+      const trackId = parseInt(trackIdRaw, 10);
 
       const bitrateRaw = req.query["bitrate"];
       let bitrate = 320;
       if (bitrateRaw !== undefined) {
         const bitrateStr =
           typeof bitrateRaw === "string" ? bitrateRaw : String(bitrateRaw);
-        const parsed = parseInt(bitrateStr, 10);
-        if (isNaN(parsed) || !VALID_BITRATES.has(parsed)) {
-          res.status(400).json({
-            error: {
-              code: "BAD_REQUEST",
-              message: "Invalid bitrate. Must be 128 or 320",
-            },
-          });
-          return;
+        if (
+          !/^\d+$/.test(bitrateStr) ||
+          !VALID_BITRATES.has(parseInt(bitrateStr, 10))
+        ) {
+          throw createError(
+            400,
+            "BAD_REQUEST",
+            "Invalid bitrate. Must be 128 or 320",
+          );
         }
-        bitrate = parsed;
+        bitrate = parseInt(bitrateStr, 10);
       }
 
       const sourcePath = await resolveFilePath(trackId);

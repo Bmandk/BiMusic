@@ -60,8 +60,11 @@ void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   // Reduce libmpv demuxer buffer from the default 32 MB to 2 MB to cut
   // initial prebuffer time on Windows/Linux without risking glitches on LAN.
-  JustAudioMediaKit.bufferSize = 2 * 1024 * 1024;
-  JustAudioMediaKit.ensureInitialized();
+  // media_kit backend is only active on desktop platforms.
+  if (isDesktop) {
+    JustAudioMediaKit.bufferSize = 2 * 1024 * 1024;
+    JustAudioMediaKit.ensureInitialized();
+  }
 
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
     await _initBackgroundService();

@@ -494,8 +494,21 @@ describe("serveFile", () => {
     );
   });
 
-  it("returns 416 when range is out of bounds", () => {
-    const req = makeReq("bytes=9999-20000"); // end exceeds file size
+  it("clamps end to fileSize-1 when range end exceeds file size (RFC 7233)", () => {
+    const req = makeReq("bytes=9999-20000"); // end exceeds file size — should be clamped
+    const res = makeMockRes();
+
+    serveFile("/music/track.mp3", req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(206);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Range",
+      "bytes 9999-9999/10000",
+    );
+  });
+
+  it("returns 416 when start is at or beyond file size", () => {
+    const req = makeReq("bytes=10000-10999"); // start >= fileSize
     const res = makeMockRes();
 
     serveFile("/music/track.mp3", req, res as never);

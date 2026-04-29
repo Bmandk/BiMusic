@@ -15,7 +15,17 @@ function createLogger() {
     });
   }
 
-  return pino({ level: "info" });
+  return pino({
+    level: "info",
+    redact: {
+      paths: [
+        "req.headers.authorization",
+        "res.headers.authorization",
+        "req.query.token",
+      ],
+      censor: "[REDACTED]",
+    },
+  });
 }
 
 export const logger = createLogger();

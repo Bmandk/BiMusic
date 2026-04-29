@@ -29,6 +29,15 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     return '$m:$s';
   }
 
+  Future<void> _handleSeekEnd(double v, double maxMs) async {
+    final target = Duration(milliseconds: (v * maxMs).round());
+    try {
+      await ref.read(playerNotifierProvider.notifier).seekTo(target);
+    } finally {
+      if (mounted) setState(() => _dragValue = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final playerState = ref.watch(playerNotifierProvider);
@@ -190,12 +199,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   Slider(
                     value: sliderValue.clamp(0.0, 1.0),
                     onChanged: (v) => setState(() => _dragValue = v),
-                    onChangeEnd: (v) {
-                      ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: (v * maxMs).round()),
-                      );
-                      setState(() => _dragValue = null);
-                    },
+                    onChangeEnd: (v) => _handleSeekEnd(v, maxMs),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -403,12 +407,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   Slider(
                     value: sliderValue.clamp(0.0, 1.0),
                     onChanged: (v) => setState(() => _dragValue = v),
-                    onChangeEnd: (v) {
-                      ref.read(playerNotifierProvider.notifier).seekTo(
-                        Duration(milliseconds: (v * maxMs).round()),
-                      );
-                      setState(() => _dragValue = null);
-                    },
+                    onChangeEnd: (v) => _handleSeekEnd(v, maxMs),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),

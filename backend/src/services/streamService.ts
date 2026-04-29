@@ -34,21 +34,26 @@ async function getLidarrRootPath(): Promise<string> {
   if (lidarrRootPromise !== null) return lidarrRootPromise;
 
   lidarrRootPromise = (async () => {
-    const roots = await getRootFolders();
-    if (roots.length === 0) {
-      throw createError(
-        500,
-        "INTERNAL_ERROR",
-        "No root folders configured in Lidarr",
+    try {
+      const roots = await getRootFolders();
+      if (roots.length === 0) {
+        throw createError(
+          500,
+          "INTERNAL_ERROR",
+          "No root folders configured in Lidarr",
+        );
+      }
+      // Normalise: strip trailing slashes for reliable prefix matching.
+      lidarrRootPath = roots[0].path.replace(/[\\/]+$/, "");
+      logger.info(
+        { lidarrRootPath, musicLibraryPath: env.MUSIC_LIBRARY_PATH },
+        "Cached Lidarr root folder for path remapping",
       );
+      return lidarrRootPath;
+    } catch (err) {
+      lidarrRootPromise = null;
+      throw err;
     }
-    // Normalise: strip trailing slashes for reliable prefix matching.
-    lidarrRootPath = roots[0].path.replace(/[\\/]+$/, "");
-    logger.info(
-      { lidarrRootPath, musicLibraryPath: env.MUSIC_LIBRARY_PATH },
-      "Cached Lidarr root folder for path remapping",
-    );
-    return lidarrRootPath;
   })();
 
   return lidarrRootPromise;
@@ -65,7 +70,7 @@ function remapPath(lidarrFilePath: string, lidarrRoot: string): string {
   const normFile = lidarrFilePath.replace(/\\/g, "/");
   const normRoot = lidarrRoot.replace(/\\/g, "/");
 
-  if (normFile.startsWith(normRoot)) {
+  if (normFile === normRoot || normFile.startsWith(normRoot + "/")) {
     const relative = normFile.slice(normRoot.length);
     return path.join(env.MUSIC_LIBRARY_PATH, relative);
   }
@@ -473,12 +478,14 @@ export function serveFile(filePath: string, req: Request, res: Response): void {
 
     const [startStr, endStr] = range.split("-");
     const start = parseInt(startStr, 10);
-    const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+    let end = endStr ? parseInt(endStr, 10) : fileSize - 1;
 
-    if (isNaN(start) || isNaN(end) || start > end || end >= fileSize) {
+    if (isNaN(start) || isNaN(end) || start >= fileSize || start > end) {
       res.status(416).setHeader("Content-Range", `bytes */${fileSize}`).end();
       return;
     }
+
+    end = Math.min(end, fileSize - 1);
 
     const chunkSize = end - start + 1;
     res.status(206);
