@@ -109,13 +109,21 @@ export function killAllActiveTranscodes(): void {
 /** Create temp dir and clear any leftover files from a previous run. */
 export function initTempDir(): void {
   mkdirSync(env.TEMP_DIR, { recursive: true });
+  let cleaned = 0;
   try {
     for (const file of readdirSync(env.TEMP_DIR)) {
       try {
         unlinkSync(path.join(env.TEMP_DIR, file));
+        cleaned++;
       } catch {
         // ignore individual file errors
       }
+    }
+    if (cleaned > 0) {
+      logger.info(
+        { count: cleaned },
+        "Cleaned up leftover temp files on startup",
+      );
     }
   } catch {
     // ignore if dir was just created

@@ -537,8 +537,8 @@ describe("serveFile", () => {
 
     serveFile("/music/track.mp3", req, res as never);
 
-    // bytes= has no range so it triggers 416 (NaN check)
-    // Actually "bytes=" splits to ["bytes", ""] and range is "" which is falsy
+    // "bytes=" splits to ["bytes", ""] and range is "" (falsy),
+    // triggering the !range check in serveFile which returns 400.
     expect(res.status).toHaveBeenCalledWith(400);
   });
 

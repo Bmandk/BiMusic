@@ -47,6 +47,7 @@ class BiMusicAudioHandler extends BaseAudioHandler {
       playlist,
       initialIndex: index,
       initialPosition: position,
+      preload: false,
     );
     if (wasPlaying) await _player.play();
   }
