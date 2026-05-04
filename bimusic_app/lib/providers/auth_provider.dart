@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,21 +47,54 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> _init() async {
+    dev.log('_init(): starting auth startup check', name: 'BiMusic.Auth');
     final svc = ref.read(authServiceProvider);
     final stored = await svc.readStoredTokens();
+
     if (stored == null) {
-      state = const AuthStateUnauthenticated();
+      // readStoredTokens() requires both tokens. On Windows, the access token
+      // may not persist across restarts while the refresh token does. If we
+      // have a refresh token, attempt a refresh to rebuild the session.
+      final hasRefresh = await svc.hasStoredRefreshToken();
+      if (!hasRefresh) {
+        dev.log('_init(): no stored tokens → unauthenticated', name: 'BiMusic.Auth');
+        state = const AuthStateUnauthenticated();
+        return;
+      }
+      dev.log('_init(): access token missing but refresh token present — attempting refresh', name: 'BiMusic.Auth');
+      final result = await svc.refresh();
+      dev.log('_init(): refresh outcome=${result.outcome.name}', name: 'BiMusic.Auth');
+      switch (result.outcome) {
+        case RefreshOutcome.success:
+          dev.log('_init(): → authenticated (refreshed from refresh-token-only state)', name: 'BiMusic.Auth');
+          state = AuthStateAuthenticated(result.tokens!);
+          _scheduleTokenRefresh(result.tokens!);
+        case RefreshOutcome.rejected:
+          dev.log('_init(): → unauthenticated (refresh rejected)', name: 'BiMusic.Auth');
+          await svc.clearTokens();
+          state = const AuthStateUnauthenticated();
+        case RefreshOutcome.transient:
+          // No access token and network unavailable — can't reconstruct session.
+          dev.log('_init(): → unauthenticated (transient error, no access token to fall back on)', name: 'BiMusic.Auth');
+          state = const AuthStateUnauthenticated();
+      }
       return;
     }
+
+    dev.log('_init(): stored tokens found for user="${stored.user.username}", attempting refresh', name: 'BiMusic.Auth');
     final result = await svc.refresh();
+    dev.log('_init(): refresh outcome=${result.outcome.name}', name: 'BiMusic.Auth');
     switch (result.outcome) {
       case RefreshOutcome.success:
+        dev.log('_init(): → authenticated (refreshed)', name: 'BiMusic.Auth');
         state = AuthStateAuthenticated(result.tokens!);
         _scheduleTokenRefresh(result.tokens!);
       case RefreshOutcome.rejected:
+        dev.log('_init(): → unauthenticated (refresh rejected)', name: 'BiMusic.Auth');
         await svc.clearTokens();
         state = const AuthStateUnauthenticated();
       case RefreshOutcome.transient:
+        dev.log('_init(): → authenticated (transient error, keeping stored session)', name: 'BiMusic.Auth');
         // Network/transport failure on launch — keep stored session alive.
         // The interceptor will refresh when the next request goes out.
         state = AuthStateAuthenticated(stored);
