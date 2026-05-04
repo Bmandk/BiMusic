@@ -56,6 +56,7 @@ void main() {
   group('startup', () {
     test('starts in loading state', () {
       when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken()).thenAnswer((_) async => false);
 
       final state = container.read(authNotifierProvider);
       expect(state, isA<AuthStateLoading>());
@@ -63,6 +64,41 @@ void main() {
 
     test('goes unauthenticated when no stored tokens', () async {
       when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken()).thenAnswer((_) async => false);
+
+      await waitForInit();
+
+      expect(container.read(authNotifierProvider), isA<AuthStateUnauthenticated>());
+    });
+
+    test('authenticates when only refresh token is present and refresh succeeds', () async {
+      when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken()).thenAnswer((_) async => true);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => successResult);
+
+      await waitForInit();
+
+      final state = container.read(authNotifierProvider);
+      expect(state, isA<AuthStateAuthenticated>());
+      expect((state as AuthStateAuthenticated).tokens, testTokens);
+    });
+
+    test('goes unauthenticated when only refresh token is present but refresh is rejected', () async {
+      when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken()).thenAnswer((_) async => true);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => rejectedResult);
+      when(() => mockAuthService.clearTokens()).thenAnswer((_) async {});
+
+      await waitForInit();
+
+      expect(container.read(authNotifierProvider), isA<AuthStateUnauthenticated>());
+      verify(() => mockAuthService.clearTokens()).called(1);
+    });
+
+    test('goes unauthenticated when only refresh token is present but refresh is transient', () async {
+      when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken()).thenAnswer((_) async => true);
+      when(() => mockAuthService.refresh()).thenAnswer((_) async => transientResult);
 
       await waitForInit();
 
@@ -111,6 +147,7 @@ void main() {
   group('login', () {
     setUp(() {
       when(() => mockAuthService.readStoredTokens()).thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken()).thenAnswer((_) async => false);
     });
 
     test('success sets state to authenticated', () async {
@@ -164,6 +201,8 @@ void main() {
     setUp(() {
       when(() => mockAuthService.readStoredTokens())
           .thenAnswer((_) async => null);
+      when(() => mockAuthService.hasStoredRefreshToken())
+          .thenAnswer((_) async => false);
     });
 
     test('immediately calls refresh when access token is already expired',
